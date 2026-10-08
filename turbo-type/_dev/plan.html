@@ -1,0 +1,16 @@
+<script src="../../shared/vendor/three.bundle.js"></script><script src="../track.js"></script>
+<body style="margin:0;background:#222"><canvas id=c width=1800 height=700></canvas><script>
+const c=document.getElementById('c'),x=c.getContext('2d');
+const out=[];
+TT.TRACKS.forEach((d,ti)=>{const t=TT.buildTrack(d);const b=t.bounds;const sc=Math.min(560/(b.x1-b.x0),680/(b.z1-b.z0));const ox=ti*600+20-b.x0*sc+10,oy=10-b.z0*sc;
+ x.lineWidth=d.width*sc;x.strokeStyle='#777';x.beginPath();for(let i=0;i<=t.N;i++){const j=i%t.N;const px=t.X[j]*sc+ox,pz=t.Z[j]*sc+oy;i?x.lineTo(px,pz):x.moveTo(px,pz)}x.stroke();
+ x.lineWidth=2;for(let i=0;i<t.N;i+=1){const k=Math.abs(t.K[i]);x.fillStyle=k>1/40?'#f44':k>1/80?'#fa0':'#4f4';x.fillRect(t.X[i]*sc+ox-1,t.Z[i]*sc+oy-1,3,3)}
+ x.fillStyle='#fff';x.fillRect(t.X[0]*sc+ox-4,t.Z[0]*sc+oy-4,8,8);
+ for(const j of t.jumps){const o={};t.at(j.s0,o);x.fillStyle='#0ff';x.fillRect(o.x*sc+ox-4,o.z*sc+oy-4,8,8)}
+ // self-proximity
+ let mind=1e9,ma=0,mb=0;for(let i=0;i<t.N;i+=3)for(let j=i+1;j<t.N;j+=3){const dd=Math.min(j-i,t.N-(j-i))*t.step;if(dd<120)continue;const d=Math.hypot(t.X[i]-t.X[j],t.Z[i]-t.Z[j]);if(d<mind){mind=d;ma=i;mb=j}}
+ x.fillStyle='#fff';x.font='14px monospace';x.fillText(d.id+' L='+t.L.toFixed(0)+' minR='+t.minRadius.toFixed(0)+'@'+t.minRadiusAt.toFixed(0)+' selfgap='+mind.toFixed(0)+'@'+(ma*t.step).toFixed(0)+'/'+(mb*t.step).toFixed(0),ti*600+10,690);
+ if(mind<40){x.strokeStyle='#f0f';x.lineWidth=2;x.beginPath();x.arc(t.X[ma]*sc+ox,t.Z[ma]*sc+oy,10,0,7);x.stroke()}
+});
+window.done=1;
+</script>

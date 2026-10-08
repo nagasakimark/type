@@ -1,0 +1,23 @@
+<style>html,body{margin:0;height:100%;overflow:hidden;background:#000}canvas{width:100vw;height:100vh;display:block}</style>
+<script src="../../shared/vendor/three.bundle.js"></script><script src="../track.js"></script><script src="../world.js"></script>
+<canvas id=c></canvas><script>
+const q=new URLSearchParams(location.search);
+(async()=>{
+ const w=new TT.World(document.getElementById('c'));window.w=w;
+ TT.MODEL_BASE='../../assets/kenney/turbo-type/models/';await TT.Models.load();
+ const def=TT.TRACKS.find(t=>t.id===(q.get('track')||'sunny'));const track=TT.buildTrack(def);window.track=track;console.log(JSON.stringify({L:track.L,jumps:track.jumps,pads:track.pads,feats:track.feats}));
+ const t0=performance.now();w.build(track);console.log('build ms',performance.now()-t0, 'trees',w.treeCount);
+ const s=+q.get('s')||0, view=q.get('view')||'chase', o={};track.at(s,o);
+ const TINT={raceCarOrange:{mat:'pylon',color:0xff7a1a},raceCarRed:{mat:'red',color:0xe5383b},raceCarGreen:{mat:'grass',color:0x2bb673},raceCarWhite:{mat:'grey',color:0x5aa8ff}};const names=['raceCarOrange','raceCarRed','raceCarGreen','raceCarWhite'];
+ names.forEach((n,i)=>{const c=w.addCar(n,TINT[n],def.theme.id==='night');track.at(s+i*8-4,o);const lat=(i%2?4.5:-4.5);const yaw=Math.atan2(o.fx,o.fz);
+  const x=o.x+o.rx*lat,z=o.z+o.rz*lat,y=track.roadY(s+i*8-4,lat);w.poseCar(c,x,y,z,yaw,0,0,i==0?+q.get('fl')||0:0);w.shadowPose(c,x,y,z,yaw,1,0.7);});
+ track.at(s,o);const cam=w.camera;
+ if(view==='chase'){cam.position.set(o.x-o.fx*14,o.y+6,o.z-o.fz*14);cam.lookAt(o.x+o.fx*20,o.y+1,o.z+o.fz*20);}
+ else if(view==='top'){cam.position.set(o.x,o.y+90,o.z+1);cam.lookAt(o.x,o.y,o.z);}
+ else if(view==='front'){cam.position.set(o.x+o.fx*16+o.rx*8,o.y+4,o.z+o.fz*16+o.rz*8);cam.lookAt(o.x,o.y+1,o.z);}
+ else if(view==='side'){cam.position.set(o.x+o.rx*16,o.y+5,o.z+o.rz*16+0);cam.lookAt(o.x,o.y+1,o.z);}
+ else if(view==='far'){cam.position.set(o.x-o.fx*70+o.rx*40,o.y+40,o.z-o.fz*70+o.rz*40);cam.lookAt(o.x+o.fx*20,o.y,o.z+o.fz*20);}
+ cam.position.y+=+q.get('cyoff')||0;
+ w.resize();w.render(1,0);w.render(1,0);window.done=1;
+})();
+</script>

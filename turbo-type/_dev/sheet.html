@@ -1,0 +1,10 @@
+<style>body{margin:0}</style><script src="../../shared/vendor/three.bundle.js"></script><body><script>
+const names=['raceCarRed','raceCarGreen','raceCarOrange','raceCarWhite','treeLarge','treeSmall','grandStand','grandStandCovered','grandStandRound','grandStandAwning','barrierRed','barrierWhite','barrierWall','fenceStraight','flagCheckers','flagCheckersSmall','flagGreen','flagRed','bannerTowerRed','bannerTowerGreen','lightPostLarge','lightPostModern','lightRedDouble','overhead','overheadLights','overheadRound','overheadRoundColored','pylon','tent','tentClosed','billboard','billboardLow','pitsGarage','pitsOffice','roadRamp','ramp','lightColored'];
+const R=new THREE.WebGLRenderer({antialias:true});R.setSize(1600,1000);document.body.append(R.domElement);
+R.outputColorSpace=THREE.SRGBColorSpace;
+const sc=new THREE.Scene();sc.background=new THREE.Color(0x9fd3ff);
+sc.add(new THREE.HemisphereLight(0xffffff,0x889988,1.6));const dl=new THREE.DirectionalLight(0xffffff,2);dl.position.set(3,6,4);sc.add(dl);
+const L=new THREE.GLTFLoader();let i=0;const cols=8;
+Promise.all(names.map((n,i)=>new Promise(r=>L.load('../../assets/kenney/turbo-type/models/'+n+'.glb',g=>{const o=g.scene;const b=new THREE.Box3().setFromObject(o);const c=b.getCenter(new THREE.Vector3());o.position.set(-c.x,-b.min.y,-c.z);const w=new THREE.Group();w.add(o);w.position.set((i%cols)*3,0,Math.floor(i/cols)*3);w.rotation.y=0.6;sc.add(w);r()}))))
+.then(()=>{const cam=new THREE.PerspectiveCamera(30,1.6,1,200);cam.position.set(10.5,34,34);cam.lookAt(10.5,0,5.5);R.render(sc,cam);window.done=1});
+</script>

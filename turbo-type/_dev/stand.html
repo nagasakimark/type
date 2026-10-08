@@ -1,0 +1,5 @@
+<script src="../../shared/vendor/three.bundle.js"></script><script src="../track.js"></script><script src="../world.js"></script><script>
+(async()=>{TT.MODEL_BASE='../../assets/kenney/turbo-type/models/';await TT.Models.load();const out={};
+for(const n of ['grandStand','grandStandCovered','pitsGarage','billboard']){const m=TT.Models.get(n);out[n]=m.parts.map(p=>{p.geo.computeBoundingBox();const b=p.geo.boundingBox;return p.mat.name+' '+[b.min.x,b.min.y,b.min.z,b.max.x,b.max.y,b.max.z].map(v=>v.toFixed(2)).join(',')+' n='+p.geo.attributes.position.count})}
+console.log(JSON.stringify(out,null,1));window.done=1})();
+</script>

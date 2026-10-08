@@ -36,3 +36,9 @@ untested, no real-GPU frame-rate measurement anywhere - test on a school laptop)
 Playwright (chromium preinstalled; swiftshader flags for turbo-type) against `python3 -m http.server`; a smoke script that
 loads each game at 1920x1080 and 3440x1080 and prints console errors; per-game agents with a shared brief; commit and push
 after every agent returns so work can't be lost.
+
+
+## Handoff update (latest session)
+Done: Star Sweep targeting fix; TM.Adapt rubber-band in all 5 games (shared/adapt.js, Gentle/Normal/Turbo = target success + push + pace); Word Jumper hero picker + zombie unlock (tools/make_heroes.py); Word Ninja flood fix; Teacher QR modal; Japanese UI everywhere (hub, framework, all games; font subset rebuilt via assets/fonts/build-subset.py with subset-chars.txt; check new UI kanji exist in that file); fit-to-window title/results/how-to via TM.ui.fit; progress tracking (TM.progress) on picker/results/hub.
+Dev tools: ?speed=N, ?bot=cps,err,think; tools/sim.py <game> <diff> <cps> <err> <think> [wall] [speed]; star-sweep/_dev/regress_targeting.py.
+Still open: Star Sweep weapon progression/upgrades; Ink Rush harbour props (containers on quays, boats on water) + spline camera route; picker re-check at all sizes; Word Ninja combo paths; real-GPU frame rate; shared g.wordDone popups. Rooftop Rascal stays disabled.

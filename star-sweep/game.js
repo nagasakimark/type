@@ -38,7 +38,7 @@
       popFn,
       t: 0, mode: 'fight', sector: 0, wave: 0, perSector: perSectorFor(g), L: 0, plan: null, queue: [], spawnT: 2, uid: 0,
       enemies: [], bolts: [], shots: [], F: null,
-      lockT: null, lastFire: { e: null, t: -9 },
+      lockT: null, lockMiss: 0, lastFire: { e: null, t: -9 },
       ship: { x: SX, y: 880, rot: 0, slide: 0, recoil: 0, shieldHit: 0, hullHit: 0, hitAng: 0, gunSide: 1, flamePh: 0 },
       shield: 100, hull: 100, shieldDelay: 0, inv: 0, slow: 0, dbl: 0, timeScale: 1, slowmo: 0, pace: 1,
       pulse: 1, flash: { a: 0, c: '#fff' }, banner: null, bq: [], bGap: 0, pops: [], comboFlash: null, audit: null, warp: 0, clearT: 0, map: null, vt: 0, dying: 0, boss: null, bossFx: [],
@@ -81,7 +81,7 @@
      ship that no longer existed - nothing seemed to work until that hidden word was finished.) */
   function clearField(g) {
     for (const e of S.enemies) { e.locked = false; if (e.alive && e.type === 'powerup') SS.fx.ring(e.x, e.y, 150, '#ffffff', 0.3); }
-    S.lockT = null; S.enemies.length = 0; S.bolts.length = 0; S.shots.length = 0; S.timers.length = 0; S.beams.length = 0;
+    S.lockT = null; S.lockMiss = 0; S.enemies.length = 0; S.bolts.length = 0; S.shots.length = 0; S.timers.length = 0; S.beams.length = 0;
     S.lastFire = { e: null, t: -9 }; S.missRun = 0; S.gen++; S.boss = null; S.chain = { n: 0, t: 0 };
   }
   function startWave(g) {
@@ -338,19 +338,39 @@
     e.locked = false; S.lockT = null;
     if (!e.keepProgress && !e.typer.done && e.typer.pos > 0 && !keepProgress) { const errs = e.typer.errors; e.typer = new TM.Typer(e.typer.item); e.typer.errors = errs; }
   }
+  /* a ship whose word starts with k (fresh word, or a big ship's next phrase not yet started) - most dangerous first */
+  function pickFresh(k, exclude) {
+    let best = null;
+    for (const e of S.enemies) if (e !== exclude && canType(e) && e.typer.pos === 0 && e.typer.wouldAccept(k) && (!best || (e.danger || 0) > (best.danger || 0))) best = e;
+    return best;
+  }
+  /* resume a big ship (ace / boss) part-way through its sentence */
+  function pickResume(k) {
+    let best = null;
+    for (const e of S.enemies) if (canType(e) && e.keepProgress && e.typer.pos > 0 && e.typer.wouldAccept(k) && (!best || (e.danger || 0) > (best.danger || 0))) best = e;
+    return best;
+  }
   function press(g, k) {
     if (S.mode === 'map') { if (k === ' ' && S.map.t > 1.5) S.map.t = Math.max(S.map.t, 5.6); return; }
     if (S.mode !== 'fight' && S.mode !== 'clear') return;
-    const F = S.F; let t = S.lockT;
-    if (t && (!t.alive || t.doomed)) { release(true); t = null; }
+    let t = S.lockT;
+    if (t && (!t.alive || t.doomed || !canType(t))) { release(true); t = null; }
+    /* Locks must never trap a kid (v2 bug: in the mini-boss wave the ace's long sentence kept the lock, so letters typed at the
+       other ships were swallowed until the sentence was done). Big targets (ace / boss, keepProgress) are SOFT locks: a key that
+       doesn't fit them but starts another ship's word switches the lock (the big target keeps its progress). A normal word lets
+       go after 2 wrong keys in a row if another ship starts with the key. */
+    if (t && !t.typer.wouldAccept(k)) {
+      const other = pickFresh(k, t);
+      if (other && (t.keepProgress || S.lockMiss >= 1)) { release(t.keepProgress); t = null; }
+      else S.lockMiss++;
+    }
     let res, tgt;
-    if (t) { tgt = t; res = t.typer.feed(k); }
+    if (t) { tgt = t; res = t.typer.feed(k); if (res !== 'miss') S.lockMiss = 0; }
     else {
-      const c = S.enemies.filter((e) => canType(e) && e.typer.wouldAccept(k) && (e.typer.pos === 0 || e.keepProgress));
-      if (!c.length) { g.keyResult('miss'); missFire(); return; }
-      c.sort((a, b) => (b.danger || 0) - (a.danger || 0));
-      tgt = c[0]; res = tgt.typer.feed(k);
-      S.lockT = tgt; tgt.locked = true;
+      tgt = pickFresh(k, null) || pickResume(k);
+      if (!tgt) { g.keyResult('miss'); missFire(); return; }
+      res = tgt.typer.feed(k);
+      S.lockT = tgt; tgt.locked = true; S.lockMiss = 0;
       snd('computer', { vol: 0.12, rate: 1.6 + rnd(0, 0.3) });
     }
     g.keyResult(res);
@@ -1144,7 +1164,7 @@
     spawn: (t, n) => { for (let i = 0; i < (n || 1); i++) spawn(G, t); },
     power: (k) => spawnPower(G, undefined, undefined, k),
     ace: () => spawnAce(G),
-    goto: (sector, wave) => { S.enemies.length = 0; S.shots.length = 0; S.bolts.length = 0; S.lockT = null; S.sector = sector; S.wave = wave; S.perSector = perSectorFor(G); SS.bg.set(sector); startWave(G); },
+    goto: (sector, wave) => { clearField(G); S.sector = sector; S.wave = wave; S.perSector = perSectorFor(G); SS.bg.set(sector); startWave(G); },
     set: (o) => Object.assign(S, o),
     god: (on) => { S.god = on; },
     auto: (cps, err, think) => { S.auto = cps ? { cps, err: err || 0, think: think ?? 0.3, acc: 0 } : null; },

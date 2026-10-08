@@ -70,14 +70,32 @@
     /* ---------- loop ---------- */
     let last = performance.now(), acc = 0, countdown = 0;
     const STEP = 1 / 60;
+    /* dev/test only: ?speed=N runs the sim N times faster, ?bot=cps,err,think types for you (real game logic, no shortcuts) */
+    const DEVSPEED = Math.max(1, Math.min(8, +U.qs('speed') || 1));
+    const BOTQ = (U.qs('bot') || '').split(',').map(Number);
+    const bot = BOTQ[0] > 0 ? { cps: BOTQ[0], err: BOTQ[1] || 0, think: BOTQ[2] != null && !isNaN(BOTQ[2]) ? BOTQ[2] : 0.5, acc: 0, wait: 0, keys: 0 } : null;
+    g.devBot = bot;
+    function runBot(dt) {
+      if (!bot || g.state !== 'play' || !def.nextKey) return;
+      if (bot.wait > 0) { bot.wait -= dt; return; }
+      bot.acc += dt * bot.cps;
+      while (bot.acc >= 1) {
+        bot.acc -= 1;
+        const w0 = g.score.wordsDone; let k = def.nextKey(g);
+        if (!k) { bot.acc = 0; break; }
+        if (Math.random() < bot.err) k = 'abcdefghijklmnopqrstuvwxyz'[Math.floor(Math.random() * 26)];
+        bot.keys++; def.onKey(g, k.toLowerCase());
+        if (g.score.wordsDone !== w0) { bot.wait = bot.think * (0.7 + Math.random() * 0.6); bot.acc = 0; break; }
+      }
+    }
     function frame(now) {
       requestAnimationFrame(frame);
       let dt = Math.min(0.1, (now - last) / 1000); last = now;
       if (g.state !== 'paused') {
-        acc += dt;
+        acc += dt * DEVSPEED;
         let n = 0;
-        while (acc >= STEP && n < 6) { tick(STEP); acc -= STEP; n++; }
-        if (n === 6) acc = 0;
+        while (acc >= STEP && n < 6 * DEVSPEED) { tick(STEP); acc -= STEP; n++; }
+        if (n === 6 * DEVSPEED) acc = 0;
       }
       render();
     }
@@ -91,6 +109,7 @@
       }
       if (g.state === 'play') g.playT += dt;
       def.update(g, dt);
+      runBot(dt);
       g.fx.update(dt);
       hud.update();
       kbd.update();

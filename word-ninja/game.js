@@ -43,11 +43,15 @@
       level: 1, maxLevel: ml, bosses: bossLevels(g), phase: 'intro', phaseT: 0, waves: [], waveIdx: 0, waveWait: 0, resolved: 0, total: 1,
       lives: lv, maxLives: lv, chain: 0, lastSlice: -9, frenzy: 0, ice: 0, ts: 1, freeze: 0, slow: 0,
       sliced: 0, bossesDown: 0, mercy: 0, lastKind: '', demoT: 1.2, px: 0, focus: W / 2, boss: null, bossT: 0, music: 'main', lvlMisses: 0, perfect: true,
-      lockWarn: 0, pace: perWord(g) * 0.9, lastKeyT: -9,
+      lockWarn: 0, lastDone: 0, ad: new TM.Adapt(g.diff), lastKeyT: -9,
     };
+    g.ad = S.ad; WN.dbg = () => S;
     if (!g.demo) startLevel(g, Math.max(1, Math.min(ml, +U.qs('wnlevel') || 1)));
   }
-  const stage = () => (S.maxLevel > 1 ? (S.level - 1) / (S.maxLevel - 1) : 0);
+  /* word difficulty ladder: level progress, nudged by how hard the rubber band currently is (struggling players get shorter words) */
+  const stage = () => U.clamp((S.maxLevel > 1 ? (S.level - 1) / (S.maxLevel - 1) : 0) + (S.ad ? (S.ad.load - 0.4) * 0.4 : 0), 0, 1);
+  /* seconds per character the player is asked for right now (adaptive: the rubber band owns this) */
+  const pcNow = () => U.clamp(1 / S.ad.demand, 0.12, 1.1);
   const perWord = (g) => (g.diff === 'gentle' ? 0.8 : g.diff === 'turbo' ? 0.42 : 0.56);
   const hudBottom = (g) => { const v = g.vw(); return v.y + 118 * (v.w / window.innerWidth); };
   const aliveFruits = () => S.fruits.filter((f) => f.alive);
@@ -130,7 +134,7 @@
   }
   function airtime(g, len, o = {}) {
     const lv = Math.max(0.78, 1 - 0.04 * (S.level - 1));
-    const pc = U.clamp(S.pace * 1.25, perWord(g) * 0.78, perWord(g) * 1.5);
+    const pc = pcNow();
     let T = (2.6 + len * pc) * lv * (1 + S.mercy) + (o.extra || 0);
     if (o.mul) T *= o.mul;
     return U.clamp(T, 2.6, 15);
@@ -147,7 +151,7 @@
     const sc = o.phrase ? 1.18 : 1;
     const size = K.size * sc;
     const f = {
-      type, kind, size, sc, r: size * (kind === 'banana' || kind === 'golden' ? 0.3 : 0.46), item, typer: new TM.Typer(item), alive: true, locked: false,
+      bornPerf: performance.now(), type, kind, size, sc, r: size * (kind === 'banana' || kind === 'golden' ? 0.3 : 0.46), item, typer: new TM.Typer(item), alive: true, locked: false,
       x: 0, y: 0, vx: 0, vy: 0, g: 0, rot: U.rand(-0.5, 0.5), vr: U.rand(1.5, 4) * (Math.random() < 0.5 ? -1 : 1), hit: 0, danger: 0, born: S.t, free: !!o.free, seed: Math.random() * 9,
       T: o.T, phrase: !!o.phrase,
     };
@@ -165,7 +169,7 @@
     else if (S.frenzy > 0) item = pickItem(g, { maxLen: 4 });
     else item = pickItem(g);
     const phrase = !!item.phrase || item.kind === 'sentence';
-    const extra = o.grp ? o.grp.sum * U.clamp(S.pace * 1.25, perWord(g) * 0.78, perWord(g) * 1.5) * (o.gf || 0.8) : 0;
+    const extra = o.grp ? o.grp.sum * pcNow() * (o.gf || 0.8) : 0;
     if (o.grp) o.grp.sum += item.len;
     const T = airtime(g, item.len, { extra, mul: type === 'golden' ? 1.2 : type === 'bomb' ? 0.8 : S.frenzy > 0 ? 1.05 : 1 });
     return newFruit(g, Object.assign({}, o, { type, item, phrase: type === 'fruit' && phrase, T }));
@@ -225,7 +229,7 @@
     g.keyResult(result);
     if (!target) return;
     if (result === 'miss') { if (target.type === 'bomb') target.typer.shake = 0.6; return; }
-    if (!g.demo && target.type !== 'bomb') { const dk = g.t - S.lastKeyT; if (dk < 1.3 && dk > 0.05) S.pace = U.clamp(U.lerp(S.pace, dk, 0.1), 0.25, 1.0); S.lastKeyT = g.t; }
+    if (!g.demo && target.type !== 'bomb') { S.lastKeyT = g.t; if (target.k0 == null) target.k0 = S.t; }
     target.hit = 1;
     if (target.type === 'bomb') {
       if (result !== 'done' && S.lockWarn <= 0) { S.lockWarn = 2.2; g.fx.pop(target.x, target.y - 150, 'くさい！ BackSpaceで はなれよう', { color: BOMB_ACCENT, size: 44, life: 1.4 }); }
@@ -280,6 +284,7 @@
     const frenzy = S.frenzy > 0;
     g.wordDone(f.typer, f.x, f.y - f.r - 30, { bonus: (frenzy ? 2 : 1) * (boss ? 3 : 1), color: frenzy ? C.gold : '#fff' });
     S.sliced++; S.resolved++;
+    if (!boss && f.type === 'fruit' && f.k0 != null) { S.ad.word(f.typer.typedReq || f.item.len, S.t - f.k0, f.typer.errors, f.k0 - f.born - 0.8, S.t - Math.max(S.lastDone, f.born + 0.9), (f.born + f.T - S.t) / f.T); S.lastDone = S.t; }
     S.mercy = Math.max(0, S.mercy - 0.03);
     if (S.chain >= 2) chainReward(g, f);
 
@@ -435,7 +440,7 @@
     WN.snd('slice', { vol: 0.25, rate: 0.7 });
     if (g.demo || g.state !== 'play') return;
     if (f.type === 'golden' || f.type === 'ice') { g.fx.pop(f.x, FLOOR_HIT - 200, 'にげられた！', { color: '#fff', size: 44, life: 1.1 }); S.resolved++; return; }
-    S.resolved++;
+    S.resolved++; S.ad.fail();
     if (window.__wndbg) console.log('MISS', f.item.t, f.item.len, 'T', f.T && f.T.toFixed(1), 'life', (S.t - f.born).toFixed(1), 'prog', f.typer.progress.toFixed(2), 'alive', S.fruits.length);
     g.missWord(f.item);
     if (f.free || S.frenzy > 0) { g.fx.pop(f.x, FLOOR_HIT - 190, 'ベチャッ！', { color: '#fff', size: 44, life: 0.9 }); return; }
@@ -498,10 +503,15 @@
     // frenzy storm
     if (S.frenzy > 0) {
       S.stormT -= wdt;
-      if (S.stormT <= 0 && alive < 8) {
-        S.stormT = U.rand(0.5, 0.8);
-        const n = U.randi(2, 3), x0 = U.rand(500, 1400), cx = U.rand(700, 1200);
-        for (let i = 0; i < n; i++) { const it = pickItem(g, { maxLen: 4 }); newFruit(g, { item: it, T: airtime(g, it.len, { extra: i * 0.7, mul: 1.1 }), x0, xa: U.clamp(cx + (i - (n - 1) / 2) * 280, 280, 1640), apex: U.rand(380, 520), free: true }); }
+      if (S.stormT <= 0 && alive < Math.round(S.ad.pick(3, 6))) {
+        /* fever is a bonus, not a flood: only as many short words as this player can actually clear right now */
+        const per = 3.6, n = Math.min(U.randi(2, 3), Math.floor((workRoom(g) + S.ad.demand) / per));
+        if (n < 1) S.stormT = 0.3;
+        else {
+          S.stormT = (n * per) / (S.ad.demand * 1.2) * U.rand(0.85, 1.1);
+          const x0 = U.rand(500, 1400), cx = U.rand(700, 1200);
+          for (let i = 0; i < n; i++) { const it = pickItem(g, { maxLen: 4 }); newFruit(g, { item: it, T: airtime(g, it.len, { extra: i * 0.7, mul: 1.1 }), x0, xa: U.clamp(cx + (i - (n - 1) / 2) * 280, 280, 1640), apex: U.rand(380, 520), free: true }); }
+        }
       }
     }
     switch (S.phase) {
@@ -515,10 +525,16 @@
           const w = S.waves[S.waveIdx];
           const free = alive === 0 && S.queue.length === 0;
           if (free && S.waveWait > 0.5) S.waveWait = 0.5;
-          if (S.waveWait <= 0 && (free || loadSec() + waveEst(w) < 4.6 + S.level * 0.35) && alive + S.queue.length + w.n <= capFor(g) + (w.n === 0 ? 3 : 0) + (alive === 0 ? 9 : 0)) {
-            launchWave(g, w); S.waveIdx++;
-            const gap = Math.max(1.2, 3.3 - 0.25 * S.level) * (g.diff === 'gentle' ? 1.3 : g.diff === 'turbo' ? 0.8 : 1);
-            S.waveWait = gap;
+          const room = workRoom(g), per = avgLen(g), capNow = Math.max(2, Math.round(S.ad.pick(2, capFor(g))));
+          if (S.waveWait <= 0) {
+            let n = w.n;
+            if (n > 0) n = Math.max(free ? 1 : 0, Math.min(n, Math.floor(room / per), capNow - alive - S.queue.length));
+            if (w.n === 0 ? (room > per || free) : n >= 1) {
+              if (n !== w.n) { S.total -= Math.max(0, w.n - n); w.n = n; if (n === 1 && w.type !== 'bomb') w.type = 'single'; }
+              launchWave(g, w); S.waveIdx++;
+              const gap = Math.max(1.2, 3.3 - 0.25 * S.level) * S.ad.pick(g.diff === 'gentle' ? 1.5 : 1.25, g.diff === 'turbo' ? 0.7 : 0.85);
+              S.waveWait = gap;
+            }
           }
         } else if (S.queue.length === 0 && alive === 0 && !S.fruits.some((f) => f.alive && f.type !== 'bomb')) {
           if (S.bosses.includes(S.level)) { S.phase = 'bossIntro'; S.phaseT = 0; addBanner(g, 'ちゅうい！', 'おおきな スイカが くるよ！', ['watermelon'], { big: true, y: 420, life: 2.4, color: '#FF6B7A' }); WN.snd('thud', { vol: 0.6, rate: 0.6 }); setMusic('boss'); }
@@ -543,8 +559,10 @@
         break;
     }
   }
-  function waveEst(w) { return (w.n === 0 ? 2 : w.n * 5) * U.clamp(S.pace * 1.1, 0.3, 1.0); }
-  function loadSec() { let n = 0; for (const f of S.fruits) if (f.alive && (f.type === 'fruit' || f.type === 'boss')) n += f.typer.item.len * (1 - f.typer.progress); for (const q of S.queue) n += 5; return n * U.clamp(S.pace * 1.1, 0.3, 1.0); }
+  /* typing work (characters) still on screen or queued, and how much more the player can be given right now */
+  function avgLen(g) { const t = g.ladder(stage()).tier; return t === 1 ? 4.2 : t === 2 ? 6.2 : 8.5; }
+  function workNow(g) { let n = 0; for (const f of S.fruits) if (f.alive && (f.type === 'fruit' || f.type === 'boss')) n += f.typer.item.len * (1 - f.typer.progress); for (const q of S.queue) n += avgLen(g); return n; }
+  function workRoom(g) { const horizon = S.ad.pick(3.4, 5.6) + 0.12 * S.level; return Math.max(0, horizon * S.ad.demand - workNow(g)); }
   function levelClear(g) {
     const bonus = 100 * S.level + (S.perfect ? 200 : 0);
     g.score.add(bonus);

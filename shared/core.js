@@ -60,6 +60,36 @@
   if (U.qs('quiet') === '1') { TM.settings.music = 0; TM.settings.sfx = 0; }
   if (['gentle', 'normal', 'turbo'].includes(U.qs('diff'))) TM.settings.difficulty = U.qs('diff');   // teacher links can pick the mode (not saved)
   TM.saveSettings = () => TM.store.set('settings', TM.settings);
+  try { if (window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches) TM.settings.reduceMotion = true; } catch (e) { /* ignore */ }
+
+  /* ---------- progress: which word lists (decks) a student has cleared in which game ----------
+     stored as { deckId: { gameId: { n: times cleared, stars: best stars, t: last time } } }. A deck counts as DONE once it is cleared in
+     at least one game; the per-game ticks show where. */
+  TM.GAMES = [
+    { id: 'word-jumper', name: 'Word Jumper', short: 'ジャンプ', c: '#6CCB3C' }, { id: 'word-ninja', name: 'Word Ninja', short: 'ニンジャ', c: '#2F9BFF' },
+    { id: 'star-sweep', name: 'Star Sweep', short: 'うちゅう', c: '#7B5CFF' }, { id: 'turbo-type', name: 'Turbo Type', short: 'レース', c: '#FF7A1A' },
+    { id: 'ink-rush', name: 'Ink Rush', short: 'インク', c: '#FF3EA5' },
+  ];
+  TM.progress = {
+    GAMES: ['word-jumper', 'word-ninja', 'star-sweep', 'turbo-type', 'ink-rush'],
+    all() { return TM.store.get('progress', {}); },
+    record(gameId, deckIds, stars) {
+      const all = this.all(); let fresh = [];
+      for (const id of deckIds) {
+        const d = (all[id] = all[id] || {}), r = d[gameId];
+        if (!r) fresh.push(id);
+        d[gameId] = { n: (r ? r.n : 0) + 1, stars: Math.max(r ? r.stars : 0, stars || 0), t: Date.now() };
+      }
+      TM.store.set('progress', all); return fresh;
+    },
+    games(deckId) { const d = this.all()[deckId] || {}; return this.GAMES.filter((g) => d[g]); },
+    done(deckId) { return this.games(deckId).length > 0; },
+    book(book) { // { done, total, pct }
+      const total = book.decks.length; let done = 0; const all = this.all();
+      for (const id of book.decks) if (all[id] && Object.keys(all[id]).length) done++;
+      return { done, total, pct: total ? Math.round((done / total) * 100) : 0 };
+    },
+  };
 
   TM.records = {
     key: (game, deckKey, diff) => `rec.${game}.${deckKey}.${diff}`,

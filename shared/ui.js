@@ -32,6 +32,19 @@
   }
   const isModalOpen = () => openCount > 0;
 
+  /* ---------- fit: scale a fixed-size UI block so it always fits the window with no scrolling (800x500 .. 3440x1440) ---------- */
+  const fits = new Set();
+  function doFit(box, o) {
+    if (!box.isConnected) { fits.delete(box); return; }
+    box.style.zoom = 1;
+    const r = box.getBoundingClientRect(); if (!r.width || !r.height) return;
+    const vw = window.innerWidth, vh = window.innerHeight, fill = o.fill || 0.94;
+    let z = Math.min((vw * fill) / r.width, (vh * fill) / r.height, o.max || 1.45);
+    box.style.zoom = Math.max(o.min || 0.45, z).toFixed(3);
+  }
+  function fit(box, o = {}) { const rec = { box, o }; fits.add(rec); doFit(box, o); requestAnimationFrame(() => doFit(box, o)); return () => doFit(box, o); }
+  window.addEventListener('resize', () => { for (const r of [...fits]) { if (!r.box.isConnected) fits.delete(r); else doFit(r.box, r.o); } });
+
   /* ---------- word-list picker: textbook covers first, then that book's units ---------- */
   function picker(root, onDone) {
     const data = TM.data;
@@ -39,26 +52,27 @@
     let book = data.decks[[...sel][0]]?.book || (data.books[0] && data.books[0].id);
     let view = 'books';
     const stage = el('div', { class: 'tm-stage' });
-    const title = el('h2', {}, 'Choose your textbook');
-    const crumb = el('button', { class: 'tm-btn small tm-back hidden', onclick: () => { view = 'books'; render(); } }, '◀ Textbooks');
+    const title = el('h2', {}, 'ほんを えらぼう');
+    const crumb = el('button', { class: 'tm-btn small tm-back hidden', onclick: () => { view = 'books'; render(); } }, '◀ ほん');
     const count = el('span', { class: 'tm-count' });
-    const shortT = el('input', { type: 'checkbox' }); shortT.checked = TM.settings.shortOnly;
-    const multi = el('input', { type: 'checkbox' });
-    const multiLbl = el('label', { class: 'tm-toggle' }, multi, 'Mix several lists');
-    const done = el('button', { class: 'tm-btn primary tm-play' }, 'Play these!');
+    const done = el('button', { class: 'tm-btn primary tm-play' }, 'これで あそぶ！');
 
     const img = (src) => (src ? root + src : '');
     const bookOf = (id) => data.books.find((x) => x.id === id);
     const selIn = (b) => b.decks.filter((id) => sel.has(id)).length;
+    const gameDots = (deckId) => {
+      const have = new Set(TM.progress.games(deckId));
+      return el('div', { class: 'gd', 'aria-label': 'クリアした ゲーム' }, TM.GAMES.map((g) => el('i', { class: have.has(g.id) ? 'on' : '', style: { '--c': g.c }, title: g.short }, have.has(g.id) ? '✓' : '')));
+    };
 
     function renderBooks() {
       const grid = el('div', { class: 'tm-books', role: 'list' });
       for (const b of data.books) {
-        const n = selIn(b);
+        const n = selIn(b), pr = TM.progress.book(b);
         const card = el('button', { class: 'tm-book' + (b.id === book ? ' cur' : ''), role: 'listitem', 'aria-label': b.name, onclick: () => { book = b.id; view = 'decks'; TM.sfx && TM.sfx.click(); render(); } },
-          el('div', { class: 'cover' }, el('img', { src: img(b.cover), alt: b.name, draggable: 'false' }), n ? el('span', { class: 'badge' }, `${n} picked`) : null),
+          el('div', { class: 'cover' }, el('img', { src: img(b.cover), alt: b.name, draggable: 'false' }), n ? el('span', { class: 'badge' }, `えらんだ ${n}`) : null),
           el('div', { class: 'bn' }, b.name),
-          el('div', { class: 'bc' }, `${b.decks.length} lists`));
+          el('div', { class: 'bp' }, el('div', { class: 'pbar' }, el('i', { style: { width: pr.pct + '%' } })), el('span', {}, `${pr.done}/${pr.total} クリア ${pr.pct}%`)));
         grid.append(card);
       }
       stage.append(grid);
@@ -67,36 +81,40 @@
       const b = bookOf(book);
       if (!b) return;
       const grid = el('div', { class: 'tm-grid' });
+      const pr = TM.progress.book(b);
       for (const id of b.decks) {
         const d = data.decks[id];
         const pic = el('div', { class: 'img' });
         const fallback = () => { pic.textContent = d.unit ? d.unit : '★'; };
         if (d.image) pic.append(el('img', { src: img(d.image), alt: '', draggable: 'false', onerror: function () { this.remove(); fallback(); } })); else fallback();
-        const nS = d.sentences ? d.sentences.length : 0;
-        const tile = el('button', { class: 'tm-tile' + (sel.has(id) ? ' on' : ''), 'aria-pressed': sel.has(id) ? 'true' : 'false' },
+        const nS = d.sentences ? d.sentences.length : 0, isDone = TM.progress.done(id);
+        const tile = el('button', { class: 'tm-tile' + (sel.has(id) ? ' on' : '') + (isDone ? ' done' : ''), 'aria-pressed': sel.has(id) ? 'true' : 'false' },
           pic,
           el('div', { class: 't' },
-            el('div', { class: 'u' }, d.unit ? `Unit ${d.unit}` : d.label),
-            el('div', { class: 'n' }, d.unit || d.label !== d.title ? d.title : ' '),
-            el('div', { class: 'c' }, `${d.words.length} words`, nS ? ` · ${nS} sentences` : '')),
-          el('div', { class: 'tick' }, '✓'));
+            el('div', { class: 'u' }, d.unit ? `ユニット ${d.unit}` : d.label),
+            el('div', { class: 'n' }, d.unit || d.label !== d.title ? d.title : ' '),
+            el('div', { class: 'c' }, `${d.words.length} ことば`, nS ? ` ・ ぶん ${nS}` : ''),
+            gameDots(id)),
+          el('div', { class: 'tick' }, '✓'),
+          isDone ? el('div', { class: 'clr' }, 'クリア！') : null);
         tile.onclick = (e) => {
-          if (e.shiftKey || e.ctrlKey || e.metaKey || sel.size === 0 || multi.checked) { sel.has(id) ? sel.delete(id) : sel.add(id); }
+          if (e.shiftKey || e.ctrlKey || e.metaKey) { sel.has(id) ? sel.delete(id) : sel.add(id); }   // teachers: Shift/Ctrl-click mixes lists
           else { sel = new Set([id]); }
           TM.sfx && TM.sfx.click();
-          const y = grid.scrollTop; render(); const g2 = stage.querySelector('.tm-grid'); if (g2) g2.scrollTop = y;
+          const y = stage.scrollTop; render(); stage.scrollTop = y;
           const t2 = stage.querySelectorAll('.tm-tile')[b.decks.indexOf(id)]; if (t2) t2.focus({ preventScroll: true });
         };
         grid.append(tile);
       }
-      stage.append(el('div', { class: 'tm-bookbar' }, el('img', { src: img(b.cover), alt: '' }), el('div', {}, el('b', {}, b.name), el('span', {}, 'Tap a unit. Tap more than one to mix them.'))), grid);
+      stage.append(el('div', { class: 'tm-bookbar' }, el('img', { src: img(b.cover), alt: '' }),
+        el('div', { class: 'bt' }, el('b', {}, b.name), el('span', {}, 'ユニットを タップしてね')),
+        el('div', { class: 'bp wide' }, el('div', { class: 'pbar' }, el('i', { style: { width: pr.pct + '%' } })), el('span', {}, `${pr.done}/${pr.total} クリア ${pr.pct}%`))), grid);
     }
     function render() {
       stage.innerHTML = '';
       crumb.classList.toggle('hidden', view === 'books');
-      multiLbl.classList.toggle('hidden', view === 'books');
       const b = bookOf(book);
-      title.textContent = view === 'books' ? 'Choose your textbook' : (b ? b.name : 'Choose words');
+      title.textContent = view === 'books' ? 'ほんを えらぼう' : (b ? b.name : 'ことばを えらぼう');
       if (view === 'books') renderBooks(); else renderDecks();
       renderCount();
       const first = stage.querySelector('.tm-book.cur, .tm-tile.on, .tm-tile, .tm-book');
@@ -104,18 +122,15 @@
     }
     function renderCount() {
       const w = new Set(); for (const id of sel) for (const x of data.decks[id].words) w.add(x);
-      count.textContent = sel.size ? `${sel.size} list${sel.size > 1 ? 's' : ''} · ${w.size} words` : 'Pick at least one list';
+      count.textContent = sel.size ? `${w.size} ことば${sel.size > 1 ? ` (${sel.size}リスト)` : ''}` : 'ひとつ えらんでね';
       done.disabled = !sel.size; done.style.opacity = sel.size ? 1 : 0.5;
     }
     const card = el('div', { class: 'tm-card tm-modal tm-picker' },
-      el('header', {}, el('div', { class: 'tm-hl' }, crumb, title), el('button', { class: 'tm-btn icon', title: 'Close', 'aria-label': 'Close', onclick: () => m.close() }, '✕')),
+      el('header', {}, el('div', { class: 'tm-hl' }, crumb, title), el('button', { class: 'tm-btn icon', title: 'とじる', 'aria-label': 'とじる', onclick: () => m.close() }, '✕')),
       stage,
-      el('footer', {},
-        el('div', { class: 'tm-row', style: { justifyContent: 'flex-start' } }, multiLbl, el('label', { class: 'tm-toggle' }, shortT, 'Short words only')),
-        el('div', { class: 'tm-row' }, count, done)));
+      el('footer', {}, el('span'), el('div', { class: 'tm-row' }, count, done)));
     done.onclick = () => {
       if (!sel.size) return;
-      TM.settings.shortOnly = shortT.checked; TM.saveSettings();
       TM.deck.set([...sel]); m.close(); onDone && onDone([...sel]);
     };
     const m = modal(card, { keys: (e) => {
@@ -127,11 +142,10 @@
     return m;
   }
 
-  /* ---------- settings ---------- */
+  /* ---------- settings: only what a student needs ---------- */
   function settings(onChange) {
     const s = TM.settings;
-    const range = (key) => { const r = el('input', { type: 'range', min: 0, max: 1, step: 0.05, value: s[key] }); r.oninput = () => { s[key] = +r.value; TM.saveSettings(); TM.audio && TM.audio.applyVolume(); }; r.onchange = () => TM.sfx && TM.sfx.word(); return r; };
-    const check = (key) => { const c = el('input', { type: 'checkbox' }); c.checked = !!s[key]; c.onchange = () => { s[key] = c.checked; TM.saveSettings(); onChange && onChange(); }; return c; };
+    const range = (key) => { const r = el('input', { type: 'range', min: 0, max: 1, step: 0.05, value: s[key] }); r.oninput = () => { s[key] = +r.value; TM.saveSettings(); TM.audio && TM.audio.applyVolume(); }; r.onchange = () => { if (key === 'sfx' && TM.sfx) TM.sfx.word(); }; return r; };
     const seg = (key, opts) => {
       const w = el('div', { class: 'tm-seg', style: { boxShadow: 'none' } });
       for (const [v, label] of opts) {
@@ -141,23 +155,16 @@
       return w;
     };
     const card = el('div', { class: 'tm-card tm-modal tm-small' },
-      el('header', {}, el('h2', {}, 'Settings'), el('button', { class: 'tm-btn icon', onclick: () => m.close() }, '✕')),
+      el('header', {}, el('h2', {}, 'せってい'), el('button', { class: 'tm-btn icon', 'aria-label': 'とじる', onclick: () => m.close() }, '✕')),
       el('div', { class: 'body' },
-        el('label', { class: 'tm-field' }, 'Sound effects', range('sfx')),
-        el('label', { class: 'tm-field' }, 'Music', range('music')),
-        el('div', { class: 'tm-field' }, 'Japanese hints', seg('hints', [['auto', 'Auto'], ['on', 'On'], ['off', 'Off']])),
-        el('label', { class: 'tm-field' }, "Must type ' and -", check('strict')),
-        el('label', { class: 'tm-field' }, 'Keyboard helper', check('keyboard')),
-        el('label', { class: 'tm-field' }, 'Reduce motion', check('reduceMotion')),
-        el('div', { class: 'tm-field' }, 'Reset my records',
-          el('button', { class: 'tm-btn small', onclick: (e) => {
-            try { Object.keys(localStorage).filter((k) => k.startsWith('tm.rec.')).forEach((k) => localStorage.removeItem(k)); } catch (err) { /* ignore */ }
-            e.target.textContent = 'Done!';
-          } }, 'Reset'))),
-      el('footer', {}, el('span', { style: { font: '500 16px var(--word)', opacity: 0.7 } }, 'Saved on this computer'), el('button', { class: 'tm-btn', onclick: () => m.close() }, 'OK')));
+        el('label', { class: 'tm-field' }, 'こうかおん', range('sfx')),
+        el('label', { class: 'tm-field' }, 'おんがく', range('music')),
+        el('div', { class: 'tm-field' }, 'にほんごヒント', seg('hints', [['auto', 'おまかせ'], ['on', 'あり'], ['off', 'なし']]))),
+      el('footer', {}, el('span'), el('button', { class: 'tm-btn', onclick: () => m.close() }, 'OK')));
     const m = modal(card);
+    fit(card, { max: 1.3, fill: 0.92 });
     return m;
   }
 
-  TM.ui = { el, modal, isModalOpen, picker, settings, starSVG, heartSVG, svgURL };
+  TM.ui = { el, modal, isModalOpen, picker, settings, fit, starSVG, heartSVG, svgURL };
 })();

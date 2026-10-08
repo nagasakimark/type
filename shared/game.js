@@ -128,7 +128,7 @@
         const n = Math.ceil(countdown), k = 1 - (countdown - Math.floor(countdown));
         ctx.save(); ctx.translate(W / 2, H / 2); const s = 1 + (1 - U.ease.outBack(Math.min(1, k * 2))) * 0.8; ctx.scale(s, s);
         ctx.globalAlpha = Math.min(1, (1 - k) * 3);
-        D.text(ctx, n > 0 ? String(n) : 'GO!', 0, 0, { size: 260, color: def.accent, outline: 26 });
+        D.text(ctx, n > 0 ? String(n) : 'ゴー！', 0, 0, { size: 260, color: def.accent, outline: 26 });
         ctx.restore();
       }
       g.fx.drawFlash(ctx, W, H);
@@ -143,7 +143,7 @@
       const lives = el('div', { class: 'tm-lives' });
       const rightTxt = el('div', { class: 'pill hidden' });
       const box = el('div', { class: 'tm-hud hidden' },
-        el('div', { class: 'pill' }, el('span', { class: 'lbl' }, 'SCORE'), scoreV),
+        el('div', { class: 'pill' }, el('span', { class: 'lbl' }, 'とくてん'), scoreV),
         el('div', { class: 'mid' }, combo, bar),
         el('div', { class: 'mid', style: { alignItems: 'flex-end' } }, lives, rightTxt));
       document.body.append(box);
@@ -158,7 +158,7 @@
           const key = [g.score.score, g.score.combo, h.lives, h.maxLives, h.right, Math.round((h.progress ?? -1) * 100)].join('|');
           if (key === lastKey) return; lastKey = key;
           scoreV.textContent = g.score.score.toLocaleString();
-          combo.textContent = g.score.combo >= 3 ? `x${g.score.mult}  COMBO ${g.score.combo}` : '';
+          combo.textContent = g.score.combo >= 3 ? `x${g.score.mult}  コンボ ${g.score.combo}` : '';
           if (h.progress != null) { bar.classList.remove('hidden'); barI.style.width = Math.round(U.clamp(h.progress, 0, 1) * 100) + '%'; } else bar.classList.add('hidden');
           if (h.maxLives) {
             if (lives.children.length !== h.maxLives) { lives.innerHTML = ''; for (let i = 0; i < h.maxLives; i++) lives.append(el('b', { style: { backgroundImage: TM.ui.svgURL(def.lifeIcon || TM.ui.heartSVG()) } })); }
@@ -175,7 +175,7 @@
       const keys = {};
       const box = el('div', { class: 'tm-kbd hidden' });
       for (const r of rows) { const row = el('div'); for (const ch of r) { const k = el('span', { class: 'fj'.includes(ch) ? 'home' : '' }, ch); keys[ch] = k; row.append(k); } box.append(row); }
-      const sp = el('span', { class: 'space' }, 'space'); keys[' '] = sp; box.append(el('div', {}, sp));
+      const sp = el('span', { class: 'space' }, 'スペース'); keys[' '] = sp; box.append(el('div', {}, sp));
       document.body.append(box);
       let lastNext = null;
       return {
@@ -198,21 +198,25 @@
       const deckImg = el('img', { alt: '', onerror: function () { this.style.display = 'none'; } });
       const segBtns = {};
       const seg = el('div', { class: 'tm-seg' });
-      for (const [v, label] of [['gentle', 'Gentle'], ['normal', 'Normal'], ['turbo', 'Turbo']]) {
+      for (const [v, label] of [['gentle', 'ゆっくり'], ['normal', 'ふつう'], ['turbo', 'ターボ']]) {
         const b = el('button', { onclick: () => setDiff(v) }, label); segBtns[v] = b; seg.append(b);
       }
       function setDiff(v) { g.diff = v; TM.settings.difficulty = v; TM.saveSettings(); for (const k in segBtns) segBtns[k].classList.toggle('on', k === v); TM.sfx.click(); }
-      const box = el('div', { class: 'tm-title' },
+      const inner = el('div', { class: 'tm-tin' },
         el('h1', { class: 'tm-logo', html: def.logoHTML || def.name }),
         def.tagline ? el('div', { class: 'tm-tagline' }, def.tagline) : null,
         el('div', { class: 'tm-row' }, el('button', { class: 'tm-btn tm-deckbtn', onclick: () => openPicker() }, deckImg, deckLabel, el('span', { style: { opacity: 0.6 } }, '▾')), seg),
         el('div', { class: 'tm-row' },
-          el('button', { class: 'tm-btn primary', onclick: () => start() }, 'Play', el('kbd', {}, 'Enter')),
-          el('button', { class: 'tm-btn', onclick: () => howto() }, 'How to play')),
-        el('div', { class: 'tm-press' }, 'Tip: use half-width English input (半角英数)'));
+          el('button', { class: 'tm-btn primary', onclick: () => start() }, 'あそぶ', el('kbd', {}, 'Enter')),
+          el('button', { class: 'tm-btn', onclick: () => howto() }, 'あそびかた')),
+        el('div', { class: 'tm-press' }, 'タイプの まえに「はんかく えいすう」に してね'));
+      const box = el('div', { class: 'tm-title' }, inner);
+      const refit = TM.ui.fit(inner, { max: 1.6, fill: 0.9 });
+      new MutationObserver(() => refit()).observe(inner, { childList: true, subtree: true, characterData: true });
+      g.refitTitle = refit;
       const corners = [
-        el('div', { class: 'tm-corner left' }, el('a', { class: 'tm-btn small', href: root + 'index.html' + (location.search || '') }, '◀ Arcade')),
-        el('div', { class: 'tm-corner right' }, el('button', { class: 'tm-btn icon', title: 'Settings', onclick: () => TM.ui.settings() }, '⚙')),
+        el('div', { class: 'tm-corner left' }, el('a', { class: 'tm-btn small', href: root + 'index.html' + (location.search || '') }, '◀ ゲームいちらん')),
+        el('div', { class: 'tm-corner right' }, el('button', { class: 'tm-btn icon', title: 'せってい', onclick: () => TM.ui.settings() }, '⚙')),
       ];
       document.body.append(box, ...corners);
       function refreshDeck() {
@@ -231,10 +235,11 @@
     function openPicker() { TM.ui.picker(root, () => { title.refreshDeck(); g.newDealer(); if (def.reset) def.reset(g); }); }
     function howto() {
       const card = el('div', { class: 'tm-card tm-modal tm-small' },
-        el('header', {}, el('h2', {}, 'How to play'), el('button', { class: 'tm-btn icon', onclick: () => m.close() }, '✕')),
+        el('header', {}, el('h2', {}, 'あそびかた'), el('button', { class: 'tm-btn icon', 'aria-label': 'とじる', onclick: () => m.close() }, '✕')),
         el('ol', { class: 'tm-howto' }, (def.howto || []).map((s) => el('li', { html: s }))),
-        el('footer', {}, el('span'), el('button', { class: 'tm-btn primary', style: { fontSize: '28px', padding: '12px 30px 8px' }, onclick: () => { m.close(); start(); } }, 'Play!')));
+        el('footer', {}, el('span'), el('button', { class: 'tm-btn primary', style: { fontSize: '28px', padding: '12px 30px 8px' }, onclick: () => { m.close(); start(); } }, 'あそぶ！')));
       const m = TM.ui.modal(card);
+      TM.ui.fit(card, { max: 1.35, fill: 0.92 });
     }
 
     /* ---------- flow ---------- */
@@ -262,14 +267,15 @@
     function pause() {
       if (g.state !== 'play' && g.state !== 'countdown') return;
       const prev = g.state; g.state = 'paused';
-      const card = el('div', { class: 'tm-card tm-pause' }, el('h2', {}, 'Paused'),
-        el('button', { class: 'tm-btn primary', onclick: () => pauseM.close() }, 'Resume', el('kbd', {}, 'Esc')),
+      const card = el('div', { class: 'tm-card tm-pause' }, el('h2', {}, 'ポーズ'),
+        el('button', { class: 'tm-btn primary', onclick: () => pauseM.close() }, 'つづける', el('kbd', {}, 'Esc')),
         el('div', { class: 'tm-row' },
-          el('button', { class: 'tm-btn', onclick: () => { pauseM.close(); start(); } }, 'Restart'),
-          el('button', { class: 'tm-btn', onclick: () => { pauseM.close(); toTitle(); } }, 'Quit'),
-          el('a', { class: 'tm-btn', href: root + 'index.html' }, 'Arcade')),
-        el('button', { class: 'tm-btn small', onclick: () => TM.ui.settings() }, '⚙ Settings'));
+          el('button', { class: 'tm-btn', onclick: () => { pauseM.close(); start(); } }, 'もういちど'),
+          el('button', { class: 'tm-btn', onclick: () => { pauseM.close(); toTitle(); } }, 'やめる'),
+          el('a', { class: 'tm-btn', href: root + 'index.html' }, 'ゲームいちらん')),
+        el('button', { class: 'tm-btn small', onclick: () => TM.ui.settings() }, '⚙ せってい'));
       pauseM = TM.ui.modal(card, { onClose: () => { if (g.state === 'paused') { g.state = prev; last = performance.now(); } pauseM = null; } });
+      TM.ui.fit(card, { max: 1.35, fill: 0.9 });
     }
     document.addEventListener('visibilitychange', () => { if (document.hidden) pause(); });
     window.addEventListener('blur', () => pause());
@@ -287,21 +293,31 @@
           const rec = TM.records.submit(def.id, deckKey, g.diff, { score: s.score, stars, wpm });
           const starBox = el('div', { class: 'tm-stars' });
           for (let i = 0; i < 3; i++) starBox.append(el('span', { html: TM.ui.starSVG(i < stars ? C.gold : '#D8D3E6') }).firstChild);
-          const stats = [['WPM', wpm], ['Accuracy', Math.round(acc * 100) + '%'], ['Words', s.wordsDone], ['Best combo', s.bestCombo]].concat(r.stats || []);
+          const stats = [['はやさ (WPM)', wpm], ['せいかく', Math.round(acc * 100) + '%'], ['ことば', s.wordsDone], ['さいこうコンボ', s.bestCombo]].concat(r.stats || []);
           const tricky = s.trickyList();
-          const card = el('div', { class: 'tm-card tm-results' },
-            el('h2', {}, r.title || (r.win === false ? 'Nice try!' : 'Great job!')),
+          /* progress: a finished run (not a game-over) marks every chosen word list as cleared in this game */
+          const ids = TM.deck.ids(), cleared = r.win !== false, fresh = cleared ? TM.progress.record(def.id, ids, stars) : [];
+          const d0 = TM.data.decks[ids[0]], bk = d0 && TM.data.books.find((x) => x.id === d0.book), pr = bk ? TM.progress.book(bk) : null;
+          const progBox = (cleared || pr) ? el('div', { class: 'tm-prog' + (fresh.length ? ' new' : '') },
+            cleared ? el('div', {}, fresh.length ? '🎉 ' : '✓ ', fresh.length ? 'はじめての クリア！ ' : 'クリア ずみ ', ids.length === 1 && d0 ? (d0.unit ? `ユニット ${d0.unit}` : d0.label) : `${ids.length}リスト`) : null,
+            pr ? el('div', { class: 'pbar' }, el('i', { style: { width: pr.pct + '%' } })) : null,
+            pr ? el('div', { style: { fontSize: '16px', opacity: 0.8 } }, `${bk.name}: ${pr.done}/${pr.total} クリア（${pr.pct}%）`) : null) : null;
+          const body = el('div', { class: 'rbody' },
+            el('h2', {}, r.title || (r.win === false ? 'おしい！' : 'すごい！')),
             r.sub ? el('div', { class: 'sub' }, r.sub) : null,
             starBox,
-            el('div', {}, el('span', { class: 'tm-score' }, s.score.toLocaleString()), rec.isNewBest && s.score > 0 ? el('span', { class: 'tm-newbest' }, 'NEW BEST!') : null),
+            el('div', {}, el('span', { class: 'tm-score' }, s.score.toLocaleString()), rec.isNewBest && s.score > 0 ? el('span', { class: 'tm-newbest' }, 'しんきろく！') : null),
             el('div', { class: 'tm-stats' }, stats.map(([a, b]) => el('div', {}, el('b', {}, String(b)), el('span', {}, a)))),
-            tricky.length ? el('div', { class: 'tm-tricky' }, el('h3', {}, 'Tricky words – practise these!'),
-              el('div', { class: 'chips' }, tricky.map((it) => el('span', { class: 'tm-wchip' }, it.t, it.hint ? el('small', {}, it.hint) : null)))) : null,
-            el('div', { class: 'tm-row' },
-              el('button', { class: 'tm-btn primary', onclick: () => start() }, 'Play again', el('kbd', {}, 'Enter')),
-              el('button', { class: 'tm-btn', onclick: () => { toTitle(); openPicker(); } }, 'Change words'),
-              el('a', { class: 'tm-btn', href: root + 'index.html' }, 'Arcade')));
+            progBox,
+            tricky.length ? el('div', { class: 'tm-tricky' }, el('h3', {}, 'にがてな ことば — れんしゅうしよう！'),
+              el('div', { class: 'chips' }, tricky.map((it) => el('span', { class: 'tm-wchip' }, it.t, it.hint ? el('small', {}, it.hint) : null)))) : null);
+          const foot = el('div', { class: 'rfoot' }, el('div', { class: 'tm-row' },
+            el('button', { class: 'tm-btn primary', onclick: () => start() }, 'もういちど', el('kbd', {}, 'Enter')),
+            el('button', { class: 'tm-btn', onclick: () => { toTitle(); openPicker(); } }, 'ことばを かえる'),
+            el('a', { class: 'tm-btn', href: root + 'index.html' }, 'ゲームいちらん')));
+          const card = el('div', { class: 'tm-card tm-results' }, body, foot);
           m = TM.ui.modal(card, { dismissable: false, keys: (e) => { if (e.key === 'Enter') { e.preventDefault(); start(); } }, onClose: () => { m = null; if (g.state === 'over') toTitle(); } });
+          TM.ui.fit(card, { max: 1.45, fill: 0.94, min: 0.4 });
           [...starBox.children].forEach((sv, i) => setTimeout(() => { sv.classList.add('in'); if (i < stars) TM.sfx.star(i); }, 350 + i * 300));
           if (stars === 3) setTimeout(() => g.fx.confetti(W / 2, H / 3, 80), 1200);
         },

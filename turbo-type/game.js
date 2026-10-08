@@ -910,7 +910,7 @@
     ST.blurb = el('div', { class: 'tt-blurb' }, '');
     ST.pick = el('div', { class: 'tt-pick' }, cards, laps, ST.blurb);
     const row2 = box.querySelectorAll('.tm-row'); const ref = row2[1] || null;
-    box.insertBefore(ST.pick, ref);
+    (ref ? ref.parentNode : box).insertBefore(ST.pick, ref);
     setLaps(ST.laps, true); refreshCards();
     if (ST.fileMode) { const n = el('div', { class: 'tt-note' }, 'ウェブサーバー（http）で ひらくと きれいな 3Dで あそべるよ'); document.body.append(n); }
     const logo = box.querySelector('.tm-logo'); if (logo) logo.innerHTML = 'Turbo Type';

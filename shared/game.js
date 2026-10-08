@@ -50,7 +50,7 @@
       (typer.item.kind === 'sentence' ? TM.sfx.big : TM.sfx.word)();
       if (g.score.mult > before) {
         TM.sfx.combo(g.score.mult);
-        g.fx.pop(W / 2, 200, `COMBO x${g.score.mult}!`, { size: 88, color: def.accent, life: 1.3 });
+        g.fx.pop(W / 2, 150, `COMBO x${g.score.mult}!`, { size: 44, color: def.accent, life: 0.8 });
         g.fx.shake(10, 0.15);
       }
       hud.bump();

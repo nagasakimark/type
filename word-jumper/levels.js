@@ -55,7 +55,7 @@
 
   WJ.buildLevel = function (o) {
     const bi = o.index % WJ.BIOMES.length, B = WJ.BIOMES[bi], R = mulberry((o.seed || (Math.random() * 1e9)) + bi * 977);
-    const picker = o.picker, diffShift = o.diff === 'gentle' ? -0.8 : o.diff === 'turbo' ? 0.5 : 0;
+    const picker = o.picker, diffShift = o.shift != null ? o.shift + (o.diff === 'gentle' ? -0.35 : o.diff === 'turbo' ? 0.25 : 0) : (o.diff === 'gentle' ? -0.8 : o.diff === 'turbo' ? 0.5 : 0);   // o.shift = rubber band: struggling players get shorter words next level, flying players get phrases/sentences sooner
     const v = o.speed;
     const L = { index: o.index, biome: B, spans: [], plats: [], pits: [], obs: [], coins: [], decor: [], flags: [], mplats: [], total: 0, speed: v };
     let cx = 0, cy = 0, id = 0, segI = 0, segN = SEGS[Math.min(4, o.index)] + (o.index >= 5 ? 1 : 0);

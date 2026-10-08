@@ -4,8 +4,10 @@
   'use strict';
   const TM = window.TM, WJ = window.WJ, C = TM.C, U = TM.U, D = TM.draw, P = D.P;
   const W = 1920, H = 1080, TS = WJ.TS;
-  const HERO_COLORS = ['player', 'female', 'adventurer'];
+  const HERO_COLORS = ['player', 'female', 'zombie'];   // boy, girl, zombie (zombie unlocks after the first full clear)
   const ALL_COLORS = HERO_COLORS;
+  const zombieUnlocked = () => TM.store.get('wj.zombie', false) || new URLSearchParams(location.search).get('unlock') === '1';
+  function savedHero() { const h = TM.store.get('wj.hero', 'player'); return h === 'zombie' && !zombieUnlocked() ? 'player' : (ALL_COLORS.includes(h) ? h : 'player'); }
   const LEVELS = 5;
   const GRAV = 2600;
   const PACE_ON = new URLSearchParams(location.search).get('pace') !== '0';   // ?pace=0 turns adaptive pacing off (for comparisons)
@@ -36,15 +38,15 @@
 
   /* ============================================================ state */
   function speedFor(g, li) {
-    const m = g.diff === 'gentle' ? 0.86 : g.diff === 'turbo' ? 1.16 : 1;
-    return (305 + li * 30) * m;
+    const m = g.diff === 'gentle' ? 0.92 : g.diff === 'turbo' ? 1.08 : 1;
+    return (305 + li * 30) * m * (S ? S.speedAd : 1);
   }
   function reset(g) {
     GG = g;
     const demo = g.demo;
     S = {
-      picker: WJ.makePicker(g), li: URLQ.get('level') ? clamp(parseInt(URLQ.get('level'), 10) - 1 || 0, 0, LEVELS - 1) : demo ? Math.floor(Math.random() * LEVELS) : 0, hearts: 3, maxHearts: 3, hero: null, L: null,
-      heroCol: URLQ.get('hero') && ALL_COLORS.includes(URLQ.get('hero')) ? URLQ.get('hero') : HERO_COLORS[Math.floor(Math.random() * HERO_COLORS.length)],
+      picker: WJ.makePicker(g), li: URLQ.get('level') ? clamp(parseInt(URLQ.get('level'), 10) - 1 || 0, 0, LEVELS - 1) : demo ? Math.floor(Math.random() * LEVELS) : 0, hearts: g.diff === 'gentle' ? 5 : 3, maxHearts: g.diff === 'gentle' ? 5 : 3, hero: null, L: null,
+      heroCol: URLQ.get('hero') && ALL_COLORS.includes(URLQ.get('hero')) ? URLQ.get('hero') : savedHero(), ad: new TM.Adapt(g.diff), speedAd: 1,
       t: 0, parts: [], phase: 'play', phaseT: 0, banner: null, cam: { x: 0, y: 0, ty: 0 }, fade: 1, proj: { z: 1, gl: 800, vx: 0, vy: 0, sc: 1, anchor: 520 },
       coinsAll: 0, coinTotAll: 0, starsAll: 0, levelStars: [], lvl: null, bot: new TM.Bot(7.5), botJit: 0, runT: 0, shakeX: 0,
       toast: null, chipRects: [], dbgOverlap: 0,
@@ -52,12 +54,13 @@
     };
     // every popup (ours and the framework's) goes through one small, non-stacking toast in a safe zone
     g.fx.pop = (x, y, str, o) => toast(str, o || {});
+    g.ad = S.ad; renderPick();
     loadLevel(g, S.li, true);
   }
 
   function loadLevel(g, li, first) {
-    S.li = li;
-    S.L = WJ.buildLevel({ index: li, picker: S.picker, speed: speedFor(g, li), diff: g.diff, seed: Math.floor(Math.random() * 1e9) });
+    S.li = li; S.speedAd = S.ad.pick(0.9, 1.25);   // the rubber band sets this level's running speed
+    S.L = WJ.buildLevel({ index: li, picker: S.picker, speed: speedFor(g, li), diff: g.diff, shift: (S.ad.load - 0.45) * 1.7, seed: Math.floor(Math.random() * 1e9) });
     const L = S.L;
     for (const o of L.obs) { if (o.item) o.typer = new TM.Typer(o.item); o.px = o.x; }
     S.oi = 0; S.t = 0; S.parts.length = 0; S.cp = L.flags[0];
@@ -153,7 +156,14 @@
 
   function completeWord(g, ob) {
     ob.status = 'ready'; ob.readyT = S.t;
-    const pc = S.pc; pc.lastDoneT = S.runT;
+    const pc = S.pc;
+    if (!g.demo && ob.item) { // teach the rubber band: how fast was this word, and how much slack was left?
+      const hh = S.hero, v0 = speedFor(g, S.li), slack = hh.st === 'teeter' ? -(hh.teeterR || 0) : (ob.launchX - hh.x) / Math.max(60, v0 * pc.speed);
+      const margin = hh.st === 'teeter' ? clamp(0.2 * (1 - (hh.teeterR || 0) / Math.max(1, hh.grace || 4)), 0, 0.2) : clamp(0.25 + slack / 4, 0.25, 1);
+      const len = ob.req || ob.item.len;
+      S.ad.word(len, ob.k0 != null ? S.runT - ob.k0 : len / S.ad.cps, ob.typer.errors, ob.k0 != null ? ob.k0 - pc.lastDoneT : null, S.runT - pc.lastDoneT, margin);
+    }
+    pc.lastDoneT = S.runT;
     if (pc.ts < 0.8 && !g.demo) { pc.snap = 0.45; TM.sfx.whoosh(); }   // bullet time ends: snap back to full speed with a whoosh
     pc.ts = 1;
     const h = S.hero, early = (ob.launchX - h.x) > speedFor(g, S.li) * 0.9 && h.st === 'run';
@@ -172,6 +182,7 @@
     if (h.st === 'fall' || h.st === 'bonk' || h.st === 'dead' || h.st === 'respawn') return;
     const t = targetOb(); if (!t) return;
     const pos0 = t.typer.pos, pc = S.pc;
+    if (pos0 === 0 && t.k0 == null) t.k0 = S.runT;
     const r = t.typer.feed(k);
     g.keyResult(r);
     if (r !== 'miss') { // rolling estimate of this player's typing speed
@@ -290,7 +301,8 @@
     const h = S.hero; ob.fails = (ob.fails || 0) + 1;
     g.missWord(ob.item);
     TM.sfx.hurt(); WJ.sound('lowRandom', 0.5);
-    const lose = !g.demo && g.diff !== 'gentle';
+    const lose = !g.demo;
+    S.ad.fail(1.2);
     if (lose) { S.hearts--; S.lvl.lost++; }
     const pit = ob.type === 'gap' || ob.type === 'bossgap' || ob.type === 'mplatIn';
     if (pit) { h.st = 'fall'; h.vx = 150; h.vy = -380; h.wait = 0; }
@@ -299,6 +311,11 @@
     g.fx.shake(14, 0.22);
     const v = w2v(h.x, h.y - 150); g.fx.pop(v.x, v.y, pit ? 'ドボン！' : 'ゴツン！', { color: '#FF5A5F', size: 60 });
     if (lose && S.hearts <= 0) { h.dead = true; }
+  }
+  /* seconds the hero waits at a word before falling: the time THIS player needs for it (adaptive) plus a little slack; never endless */
+  function graceFor(g, len) {
+    const slack = g.diff === 'gentle' ? 1.6 : g.diff === 'turbo' ? 0.8 : 1.15, f = g.diff === 'gentle' ? 1.7 : g.diff === 'turbo' ? 1.15 : 1.4;
+    return clamp(S.ad.time(len) * f + slack, 2.6, 7.5);
   }
   function respawn(g) {
     const h = S.hero, cp = S.cp;
@@ -338,7 +355,8 @@
     if (S.phase !== 'rating') return;
     if (S.li + 1 >= LEVELS) {
       const avg = S.starsAll / LEVELS;
-      g.end({ win: true, title: 'やったね！', sub: `${LEVELS}つの せかいを ぜんぶ クリア！`, targetMet: avg >= 2, stats: [['星', S.starsAll + '/' + LEVELS * 3], ['コイン', S.coinsAll]] });
+      const firstClear = !zombieUnlocked(); if (!g.demo) TM.store.set('wj.zombie', true);
+      g.end({ win: true, title: 'やったね！', sub: `${LEVELS}つの せかいを ぜんぶ クリア！` + (firstClear ? ' ゾンビが つかえるように なったよ！' : ''), targetMet: avg >= 2, stats: [['星', S.starsAll + '/' + LEVELS * 3], ['コイン', S.coinsAll]] });
       S.phase = 'end'; return;
     }
     S.phase = 'fadeout'; S.phaseT = 0;
@@ -362,7 +380,11 @@
     const pc = S.pc, h = S.hero;
     let spT = 1, tsT = 1;
     const live = PACE_ON && !g.demo && g.state === 'play' && S.phase === 'play' && h.st !== 'fall' && h.st !== 'bonk' && h.st !== 'dead' && h.st !== 'celebrate';
-    if (live) {
+    /* 'engaged' = the player is actually typing (a key in the last 1.6s, or a word just finished). Only then does the game ease off
+       (slower run, bullet time). Stand still and the hero runs at full speed into the word: nothing slows down for an idle player. */
+    const engaged = S.runT - pc.lastKeyT < 1.6 || S.runT - pc.lastDoneT < 0.9;
+    if (live && !engaged) { pc.lead = 0; }
+    else if (live) {
       const o = frontier(), v = speedFor(g, S.li);
       if (o) {
         const D = Math.max(0, o.launchX - h.x), tw = remainingTime(o);
@@ -475,8 +497,11 @@
         const ob = h.ob; h.teeterT += dt; h.teeterR = (h.teeterR || 0) + rdt; h.walkT = 0;
         if (ob.status === 'ready') { h.st = 'run'; execute(g, ob); break; }
         const len = ob.item ? ob.item.len : 5;
-        const grace = (g.diff === 'gentle' ? 7 : g.diff === 'turbo' ? 3 : 4.5) + len * (g.diff === 'gentle' ? 1.0 : g.diff === 'turbo' ? 0.4 : 0.7);
+        const grace = graceFor(g, len);
+        h.grace = grace;
         if (g.demo) { if (h.teeterT > 9) failOb(g, ob); break; }
+        /* the clock runs at full speed while the player is idle and at 1/3 speed while they are actively typing this word */
+        h.teeterR += rdt * (S.runT - S.pc.lastKeyT < 0.8 ? -0.65 : 0);
         if (h.teeterR > grace) failOb(g, ob);   // grace is real time, not slowed by bullet time
         break;
       }
@@ -726,7 +751,12 @@
     ctx.restore(); ctx.globalAlpha = 1;
     if (h.st === 'teeter' && h.teeterT > 0.35) { // "!" bubble
       const bx = h.x - 72, by = h.y - 120 + Math.sin(h.teeterT * 8) * 4;
-      D.text(ctx, '!', bx, by, { size: 60, color: '#FF5A5F', outline: 10 });
+      const left = clamp(1 - (h.teeterR || 0) / Math.max(1, h.grace || 4), 0, 1);
+      ctx.save(); ctx.lineCap = 'round';
+      ctx.strokeStyle = 'rgba(31,26,61,0.35)'; ctx.lineWidth = 14; ctx.beginPath(); ctx.arc(bx, by - 2, 46, 0, 7); ctx.stroke();
+      ctx.strokeStyle = left > 0.4 ? '#FFD93D' : '#FF5A5F'; ctx.lineWidth = 10; ctx.beginPath(); ctx.arc(bx, by - 2, 46, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * left); ctx.stroke();
+      ctx.restore();
+      D.text(ctx, '!', bx, by, { size: 60, color: left > 0.4 ? '#fff' : '#FF5A5F', outline: 10 });
     }
   }
 
@@ -907,7 +937,7 @@
       ctx.restore();
     }
     D.text(ctx, `コイン ${r.coins}/${r.total}`, -340, 258, { size: 34, color: C.ink, align: 'left' });
-    if (!g.demo && g.diff !== 'gentle') {
+    if (!g.demo) {
       D.text(ctx, `ハート ${S.hearts}/${S.maxHearts}`, 340, 258, { size: 34, color: '#E0457B', align: 'right' });
     }
     const pulse2 = 1 + Math.sin(g.t * 5) * 0.04;
@@ -917,6 +947,41 @@
     D.text(ctx, 'スペースかEnterで ' + nxt, 0, 3, { size: 28, color: '#fff', outline: 7 });
     ctx.restore();
     ctx.restore();
+  }
+
+  /* ============================================================ character picker (title screen) */
+  const PICK = [{ id: 'player', label: 'おとこのこ' }, { id: 'female', label: 'おんなのこ' }, { id: 'zombie', label: 'ゾンビ' }];
+  const HERO_ROW = { player: 0, female: 1, adventurer: 2, zombie: 3 };
+  let pickBox = null;
+  function renderPick() {
+    const title = document.querySelector('.tm-title'); if (!title) return;
+    if (!document.getElementById('wj-pick-css')) {
+      const st = document.createElement('style'); st.id = 'wj-pick-css';
+      st.textContent = '.wj-pick{display:flex;gap:14px;justify-content:center;align-items:flex-end;margin:2px 0 6px}' +
+        '.wj-pick button{all:unset;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:2px;padding:6px 12px 8px;border-radius:22px;background:rgba(255,255,255,.55);border:4px solid transparent;font:800 18px var(--word,sans-serif);color:#1F1A3D;transition:transform .12s}' +
+        '.wj-pick button:hover{transform:translateY(-3px)}.wj-pick button.on{background:#fff;border-color:var(--accent,#6CCB3C);box-shadow:0 6px 0 rgba(31,26,61,.18)}' +
+        '.wj-pick button:focus-visible{outline:4px solid #1F1A3D}.wj-pick i{display:block;width:80px;height:110px;background-image:url(../assets/kenney/word-jumper/heroes.png);background-size:1200px 440px}' +
+        '.wj-pick button.lock i{filter:brightness(0) opacity(.35)}.wj-pick button.lock{opacity:.9}.wj-pick small{font:700 14px var(--word,sans-serif);opacity:.75}';
+      document.head.appendChild(st);
+    }
+    if (!pickBox) {
+      pickBox = document.createElement('div'); pickBox.className = 'wj-pick';
+      const rows = title.querySelectorAll('.tm-row'); const after = rows[0] || title.firstChild;
+      after.insertAdjacentElement('afterend', pickBox);
+    }
+    const open = zombieUnlocked(), cur = S ? S.heroCol : savedHero();
+    pickBox.innerHTML = '';
+    for (const c of PICK) {
+      const locked = c.id === 'zombie' && !open;
+      const b = document.createElement('button'); b.type = 'button'; b.className = (c.id === cur ? 'on ' : '') + (locked ? 'lock' : '');
+      b.setAttribute('aria-label', c.label + (locked ? '（ロックちゅう）' : ''));
+      const i = document.createElement('i'); i.style.backgroundPosition = `0 -${HERO_ROW[c.id] * 110}px`;
+      const l = document.createElement('span'); l.textContent = locked ? '🔒 ???' : c.label;
+      b.append(i, l);
+      if (locked) { const sm = document.createElement('small'); sm.textContent = 'ぜんぶ クリアで ゲット！'; b.append(sm); }
+      b.onclick = () => { if (locked) { TM.sfx.miss(); return; } TM.store.set('wj.hero', c.id); if (S) S.heroCol = c.id; TM.sfx.click(); renderPick(); };
+      pickBox.append(b);
+    }
   }
 
   /* ============================================================ framework */
@@ -938,7 +1003,7 @@
     onEnter: (g) => { if (S && S.phase === 'rating') proceed(g); },
     nextKey: () => { if (!S || S.phase !== 'play') return null; const t = targetOb(); return t ? t.typer.nextReq() : null; },
     hud: (g) => ({
-      lives: S ? S.hearts : 3, maxLives: g.diff === 'gentle' ? 0 : 3,
+      lives: S ? S.hearts : 3, maxLives: S ? S.maxHearts : 3,
       right: S ? `ステージ ${S.li + 1}/${LEVELS}` : '',
       progress: S && S.L ? clamp((S.hero.x - S.L.startX) / Math.max(1, S.L.goalX - S.L.startX), 0, 1) : 0,
     }),

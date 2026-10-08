@@ -247,9 +247,12 @@
       else if (c.spec.name === 'Sora') m *= lerp(0.8, 1.22, smooth(0.1, 0.8, prog));
       /* Rivals match the player's real typing pace (long-run average) so a slow typist AND a fast typist both get a
          close race; rubber-banding keeps the pack within sight: far behind the player -> push, far ahead -> ease off. */
-      const ref = S.demo ? c.baseWpm / c.mult / 12 : Math.max(c.baseWpm / c.mult / 12 * 0.85, S.avgRate * 1.0);
+      /* mode = how the rubber band behaves: Gentle rivals run a little slower than you and haul themselves back to you quickly when they
+         fall behind but ease right off when ahead; Turbo rivals run a little faster than you and pull away harder when ahead. */
+      const MK = g.diff === 'gentle' ? { ref: 0.9, behind: 0.40, ahead: 0.30 } : g.diff === 'turbo' ? { ref: 1.1, behind: 0.30, ahead: 0.16 } : { ref: 1.0, behind: 0.32, ahead: 0.22 };
+      const ref = (S.demo ? c.baseWpm / c.mult / 12 : Math.max(c.baseWpm / c.mult / 12 * 0.85, S.avgRate * 1.0)) * (S.demo ? 1 : MK.ref);
       const gap = P.dist - c.dist;                       // + = rival is behind
-      const rubber = S.demo ? 0 : clamp(gap / 140, -1, 1) * (gap > 0 ? 0.32 : 0.22);
+      const rubber = S.demo ? 0 : clamp(gap / 140, -1, 1) * (gap > 0 ? MK.behind : MK.ahead);
       const wob = 1 + Math.sin(T * 0.5 + c.wob) * 0.07 + Math.sin(T * 1.3 + c.wob * 2) * 0.04;
       c.rubber = rubber * 0.55;
       cps = ref * m * wob * (1 + rubber * 0.45) * (S.demo ? 1.5 : 1);

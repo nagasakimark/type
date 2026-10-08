@@ -55,9 +55,10 @@
     G = g;
     S = {
       team: team(), stage: 0, stopI: 0, cz: 0, phase: 'move', t: 0, enemies: [], shots: [], critters: [], splats: [], goo: [], msg: null, chipRects: [], msgRect: null, queue: [], qt: 0,
-      tank: 100, ultra: 0, ultraFx: null, lock: new TM.LockOn(), bot: { acc: 0 }, recoil: 0, aim: 0, pair: ['#FF3EA5', '#B8F03A'], shotI: 0, hitFlash: 0, wipe: null, amt: 0, cov: 0, stageCov: [],
+      ad: new TM.Adapt(g.diff), lastDone: 0, tank: 100, ultra: 0, ultraFx: null, lock: new TM.LockOn(), bot: { acc: 0 }, recoil: 0, aim: 0, pair: ['#FF3EA5', '#B8F03A'], shotI: 0, hitFlash: 0, wipe: null, amt: 0, cov: 0, stageCov: [],
       splatted: 0, ultras: 0, bossesDown: 0, thumbs: [], turf: [], lowT: 0, comboShown: 0, lastDmgT: -9, topY: 110, muzzle: { x: VX + 430, y: H - 200 }, ending: false, stats: { glob: 0 },
     };
+    g.ad = S.ad;
     parts.clear(); INK.quality = 0; slowN = 0;
     newStage(g, Math.min(NSTAGE - 1, +(TM.U.qs('stage') || 0)));
   }
@@ -109,13 +110,16 @@
       default: items = [takeWord(g, { kind: 'word', maxLen })];
     }
     const total = items.reduce((a, it) => a + it.len, 0);
-    let time = baseTime() + total * perKey();
-    if (type === 'tiny') time = baseTime() * 0.55 + total * perKey();
-    if (type === 'glob') time = [4.6, 3.6, 2.8][diffK()] + total * perKey() * 0.5;
+    /* time to reach the player = what THIS player needs for these letters right now (rubber band) + a little walking slack */
+    const need = (g.demo ? total * perKey() : total / S.ad.demand * 1.6);
+    let time = (g.demo ? baseTime() : 2.2) + need;
+    if (type === 'tiny') time = (g.demo ? baseTime() * 0.55 : 1.6) + need;
+    if (type === 'glob') time = (g.demo ? [4.6, 3.6, 2.8][diffK()] : 1.8) + need * 0.6;
     const z0 = o.z ?? (Z_FAR + U.rand(-1, 4));
+    const bornT = S.t;
     const x0 = o.x ?? laneX(g);
     const e = {
-      type, x: x0, x0, z: z0, y: 0, speed: ((z0 - Z_ATK) / time) * T.spd * (g.demo ? 0.8 : 1), items, idx: 0, typer: new TM.Typer(items[0]), alive: true, state: 'walk', t: U.rand(0, 9), seed: U.rand(0, 20), var: U.randi(0, 2),
+      bornT, zStart: z0, type, x: x0, x0, z: z0, y: 0, speed: ((z0 - Z_ATK) / time) * T.spd * (g.demo ? 0.8 : 1), items, idx: 0, typer: new TM.Typer(items[0]), alive: true, state: 'walk', t: U.rand(0, 9), seed: U.rand(0, 20), var: U.randi(0, 2),
       col: U.shade(INK.GREY[type], U.rand(-0.06, 0.1)), spots: [], sq: 0, phase: 0, locked: false, danger: 0, shield: type === 'brolly', hurt: 0, near: false, blink: 0, look: 0, kick: 0,
       dmg: type === 'glob' ? 9 : type === 'split' || type === 'stilt' ? 16 : 12, doomT: 0, chipW: 0,
     };
@@ -137,12 +141,12 @@
     const rec = RECIPES[S.stage][S.stopI]; if (!rec) return;
     const list = []; for (const [t, n] of rec) for (let i = 0; i < n; i++) list.push(t);
     U.shuffle(list);
-    const gap = [2.8, 2.5, 2.2, 2.0][S.stage] * [1.4, 1, 0.82][diffK()];
+    const gap = [2.8, 2.5, 2.2, 2.0][S.stage] * [1.4, 1, 0.82][diffK()] * (G.demo ? 1 : S.ad.pick(1.3, 0.8));
     let t = 0.9;
     S.queue = []; S.qt = 0;
     for (const type of list) { S.queue.push({ t, type }); t += gap * U.rand(0.75, 1.3) + (type === 'tiny' ? 1.2 : 0); }
   }
-  function maxAlive() { const m = [3, 4, 5][diffK()] + (S.stage >= 2 ? 1 : 0) - (S.tank < 35 ? 1 : 0); return Math.max(2, m); }
+  function maxAlive() { const m = [3, 4, 5][diffK()] + (S.stage >= 2 ? 1 : 0) - (S.tank < 35 ? 1 : 0) + (S.ad.load > 0.8 ? 1 : S.ad.load < 0.2 ? -1 : 0); return Math.max(2, m); }
 
   /* ---------------- bosses ---------------- */
   function startBoss(g) {
@@ -189,6 +193,7 @@
       missCost(g, k);
       return;
     }
+    if (target && target.k0 == null) target.k0 = S.t;
     if (target) fire(g, target, result === 'done');
   }
   function onBack() { S.lock.release(); }
@@ -209,6 +214,7 @@
     parts.sprite('muzzle_02', S.muzzle.x, S.muzzle.y - 14, 120, { color: col, life: 0.1, rot: -0.15 + S.aim * 1, add: false, a: 0.95, size: 120 });
     parts.sprite('circle_05', S.muzzle.x, S.muzzle.y, 140, { color: '#ffffff', life: 0.12, add: true, a: 0.9 });
     INK.snd('shot', 0.55, U.rand(0.95, 1.3));
+    if (final && !e.boss && !G.demo && e.k0 != null) { const margin = U.clamp((e.z - Z_ATK) / Math.max(1, e.zStart - Z_ATK), 0, 1); S.ad.word(e.typer.typedReq || e.items[e.idx].len, S.t - e.k0, e.typer.errors, e.k0 - e.bornT, S.t - Math.max(S.lastDone, e.bornT), margin); S.lastDone = S.t; }
     if (final) { e.state = e.boss ? e.state : 'doomed'; e.doomT = 0; e.dizzy = !e.boss; if (e.locked) { /* lock released by LockOn */ } }
   }
   const eScreen = (e) => {
@@ -342,6 +348,7 @@
 
   /* ---------------- damage ---------------- */
   function hitPlayer(g, e) {
+    if (!g.demo) S.ad.fail();
     e.alive = false; S.lock.locked === e && S.lock.release();
     const s = { x: INK.sx(e.x, e.z), y: INK.gy(e.z) };
     // harmless goo splats on the screen edges, never anything scary

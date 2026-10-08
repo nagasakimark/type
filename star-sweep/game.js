@@ -5,7 +5,7 @@
   const TM = window.TM, SS = window.SS, C = TM.C, U = TM.U, D = TM.draw, P = D.P;
   const W = 1920, H = 1080, SX = W / 2;
   const rnd = U.rand, clamp = U.clamp, lerp = U.lerp;
-  const JF = '"Hiragino Maru Gothic ProN", "BIZ UDGothic", "Yu Gothic UI", "Meiryo", "Noto Sans CJK JP", sans-serif';
+  const JF = '"TM JP", "Hiragino Maru Gothic ProN", "BIZ UDGothic", "Yu Gothic UI", "Meiryo", "Noto Sans CJK JP", sans-serif';
   const KV = (px) => `${px}px KenVector, "Baloo 2", "Arial Rounded MT Bold", ${JF}`;
   const BD = (px, w) => `${w || 800} ${px}px "Baloo 2", "Arial Rounded MT Bold", ${JF}`;
   const BOLTS = [['laserBlue04', '#8fdcff'], ['laserGreen04', '#a6ff9d'], ['laserRed04', '#ff9a9a'], ['laserBlue07', '#fff2a0']];
@@ -179,7 +179,7 @@
   }
   function spawnToken(g, tok) {
     const F = S.F;
-    if (tok === 'swarm') { const cx = rnd(F.xmin + 250, F.xmax - 250); for (let i = 0; i < 3; i++) spawn(g, 'kamikaze', { x: cx + (i - 1) * 190, y: F.top - 130 - Math.abs(i - 1) * 60, delay: i * 0.12 }); g.fx.pop(SX, F.bottom - 330, 'SWARM!', { color: '#ff8a8a', size: 60, life: 1.2 }); snd('lowThreeTone', { vol: 0.3 }); }
+    if (tok === 'swarm') { const cx = rnd(F.xmin + 250, F.xmax - 250); for (let i = 0; i < 3; i++) spawn(g, 'kamikaze', { x: cx + (i - 1) * 190, y: F.top - 130 - Math.abs(i - 1) * 60, delay: i * 0.12 }); g.fx.pop(SX, F.bottom - 330, 'むれが きた！', { color: '#ff8a8a', size: 60, life: 1.2 }); snd('lowThreeTone', { vol: 0.3 }); }
     else if (tok === 'shower') { for (let i = 0; i < 4; i++) S.queue.unshift('meteor'); S.spawnT = 0.4; S.plan.cap += 1; }
     else if (tok === 'powerup') spawnPower(g);
     else if (tok === 'boss') spawnBoss(g);
@@ -463,7 +463,7 @@
       for (let i = 0; i < n; i++) { const a = -Math.PI / 2 + (i - (n - 1) / 2) * 1.0; spawn(g, 'mini', { x, y, vx: Math.cos(a) * 420 + (i - 1) * 40, vy: Math.sin(a) * 120 + 40 }); }
       SS.fx.ring(x, y, 260, '#ff8fe0', 0.6); snd('phaseJump3', { vol: 0.3, rate: 1.4 });
     }
-    if (T === 'ace') { g.fx.pop(x, y + 60, 'MINI-BOSS DOWN!', { color: '#ff9bd8', size: 56, life: 1.4 }); SS.fx.confettiStars(x, y, 14); if (S.hull < 100 && !o.silent) S.hull = Math.min(100, S.hull + 8); spawnPower(g, x, y); }
+    if (T === 'ace') { g.fx.pop(x, y + 60, 'ミニボス げきは！', { color: '#ff9bd8', size: 56, life: 1.4 }); SS.fx.confettiStars(x, y, 14); if (S.hull < 100 && !o.silent) S.hull = Math.min(100, S.hull + 8); spawnPower(g, x, y); }
     else if (!o.silent && !g.demo && T !== 'mini' && T !== 'boss' && S.puCool <= 0 && Math.random() < 0.07 && !S.enemies.some((q) => q.alive && q.type === 'powerup')) spawnPower(g, x, y);
   }
   function bossPhaseBreak(g, e, b) {
@@ -573,7 +573,7 @@
     S.lockT = null; for (const e of S.enemies) e.locked = false;
     snd('hugeBoom', { vol: 0.6 }); snd('lose', { vol: 0.5, delay: 0.4 });
     const sector = S.sector + 1, wave = S.wave + 1;
-    g.end({ win: false, delay: 2600, title: 'Ship needs repairs!', sub: `You flew through Sector ${sector} – ${SS.SECTORS[S.sector].name}`, targetMet: S.sector >= 2, stats: [['Sector', sector], ['Wave', wave]] });
+    g.end({ win: false, delay: 2600, title: 'ふねを しゅうりしよう！', sub: `セクター${sector}（${SS.SECTORS[S.sector].name}）まで いったよ`, targetMet: S.sector >= 2, stats: [['セクター', sector], ['ウェーブ', wave]] });
   }
   function impact(g, e, F) {
     e.alive = false; if (S.lockT === e) release(true);
@@ -585,7 +585,7 @@
     if (g.demo || g.state !== 'play') return;
     g.missWord(e.item); g.score.breakCombo(); S.escaped++;
     S.ad.fail(); S.pace = Math.max(0.7, S.pace - 0.05);
-    g.fx.pop(x, y - 70, 'Ouch!', { color: '#ff8a8a', size: 46 });
+    g.fx.pop(x, y - 70, 'いたっ！', { color: '#ff8a8a', size: 46 });
     hurtPlayer(g, e.T.dmg * (e.type === 'ace' ? 1 : 1), x, F.impactY, 'ram');
   }
 
@@ -624,7 +624,7 @@
     SS.fx.ring(sh.x, sh.y, 2000, '#7fdcff', 0.8, 'p_circle3'); SS.fx.ring(sh.x, sh.y, 1300, '#ffffff', 0.6); g.fx.shake(10, 0.25); S.flash = { a: 0.25, c: '#8fe0ff' };
     for (const e of S.enemies) if (e.alive && e.seen && e.type !== 'powerup' && e.type !== 'boss') { e.stun = 2.6; e.push = 520; e.flash = 1; }
     for (const s of S.shots) { s.dead = true; SS.fx.sparks(s.x, s.y, 4, '#ffffff', 300, 20); }
-    g.fx.pop(SX, S.F.bottom - 330, 'PULSE! Breathe...', { color: '#8fe0ff', size: 60, life: 1.4 });
+    g.fx.pop(SX, S.F.bottom - 330, 'パルス！ ふかこきゅう…', { color: '#8fe0ff', size: 60, life: 1.4 });
   }
 
   /* ---------- update ---------- */
@@ -767,7 +767,7 @@
     }
     if (S.vt > 1.2 && Math.random() < dt * 5) SS.fx.emit({ spr: 'p_symbol1', x: SX + rnd(-230, 230), y: (F.top + F.bottom) / 2 + 150, vx: rnd(-20, 20), vy: -rnd(70, 140), life: 2.4, s0: 46, s1: 70, a0: 1, a1: 0, add: true, tint: '#ff7fb5', rot: rnd(-0.3, 0.3), fadeIn: 0.2 });
     if (S.vt > 6.2 && g.state === 'play') {
-      g.end({ win: true, delay: 300, title: 'Planet Pip is saved!', sub: 'You swept every sector clean!', targetMet: true, stats: [['Sectors', 5]] });
+      g.end({ win: true, delay: 300, title: 'ピップわくせいを すくった！', sub: 'ぜんぶの セクターを きれいにしたよ！', targetMet: true, stats: [['セクター', 5]] });
     }
   }
 
@@ -909,7 +909,7 @@
       if (e.type === 'boss' && !e.targetable && !e.dyingBoss) continue;
       if (e.type === 'boss' && e.dyingBoss) continue;
       S.chipRects.push(Object.assign(chipRect(ctx, g, e, c), { id: e.id, type: e.type, ey: e.y, typable: canType(e) }));
-      if (e.type === 'shielded' && !e.shieldGone) { D.text(ctx, 'SHIELD!', c.x, c.y - 44, { font: KV(18), size: 18, color: '#bfe6ff', outline: 7 }); }
+      if (e.type === 'shielded' && !e.shieldGone) { D.text(ctx, 'シールド！', c.x, c.y - 44, { font: KV(18), size: 18, color: '#bfe6ff', outline: 7 }); }
       D.chip(ctx, c.x, c.y, e.typer, { size: c.size, accent, locked: e.locked, hint: g.hint, alpha: (e.doomed ? 0.5 : 1) * Math.min(1, 0.4 + e.seenT * 6), dim: false });
     }
   }
@@ -972,8 +972,8 @@
     ctx.fillStyle = 'rgba(8,10,34,0.35)'; ctx.fill(P.rr(x0 - 20, yb - 22, 430, 112, 26));
     ctx.restore();
     const low = S.hull < 30;
-    bar(ctx, x0 + 52, yb - 4, 310, 26, S.shield / 100, '#8fe9ff', '#2f9bff', 'SHIELD');
-    bar(ctx, x0 + 52, yb + 42, 310, 26, S.hull / 100, S.hull > 50 ? '#9dff9d' : S.hull > 28 ? '#ffe066' : '#ff8a8a', S.hull > 50 ? '#2bb673' : S.hull > 28 ? '#ffa31a' : '#e5383b', 'HULL');
+    bar(ctx, x0 + 52, yb - 4, 310, 26, S.shield / 100, '#8fe9ff', '#2f9bff', 'シールド');
+    bar(ctx, x0 + 52, yb + 42, 310, 26, S.hull / 100, S.hull > 50 ? '#9dff9d' : S.hull > 28 ? '#ffe066' : '#ff8a8a', S.hull > 50 ? '#2bb673' : S.hull > 28 ? '#ffa31a' : '#e5383b', 'ボディ');
     SS.spr(ctx, 'pu_shield_silver', x0 + 20, yb + 9, { s: 1.5, tint: S.inv > 0 ? '#ffe066' : null });
     SS.spr(ctx, 'life_blue', x0 + 20, yb + 55, { s: 1.5 });
     if (low && Math.sin(S.t * 10) > 0) { ctx.save(); ctx.globalCompositeOperation = 'lighter'; SS.spr(ctx, 'p_circle5', x0 + 20, yb + 55, { max: 60, a: 0.8, tint: '#ff5050' }); ctx.restore(); }
@@ -989,9 +989,9 @@
     ctx.strokeStyle = mc; ctx.beginPath(); ctx.arc(cx, cy, 58, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * clamp(k, 0.001, 1)); ctx.stroke();
     ctx.restore();
     D.text(ctx, 'x' + mult, cx, cy - 8, { font: BD(54), size: 54, color: mc, outline: 10 });
-    D.text(ctx, combo >= 2 ? `COMBO ${combo}` : 'COMBO', cx, cy + 32, { font: BD(21, 700), size: 21, color: '#fff', outline: 6 });
+    D.text(ctx, combo >= 2 ? `コンボ ${combo}` : 'コンボ', cx, cy + 32, { font: BD(21, 700), size: 21, color: '#fff', outline: 6 });
     if (S.comboFlash) { const f = S.comboFlash, kk = f.t / 1.1; ctx.save(); ctx.globalAlpha = kk > 0.7 ? 1 - (kk - 0.7) / 0.3 : 1; D.text(ctx, f.text + '!', cx, cy - 150 - kk * 20, { font: KV(34), size: 34, color: f.color, outline: 9 }); ctx.restore(); }
-    if (S.comboLostT > 0) D.text(ctx, 'combo lost', cx, cy - 92, { size: 28, color: '#ff9a9a', outline: 8 });
+    if (S.comboLostT > 0) D.text(ctx, 'コンボ きれた', cx, cy - 92, { size: 28, color: '#ff9a9a', outline: 8 });
     // pulse indicator + power-up timers
     let px = cx - 120;
     const timers = [];
@@ -1004,7 +1004,7 @@
     }
     // pulse
     const pr = S.pulse > 0;
-    D.text(ctx, pr ? 'ENTER = PULSE' : 'pulse used', W - 60, F.bottom - 188, { font: KV(17), size: 17, color: pr ? '#8fe9ff' : 'rgba(255,255,255,0.4)', align: 'right', outline: 6 });
+    D.text(ctx, pr ? 'Enter = パルス' : 'パルス つかった', W - 60, F.bottom - 188, { font: KV(17), size: 17, color: pr ? '#8fe9ff' : 'rgba(255,255,255,0.4)', align: 'right', outline: 6 });
     // boss bar
     const b = S.boss;
     if (b && b.alive && !b.dyingBoss && b.seen && !S.banner) drawBossBar(ctx, g, F, b);
@@ -1081,8 +1081,8 @@
       ctx.globalAlpha = a * (done || cur ? 1 : 0.55); const im = SS.planets[pl]; if (im) ctx.drawImage(im, x - size / 2, y - size / 2, size, size); ctx.globalAlpha = a;
       if (done) { ctx.fillStyle = '#2bb673'; ctx.strokeStyle = '#fff'; ctx.lineWidth = 5; ctx.beginPath(); ctx.arc(x + size * 0.36, y - size * 0.36, 24, 0, 7); ctx.fill(); ctx.stroke(); ctx.strokeStyle = '#fff'; ctx.lineWidth = 7; ctx.beginPath(); ctx.moveTo(x + size * 0.36 - 11, y - size * 0.36); ctx.lineTo(x + size * 0.36 - 3, y - size * 0.36 + 9); ctx.lineTo(x + size * 0.36 + 12, y - size * 0.36 - 9); ctx.stroke(); }
       if (cur) { ctx.strokeStyle = sec.accent; ctx.lineWidth = 6; ctx.setLineDash([14, 12]); ctx.lineDashOffset = -S.t * 30; ctx.beginPath(); ctx.arc(x, y, size * 0.62, 0, 7); ctx.stroke(); ctx.setLineDash([]); }
-      D.text(ctx, i === 4 ? 'Planet Pip' : sec.name, x, y + size / 2 + 36, { size: 32, color: cur || done ? '#fff' : '#9aa7d6', outline: 9 });
-      if (i === 4) { D.text(ctx, 'needs help!', x, y + size / 2 + 74, { size: 28, color: '#ffd66b', outline: 8 }); }
+      D.text(ctx, i === 4 ? 'ピップわくせい' : sec.name, x, y + size / 2 + 36, { size: 32, color: cur || done ? '#fff' : '#9aa7d6', outline: 9 });
+      if (i === 4) { D.text(ctx, 'たすけて！', x, y + size / 2 + 74, { size: 28, color: '#ffd66b', outline: 8 }); }
     }
     // ship flying along the path
     const ft = clamp((t - 1.0) / 3.4, 0, 1), e = U.ease.inOut(ft); const A = pts[m.from], B = pts[m.to];
@@ -1091,8 +1091,8 @@
     ctx.save(); ctx.translate(sx, sy); ctx.rotate(ang);
     ctx.globalCompositeOperation = 'lighter'; SS.spr(ctx, FIRE[Math.floor(t * 22) % FIRE.length], -10, 26, { sw: 16, sh: 50, ay: 0.05 }); SS.spr(ctx, FIRE[(Math.floor(t * 22) + 3) % FIRE.length], 10, 26, { sw: 16, sh: 50, ay: 0.05 }); ctx.globalCompositeOperation = 'source-over';
     SS.spr(ctx, 'ship1_blue', 0, 0, { s: 1.0 }); ctx.restore();
-    if (t > 1.5 && Math.sin(t * 5) > -0.3) D.text(ctx, 'Press SPACE to launch', SX, cy + 300, { size: 40, color: '#fff', outline: 10 });
-    D.text(ctx, S.hull >= 99 ? 'Hull fully repaired!' : 'Hull repaired a bit!', SX, cy + 350, { size: 28, color: '#9dff9d', outline: 8, font: BD(28, 600) });
+    if (t > 1.5 && Math.sin(t * 5) > -0.3) D.text(ctx, 'スペースで はっしん！', SX, cy + 300, { size: 40, color: '#fff', outline: 10 });
+    D.text(ctx, S.hull >= 99 ? 'ふねが ぜんぶ なおった！' : 'ふねが ちょっと なおった！', SX, cy + 350, { size: 28, color: '#9dff9d', outline: 8, font: BD(28, 600) });
     ctx.restore();
   }
   function drawVictory(ctx, g, F) {
@@ -1106,13 +1106,13 @@
     const im = SS.planets[3]; if (im) ctx.drawImage(im, px - size / 2, py - size / 2, size, size);
     // happy eyes + smile on the planet (the lost planet is friendly!)
     if (t > 1.0) { const e = clamp((t - 1.0) / 0.5, 0, 1); ctx.save(); ctx.translate(px, py + size * 0.04); ctx.globalAlpha = e; const s = size / 560; ctx.scale(s, s); D.eyes(ctx, 0, 0, 34, 'happy', 0, 0, 1.4); D.mouth(ctx, 0, 62, 34, 'grin'); D.cheeks(ctx, 0, 0, 34, 1.4); ctx.restore(); }
-    if (t > 1.4) { const e = U.ease.outBack(clamp((t - 1.4) / 0.5, 0, 1)); ctx.save(); ctx.translate(SX, F.top + (F.bottom - F.top) * 0.16); ctx.scale(e, e); D.text(ctx, 'PLANET PIP IS SAVED!', 0, 0, { font: KV(86), size: 86, color: '#fff', outline: 18 }); ctx.restore(); }
-    if (t > 2.4) { const e = clamp((t - 2.4) / 0.6, 0, 1); ctx.save(); ctx.globalAlpha = e; D.text(ctx, 'Thank you, Star Sweeper!', SX, cy + size / 2 + 80, { size: 62, color: '#ffe066', outline: 14 }); ctx.restore(); }
+    if (t > 1.4) { const e = U.ease.outBack(clamp((t - 1.4) / 0.5, 0, 1)); ctx.save(); ctx.translate(SX, F.top + (F.bottom - F.top) * 0.16); ctx.scale(e, e); D.text(ctx, 'ピップわくせい すくった！', 0, 0, { font: KV(86), size: 86, color: '#fff', outline: 18 }); ctx.restore(); }
+    if (t > 2.4) { const e = clamp((t - 2.4) / 0.6, 0, 1); ctx.save(); ctx.globalAlpha = e; D.text(ctx, 'ありがとう、スタースイーパー！', SX, cy + size / 2 + 80, { size: 62, color: '#ffe066', outline: 14 }); ctx.restore(); }
   }
 
   function drawLoading(ctx, g, F) {
     const v = F.v; ctx.fillStyle = '#05061a'; ctx.fillRect(v.x - 100, v.y - 100, v.w + 200, v.h + 200);
-    D.text(ctx, 'Loading space…', SX, H / 2, { size: 60, color: '#fff', outline: 12 });
+    D.text(ctx, 'うちゅうを じゅんびちゅう…', SX, H / 2, { size: 60, color: '#fff', outline: 12 });
     ctx.fillStyle = 'rgba(255,255,255,0.2)'; ctx.fill(P.rr(SX - 300, H / 2 + 60, 600, 16, 8)); ctx.fillStyle = '#7B5CFF'; ctx.fill(P.rr(SX - 300, H / 2 + 60, 600 * SS.progress, 16, 8));
   }
 
@@ -1147,21 +1147,21 @@
 
   const G = TM.game({
     id: 'star-sweep', name: 'Star Sweep', accent: C.sweep, bg: '#05061a', dark: true,
-    logoHTML: 'Star<br>Sweep', tagline: 'Clean up space, one word at a time!',
+    logoHTML: 'Star<br>Sweep', tagline: 'ことばを タイプして うちゅうを きれいに しよう！',
     lifeIcon: TM.ui.heartSVG('#7B5CFF'),
     howto: [
-      'Robo-drones are bothering <b>Planet Pip</b>! Fly through 5 sectors to rescue it.',
-      'Type the first letter of a ship\'s word to <b>lock on</b>. Every correct letter fires a laser. Finish the word to blow the ship up!',
-      '<b>Backspace</b> lets go of a lock. A wrong key only breaks your combo.',
-      'Shielded ships need <b>two words</b>. Zippy little missiles have short words. Splitters break into mini ships.',
-      'Type a <b>power-up\'s</b> small word to grab it: Shield, Bomb, Slow time, x2 score, Repair.',
-      'Every sector ends with a <b>Boss</b>: type its sentence to chew its health bar away. Its attacks drain your shield, so keep typing!',
-      'Press <b>Enter</b> for an Emergency Pulse once per sector. It pushes all ships back.',
+      'ロボドローンが <b>ピップわくせい</b>を こまらせてる！ 5つの セクターを とんで たすけよう。',
+      'ふねの ことばの <b>さいしょの もじ</b>を うつと <b>ロックオン</b>。ただしい もじごとに レーザーが でるよ。さいごまで うって ばくはつ！',
+      '<b>Backspace</b>で ロックを はずせるよ。まちがえても コンボが きれるだけ。',
+      'シールドの ふねは <b>ことばが 2つ</b>。ちいさい ミサイルは みじかい ことば。スプリッターは ちいさく わかれるよ。',
+      '<b>パワーアップ</b>の ことばを うつと ゲット：シールド、ボム、スロー、とくてん2ばい、かいふく。',
+      'セクターの さいごは <b>ボス</b>！ ぶんしょうを うって たいりょくを けずろう。こうげきを うけるから うち つづけてね！',
+      '<b>Enter</b>で パルスが つかえるよ（セクターごとに 1かい）。てきを ぜんぶ おしもどす！',
     ],
     init: () => { SS.bg.init(); SS.load(); SS.bg.set(0, true); },
     reset, update, draw, onKey, onBack, onEnter,
     nextKey: () => { if (!S) return null; const t = S.lockT || S.enemies.filter((e) => e.alive && !e.doomed && e.type !== 'powerup').sort((a, b) => (b.danger || 0) - (a.danger || 0))[0]; return t ? t.typer.nextReq() : null; },
-    hud: (g) => ({ lives: 0, maxLives: 0, right: S ? (S.mode === 'victory' ? 'Planet Pip!' : `Sector ${S.sector + 1} · Wave ${Math.min(S.wave + 1, S.perSector)}/${S.perSector}`) : '', progress: S ? (S.sector * S.perSector + S.wave + (S.mode === 'clear' || S.mode === 'map' ? 1 : 0) + (S.mode === 'victory' ? 1 : 0)) / (5 * S.perSector) : 0 }),
+    hud: (g) => ({ lives: 0, maxLives: 0, right: S ? (S.mode === 'victory' ? 'ピップわくせい！' : `セクター ${S.sector + 1} ・ ウェーブ ${Math.min(S.wave + 1, S.perSector)}/${S.perSector}`) : '', progress: S ? (S.sector * S.perSector + S.wave + (S.mode === 'clear' || S.mode === 'map' ? 1 : 0) + (S.mode === 'victory' ? 1 : 0)) / (5 * S.perSector) : 0 }),
   });
 
   /* dev hooks, only with ?dev=1 (used by the Playwright tests to jump around) */

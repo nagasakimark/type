@@ -4,23 +4,23 @@
   const TM = window.TM, C = TM.C, D = TM.draw, A = TM.art, el = TM.ui.el;
 
   const GAMES = [
-    { id: 'word-jumper', name: 'Word Jumper', c: C.jumper, tag: 'Start here!', like: 'Word Jumper (platform runner)',
-      desc: 'Hop Pip the frog over logs, sandcastles and snowmen. One word at a time.' },
-    { id: 'word-ninja', name: 'Word Ninja', c: C.ninja, tag: 'Food words!', like: 'Fruit Ninja',
-      desc: 'Fruit flies up from the counter. Type its word to slice it before it falls.' },
-    { id: 'star-sweep', name: 'Star Sweep', c: C.sweep, tag: 'Space!', like: 'ZType',
-      desc: 'Sweep grumpy space junk with sparkle shots before it reaches the station.' },
-    { id: 'turbo-type', name: 'Turbo Type', c: C.turbo, tag: 'Race!', like: 'Nitro Type',
-      desc: 'Your kart goes as fast as you type. Beat three rivals and your own ghost.' },
-    { id: 'ink-rush', name: 'Ink Rush', c: C.ink2, tag: 'Splat!', like: 'The Typing of the Dead + Splatoon',
-      desc: 'Splat the sleepy grey Gloops with colour ink and paint the whole town.' },
+    { id: 'word-jumper', name: 'Word Jumper', c: C.jumper, tag: 'まずは これ！', like: 'アクションゲーム',
+      desc: 'カエルの ピップが ジャンプ！ ことばを うって きや すなのおしろを とびこえよう。' },
+    { id: 'word-ninja', name: 'Word Ninja', c: C.ninja, tag: 'たべもの！', like: 'フルーツ ニンジャ',
+      desc: 'とんでくる フルーツの ことばを うって おちるまえに スパッと きろう。' },
+    { id: 'star-sweep', name: 'Star Sweep', c: C.sweep, tag: 'うちゅう！', like: 'シューティング',
+      desc: 'ステーションに つくまえに うちゅうの ゴミを ビームで きれいにしよう。' },
+    { id: 'turbo-type', name: 'Turbo Type', c: C.turbo, tag: 'レース！', like: 'タイピング レース',
+      desc: 'タイプした ぶんだけ カートが はやく なる！ ライバル 3だいと ゴーストに かとう。' },
+    { id: 'ink-rush', name: 'Ink Rush', c: C.ink2, tag: 'ベチャッ！', like: 'インク シューティング',
+      desc: 'ねむそうな はいいろの グルーに インクを ぶつけて まちじゅうを ぬろう。' },
   ];
 
   /* ---------- header controls ---------- */
   const openPicker = () => TM.ui.picker('', () => { refresh(); });
   document.getElementById('controls').append(
-    el('button', { class: 'tm-btn', onclick: teacher }, 'Teacher QR'),
-    el('button', { class: 'tm-btn icon', title: 'Settings', 'aria-label': 'Settings', onclick: () => TM.ui.settings() }, '\u2699'));
+    el('button', { class: 'tm-btn', onclick: teacher }, '先生用 QR'),
+    el('button', { class: 'tm-btn icon', title: 'せってい', 'aria-label': 'せってい', onclick: () => TM.ui.settings() }, '\u2699'));
 
   /* ---------- the "your words" bar ---------- */
   const wordsBtn = document.getElementById('words');
@@ -31,9 +31,9 @@
   const cabs = GAMES.map((gm) => {
     const stars = el('div', { class: 'stars' });
     const a = el('a', { class: 'cab', style: { '--c': gm.c }, href: gm.id + '/index.html' },
-      el('div', { class: 'screen' }, el('img', { src: 'assets/hub/' + gm.id + '.webp', alt: gm.name + ' gameplay screenshot', loading: 'lazy', width: 960, height: 540 }), el('span', { class: 'tag' }, gm.tag)),
-      el('div', { class: 'info' }, el('h2', {}, gm.name), el('p', {}, gm.desc), el('span', { class: 'like' }, el('b', {}, 'Based on '), gm.like),
-        el('div', { class: 'row' }, stars, el('span', { class: 'go' }, 'Play \u25B6'))));
+      el('div', { class: 'screen' }, el('img', { src: 'assets/hub/' + gm.id + '.webp', alt: gm.name + ' の がめん', loading: 'lazy', width: 960, height: 540 }), el('span', { class: 'tag' }, gm.tag)),
+      el('div', { class: 'info' }, el('h2', {}, gm.name), el('p', {}, gm.desc), el('span', { class: 'like' }, el('b', {}, 'ジャンル：'), gm.like),
+        el('div', { class: 'row' }, stars, el('span', { class: 'go' }, 'あそぶ \u25B6'))));
     a.style.setProperty('--c', gm.c);
     a.addEventListener('pointerenter', () => { try { TM.sfx.click(); } catch (e) { /* audio locked */ } });
     grid.append(a);
@@ -49,10 +49,10 @@
       book ? el('span', { class: 'cover' }, el('img', { src: book.cover, alt: '' })) : null,
       first && first.image ? el('span', { class: 'thumb' }, el('img', { src: first.image, alt: '' })) : null,
       el('span', { class: 'txt' },
-        el('span', { class: 'k' }, 'Your words'),
+        el('span', { class: 'k' }, 'いまの たんご'),
         el('span', { class: 'v' }, TM.deck.label(ids)),
-        el('span', { class: 'm' }, (book ? book.name : '') + (ids.length > 1 ? ` + ${ids.length - 1} more list${ids.length > 2 ? 's' : ''}` : ''))),
-      el('span', { class: 'chg' }, 'Change \u25B8'));
+        el('span', { class: 'm' }, (book ? book.name : '') + (TM.progress && ids.length === 1 ? '  ・  クリア ' + TM.progress.games(ids[0]).length + '/' + TM.progress.GAMES.length : '') + (ids.length > 1 ? ` ほか ${ids.length - 1}こ` : ''))),
+      el('span', { class: 'chg' }, 'かえる \u25B8'));
     const q = '?deck=' + encodeURIComponent(ids.join(','));
     const key = TM.deck.key(ids);
     for (const c of cabs) {
@@ -73,27 +73,27 @@
   }
   function teacher() {
     const sel = el('select', {}, GAMES.map((g) => el('option', { value: g.id }, g.name)));
-    const diff = el('select', {}, [['gentle', 'Gentle'], ['normal', 'Normal'], ['turbo', 'Turbo']].map(([d, l]) => el('option', { value: d, selected: d === 'normal' }, l)));
+    const diff = el('select', {}, [['gentle', 'ゆっくり'], ['normal', 'ふつう'], ['turbo', 'ターボ']].map(([d, l]) => el('option', { value: d, selected: d === 'normal' }, l)));
     const quiet = el('input', { type: 'checkbox' });
     const card = el('div', { class: 'tm-card tm-modal tm-small' },
-      el('header', {}, el('h2', {}, 'QR code for class'), el('button', { class: 'tm-btn icon', 'aria-label': 'Close', onclick: () => m.close() }, '\u2715')),
+      el('header', {}, el('h2', {}, 'クラス用 QRコード'), el('button', { class: 'tm-btn icon', 'aria-label': 'とじる', onclick: () => m.close() }, '\u2715')),
       el('div', { class: 'body' },
-        el('div', { style: { font: '500 17px/1.4 var(--word)' } }, 'Students scan the code with a tablet or phone and the game opens on your word list (', el('b', {}, TM.deck.label()), ').'),
-        el('label', { class: 'tm-field' }, 'Game', sel),
-        el('label', { class: 'tm-field' }, 'Mode', diff),
-        el('label', { class: 'tm-field' }, 'Start with sound off', quiet)),
-      el('footer', {}, el('button', { class: 'tm-btn', onclick: () => m.close() }, 'Cancel'), el('button', { class: 'tm-btn primary', onclick: () => { const url = teacherUrl(sel.value, diff.value, quiet.checked); const name = sel.options[sel.selectedIndex].text, mode = diff.options[diff.selectedIndex].text; m.close(); showQR(url, name, mode); } }, 'Show QR code')));
+        el('div', { style: { font: '500 17px/1.4 var(--word)' } }, 'タブレットや スマホで よみとると、このたんご（', el('b', {}, TM.deck.label()), ') で ゲームが ひらきます。'),
+        el('label', { class: 'tm-field' }, 'ゲーム', sel),
+        el('label', { class: 'tm-field' }, 'モード', diff),
+        el('label', { class: 'tm-field' }, 'おとを けして はじめる', quiet)),
+      el('footer', {}, el('button', { class: 'tm-btn', onclick: () => m.close() }, 'キャンセル'), el('button', { class: 'tm-btn primary', onclick: () => { const url = teacherUrl(sel.value, diff.value, quiet.checked); const name = sel.options[sel.selectedIndex].text, mode = diff.options[diff.selectedIndex].text; m.close(); showQR(url, name, mode); } }, 'Show QR code')));
     const m = TM.ui.modal(card);
   }
   function showQR(url, gameName, mode) {
-    const box = el('div', { class: 'qrbox', html: qrSvg(url), role: 'img', 'aria-label': 'QR code for ' + gameName });
-    const out = el('input', { readonly: true, value: url, 'aria-label': 'Link', onfocus: function () { this.select(); } });
-    const copy = el('button', { class: 'tm-btn small' }, 'Copy link');
-    copy.onclick = () => { out.select(); try { navigator.clipboard.writeText(url); } catch (e) { document.execCommand('copy'); } copy.textContent = 'Copied!'; };
+    const box = el('div', { class: 'qrbox', html: qrSvg(url), role: 'img', 'aria-label': 'QRコード ' + gameName });
+    const out = el('input', { readonly: true, value: url, 'aria-label': 'リンク', onfocus: function () { this.select(); } });
+    const copy = el('button', { class: 'tm-btn small' }, 'リンクを コピー');
+    copy.onclick = () => { out.select(); try { navigator.clipboard.writeText(url); } catch (e) { document.execCommand('copy'); } copy.textContent = 'コピーしました'; };
     const card = el('div', { class: 'tm-card tm-modal tm-qr' },
-      el('header', {}, el('h2', {}, gameName + ' \u00b7 ' + mode), el('button', { class: 'tm-btn icon', 'aria-label': 'Close', onclick: () => m.close() }, '\u2715')),
-      el('div', { class: 'body qrwrap' }, box, el('div', { class: 'qrcap' }, 'Scan to play \u2022 ', el('b', {}, TM.deck.label()))),
-      el('footer', {}, el('div', { class: 'linkbox' }, out, copy), el('button', { class: 'tm-btn primary', onclick: () => m.close() }, 'Done')));
+      el('header', {}, el('h2', {}, gameName + ' \u00b7 ' + mode), el('button', { class: 'tm-btn icon', 'aria-label': 'とじる', onclick: () => m.close() }, '\u2715')),
+      el('div', { class: 'body qrwrap' }, box, el('div', { class: 'qrcap' }, 'よみとって あそぶ \u2022 ', el('b', {}, TM.deck.label()))),
+      el('footer', {}, el('div', { class: 'linkbox' }, out, copy), el('button', { class: 'tm-btn primary', onclick: () => m.close() }, 'おわり')));
     const m = TM.ui.modal(card);
   }
 

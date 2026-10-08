@@ -28,9 +28,9 @@
     [[['stilt', 1], ['jelly', 3], ['flyer', 2]], [['split', 1], ['brolly', 2], ['jumper', 3], ['tiny', 2]], [['stilt', 2], ['split', 2], ['flyer', 3], ['brolly', 2]], [['stilt', 2], ['split', 2], ['jumper', 3], ['flyer', 3], ['tiny', 2], ['brolly', 2]]],
   ];
   const BOSS_OF = ['big', 'squid', 'mama', 'king'];
-  const BOSS_NAME = ['Big Gloop', 'Grumpy Squid', 'Mama Splitter', 'Gloop King'];
-  const CALLOUTS = ['SPLAT!', 'SPLOOSH!', 'BLOOP!', 'SPLASH!', 'PLOP!', 'SPLOT!', 'WHOOSH!', 'SPLISH!'];
-  const COMBO_TXT = { 3: 'NICE!', 5: 'SPLAT-TASTIC!', 8: 'INK-CREDIBLE!', 12: 'SPLOOSH-ING!', 16: 'DRIP-DROP DIVA!', 20: 'GOOP-ER STAR!', 30: 'UNSTOPPA-BLOB!', 40: 'LEGEND OF GOO!', 50: 'INKY MASTER!' };
+  const BOSS_NAME = ['おおきな グルー', 'ふきげんな イカ', 'ママ スプリッター', 'グルーの おうさま'];
+  const CALLOUTS = ['ベチャッ！', 'ビシャッ！', 'ポヨン！', 'バシャッ！', 'ポトン！', 'ペタッ！', 'シュパッ！', 'ピシャッ！'];
+  const COMBO_TXT = { 3: 'いいね！', 5: 'すごい！', 8: 'インクの たつじん！', 12: 'ビシャビシャ！', 16: 'しずくの ひめ！', 20: 'ネバネバ スター！', 30: 'とまらない！', 40: 'でんせつの ネバネバ！', 50: 'インク マスター！' };
 
   /* ---------------- state ---------------- */
   let S = null, WS = null, G = null;
@@ -47,7 +47,7 @@
     S.pair = WS.pair; S.shotI = 0; S.lock.release();
     S.moveSpd = 0; S.cov = 0; S.stageStart = g.playT;
     S.msg = null; S.amt = 0;
-    msg(g, `STAGE ${si + 1}`, { sub: WS.def.name, life: 1.8, pri: 3, delay: g.state === 'countdown' ? 3.3 : 0 });
+    msg(g, `ステージ ${si + 1}`, { sub: WS.def.name, life: 1.8, pri: 3, delay: g.state === 'countdown' ? 3.3 : 0 });
     if (g.state === 'play' && !g.demo) TM.audio.startMusic(SONGS[si]);
   }
 
@@ -166,7 +166,7 @@
       col: INK.GREY[type], spots: [], sq: 0, phase: 0, locked: false, danger: 999, hurt: 0, near: false, blink: 0, look: 0, kick: 0, dmg: 30, doomT: 0, nph, kidsGone: 0, globT: 6, slam: 0, stagger: 0, addsT: 0, tPhase: 0, cape: '#A95C7A',
     };
     S.boss = e; S.enemies.push(e);
-    msg(g, 'BOSS!', { sub: BOSS_NAME[S.stage], life: 1.6, col: '#FF5A5F', pri: 3 });
+    msg(g, 'ボス とうじょう！', { sub: BOSS_NAME[S.stage], life: 1.6, col: '#FF5A5F', pri: 3 });
     TM.sfx.big(); G.fx.shake(10, 0.3);
     setPhaseSpeed(e);
   }
@@ -255,7 +255,7 @@
       e.idx++; e.typer = new TM.Typer(e.items[e.idx]); e.state = 'walk'; e.dizzy = false; e.shield = false;
       INK.snd('shield', 0.8, 1.3); TM.sfx.zap();
       for (let i = 0; i < 12; i++) parts.add({ type: 'drop', x: s.x + U.rand(-60, 60), y: s.y - 60 * Math.min(2, s.sc / 60), vx: U.rand(-500, 500), vy: U.rand(-700, -100), color: i % 2 ? e.canopy : e.canopy2, size: U.rand(8, 16), g: 1700, life: 0.7 });
-      msg(g, 'POP!', { life: 0.7, col: '#FFC83D' });
+      msg(g, 'ポン！', { life: 0.7, col: '#FFC83D' });
       return;
     }
     splatEnemy(g, e, col, false);
@@ -293,7 +293,7 @@
     if (g.demo) return;
     const c = g.score.combo;
     if (COMBO_TXT[c] || (c > 50 && c % 25 === 0)) {
-      msg(g, COMBO_TXT[c] || 'UNSTOPPA-BLOB!', { sub: 'x' + c, life: 1.0, col: S.pair[c % 2], pri: 2 });
+      msg(g, COMBO_TXT[c] || 'とまらない！', { sub: 'x' + c, life: 1.0, col: S.pair[c % 2], pri: 2 });
       INK.snd('combo', 0.8, 1 + Math.min(0.5, c * 0.01));
     }
   }
@@ -307,7 +307,7 @@
     parts.sprite('circle_02', s.x, s.y, 200, { color: sh.col, life: 0.5, grow: 700, add: true });
     INK.groundSplat(WS, e.x, S.cz + e.z, 3, sh.col); INK.paintNear(WS, S.cz, e.z, 14, S.pair, 3);
     INK.snd('slime', 1, 0.8); TM.sfx.big(); g.fx.shake(16, 0.2);
-    msg(g, ['OUCH-IE!', 'WOBBLE!', 'DIZZY!', 'SPLAT!'][Math.min(3, e.idx)], { life: 0.9, col: sh.col, pri: 2 });
+    msg(g, ['いたっ！', 'ふらふら！', 'めがまわる！', 'ベチャッ！'][Math.min(3, e.idx)], { life: 0.9, col: sh.col, pri: 2 });
     e.idx++;
     e.col = INK.mix(INK.GREY[e.type], S.pair[0], Math.min(0.75, e.idx / e.nph * 0.8));
     if (e.idx >= e.nph) { bossDefeated(g, e); return; }
@@ -328,7 +328,7 @@
     INK.groundSplat(WS, 0, S.cz + e.z, 5, S.pair[0]); INK.groundSplat(WS, 2, S.cz + e.z + 2, 4, S.pair[1]);
     INK.paintAllVisible(WS, S.cz, S.pair);
     g.score.add(500 + S.stage * 250);
-        msg(g, 'BOSS SPLATTED!', { sub: BOSS_NAME[S.stage] + ' is happy now', life: 1.8, col: '#FFC83D', pri: 3 });
+        msg(g, 'ボス たおした！', { sub: BOSS_NAME[S.stage] + ' は ごきげん！', life: 1.8, col: '#FFC83D', pri: 3 });
     for (const q of S.enemies) if (q.alive && q !== e) { splatEnemy(g, q, S.pair[0], true); }
     S.queue.length = 0;
     startRush(g);
@@ -362,7 +362,7 @@
     S.hitFlash = 1; g.fx.shake(e.boss ? 30 : 20, 0.3);
     INK.snd('hit', 0.9, 1); INK.snd('slime', 1, 0.7); TM.sfx.hurt();
     parts.burst(s.x, Math.min(s.y, H - 80), GOO, { count: 24, speed: [300, 900], up: 400, color2: GOO2 });
-    msg(g, 'SPLORT!', { life: 0.8, col: '#9B86E8', pri: 2 });
+    msg(g, 'ブシュッ！', { life: 0.8, col: '#9B86E8', pri: 2 });
     if (g.demo || g.state !== 'play') return;
     g.missWord(e.typer.item);
     const dmg = e.dmg * [0.35, 1, 1.35][diffK()];
@@ -384,7 +384,7 @@
     S.ultraFx = { t: 0, dur: 1.5, killed: new Set() };
     g.fx.doFlash('#ffffff', 0.7); g.fx.shake(26, 0.7);
     INK.snd('ultra', 1, 1); INK.snd('boom', 0.7, 0.9); INK.snd('rumble', 0.8, 1); TM.sfx.boost();
-    msg(g, 'ULTRA SPLAT!', { sub: 'Paint wave!', life: 1.4, pri: 4 });
+    msg(g, 'ウルトラ ベチャッ！', { sub: 'ペンキの なみ！', life: 1.4, pri: 4 });
     const v = g.vw();
     for (let i = 0; i < 20; i++) S.splats.push({ x: VX + (Math.random() - 0.5) * Math.min(v.w, W * 1.1), y: v.y + v.h * (0.3 + Math.random() * 0.7), k: U.pick(INK.SPLATS), col: colOf(i), size: U.rand(200, 400), t: -(Math.random() * 0.7), life: 0.7, rot: U.rand(0, 6.28) });
     for (let i = 0; i < 6; i++) parts.sprite('circle_02', VX, v.y + v.h, 200, { color: colOf(i), life: 0.9, grow: 3200, add: true, a: 0.8, g: 0 });
@@ -422,7 +422,7 @@
     const stars = stageStars(cov);
     if (!g.demo) {
       g.score.add(Math.round(cov * 600) + Math.round(S.tank * 4) + 200);
-      msg(g, 'TURF CAPTURED!', { sub: `${WS.def.name}: ${Math.round(cov * 100)}%  ${'★'.repeat(stars)}${'☆'.repeat(3 - stars)}`, life: 2.6, col: '#FFC83D', pri: 4, modal: true });
+      msg(g, 'まちを ぬった！', { sub: `${WS.def.name}: ${Math.round(cov * 100)}%  ${'★'.repeat(stars)}${'☆'.repeat(3 - stars)}`, life: 2.6, col: '#FFC83D', pri: 4, modal: true });
       g.fx.confetti(VX, 360, 70); INK.snd('clear', 1, 1); TM.sfx.win();
       S.tank = Math.min(100, S.tank + 30);
     }
@@ -448,7 +448,7 @@
         }
         if (!S.queue.length && !S.enemies.some((q) => q.alive) && !S.shots.length) {
           S.phase = 'clearing'; S.clearT = 0;
-          if (!g.demo) { msg(g, 'CLEAR!', { life: 0.9, pri: 2 }); S.tank = Math.min(100, S.tank + 10); INK.snd('up', 0.8, 1); }
+          if (!g.demo) { msg(g, 'クリア！', { life: 0.9, pri: 2 }); S.tank = Math.min(100, S.tank + 10); INK.snd('up', 0.8, 1); }
         }
       } else {
         if (S.stopT > 1.2 && !S.bossStarted) { S.bossStarted = true; startBoss(g); }
@@ -475,15 +475,15 @@
       }
     } else if (S.phase === 'wipe') {
       S.wipe.t += dt;
-      if (S.wipe.t > 0.7 && !S.wipe.swapped) { S.wipe.swapped = true; const w = S.wipe; const keep = { wipe: w, ult: S.ultraFx }; newStage(g, S.stage + 1); S.phase = 'wipe'; S.wipe = w; S.ultraFx = null; msg(g, `STAGE ${S.stage + 1}`, { sub: WS.def.name, life: 1.8, pri: 4 }); }
+      if (S.wipe.t > 0.7 && !S.wipe.swapped) { S.wipe.swapped = true; const w = S.wipe; const keep = { wipe: w, ult: S.ultraFx }; newStage(g, S.stage + 1); S.phase = 'wipe'; S.wipe = w; S.ultraFx = null; msg(g, `ステージ ${S.stage + 1}`, { sub: WS.def.name, life: 1.8, pri: 4 }); }
       if (S.wipe.t > 1.5) { S.wipe = null; S.phase = 'move'; }
     }
   }
   function arrive(g) {
     const isBoss = S.stopI === WS.def.stops.length - 1;
     S.bossStarted = false;
-    if (!isBoss) { queueStop(g); if (!g.demo) { msg(g, S.stopI === 0 ? 'GET READY!' : 'HERE THEY COME!', { life: 1.0, pri: 2 }); } }
-    else if (!g.demo) msg(g, 'WARNING!', { sub: 'Something big is coming', life: 1.3, col: '#FF5A5F', pri: 3 });
+    if (!isBoss) { queueStop(g); if (!g.demo) { msg(g, S.stopI === 0 ? 'じゅんび！' : 'きたぞ！', { life: 1.0, pri: 2 }); } }
+    else if (!g.demo) msg(g, 'ようちゅうい！', { sub: 'おおきいのが くるよ', life: 1.3, col: '#FF5A5F', pri: 3 });
     S.ultraWarn = false;
   }
 
@@ -524,16 +524,16 @@
     S.endT = 0; S.endWin = win;
     if (win) g.fx.confetti(VX, 360, 120);
     g.end({
-      win, title: win ? 'TURF WAR WON!' : 'Out of ink!', delay: 3200,
-      sub: win ? 'The whole town is full of colour and happy critters!' : `You painted ${Math.max(0, done)} stage${done === 1 ? '' : 's'} of the town. Refill and try again!`,
+      win, title: win ? 'まちが カラフルに！' : 'インクが なくなった！', delay: 3200,
+      sub: win ? 'まちじゅうが いろとりどりで みんな ニコニコ！' : `${Math.max(0, done)}ステージ ぬったよ。インクを ほじゅうして もういちど！`,
       targetMet: win && pct >= 70,
-      stats: [['Turf painted', pct + '%'], ['Gloops splatted', S.splatted], ['Ultras used', S.ultras], ['Bosses beaten', S.bossesDown]],
+      stats: [['ぬった わりあい', pct + '%'], ['たおした グルー', S.splatted], ['ウルトラ', S.ultras], ['たおした ボス', S.bossesDown]],
     });
   }
   function watchResults(url) {
     const mo = new MutationObserver(() => {
       const card = document.querySelector('.tm-results'); if (!card || card.querySelector('.ink-map')) return;
-      const img = document.createElement('img'); img.className = 'ink-map'; img.src = url; img.alt = 'Turf map';
+      const img = document.createElement('img'); img.className = 'ink-map'; img.src = url; img.alt = 'まちの ちず';
       img.style.cssText = 'width:min(100%,520px);display:block;margin:8px auto 10px;border:5px solid #1F1A3D;border-radius:18px;box-shadow:0 6px 0 rgba(31,26,61,.25)';
       const sub = card.querySelector('.sub'); (sub || card.querySelector('h2')).after(img);
       mo.disconnect();
@@ -644,7 +644,7 @@
       e.sq = Math.sin(e.t * 3) * 0.025;
       if (e.type === 'squid') { // the squid flicks goo globs at you
         e.globT -= dt;
-        if (e.globT <= 0) { e.globT = [9, 6.5, 5][diffK()] + U.rand(0, 2); const gl = mkEnemy(g, 'glob', { x: e.x + U.rand(-1.2, 1.2), z: e.z + 0.5 }); gl.y = 1.4; S.stats.glob++; msg(g, 'FLICK!', { life: 0.7, col: '#9B86E8' }); INK.snd('shot', 0.4, 0.6); }
+        if (e.globT <= 0) { e.globT = [9, 6.5, 5][diffK()] + U.rand(0, 2); const gl = mkEnemy(g, 'glob', { x: e.x + U.rand(-1.2, 1.2), z: e.z + 0.5 }); gl.y = 1.4; S.stats.glob++; msg(g, 'ピン！', { life: 0.7, col: '#9B86E8' }); INK.snd('shot', 0.4, 0.6); }
       }
       if (e.type === 'king' && e.idx >= 2 && S.queue.length === 0 && S.enemies.filter((q) => q.alive && !q.boss).length === 0 && e.tPhase > 5) { for (let i = 0; i < 2; i++) S.queue.push({ t: S.qt + 0.3 + i * 1.8, type: U.pick(['jelly', 'jumper', 'tiny']) }); }
       if (e.z <= 4.3) { // big stomp: harmless splat on you, boss bounces back
@@ -898,8 +898,8 @@
     D.pill(ctx, gx, gy, gw, gh, 'rgba(255,255,255,0.9)');
     ctx.save(); ctx.clip(P.rr(gx, gy, gw, gh, gh / 2)); const fw = Math.max(gh * 0.6, gw * (S.tank / 100));
     ctx.fillStyle = low && Math.sin(S.t * 12) > 0 ? '#FF5A5F' : S.pair[1]; ctx.fillRect(gx, gy, fw, gh); ctx.fillStyle = 'rgba(255,255,255,0.4)'; ctx.fillRect(gx, gy + 5, fw, 8); ctx.restore();
-    D.text(ctx, 'INK', gx + 52, gy + gh / 2 + 2, { size: 28, color: '#fff', outline: 8 });
-    if (low) D.text(ctx, 'LOW INK!', gx + gw / 2 + 40, gy - 22, { size: 30, color: '#FF5A5F', outline: 8 });
+    D.text(ctx, 'インク', gx + 52, gy + gh / 2 + 2, { size: 28, color: '#fff', outline: 8 });
+    if (low) D.text(ctx, 'インクが ぎりぎり！', gx + gw / 2 + 40, gy - 22, { size: 30, color: '#FF5A5F', outline: 8 });
     // ultra
     const ux = gx + gw + 80, uy = gy + gh / 2, ready = S.ultra >= 100;
     ctx.save(); ctx.translate(ux, uy); const pulse = ready ? 1 + Math.sin(S.t * 10) * 0.08 : 1; ctx.scale(pulse, pulse);
@@ -908,8 +908,8 @@
     ctx.save(); ctx.beginPath(); ctx.arc(0, 0, 42, 0, 7); ctx.clip(); ctx.fillStyle = ready ? S.pair[0] : S.pair[1]; const fh = 84 * (S.ultra / 100); ctx.fillRect(-42, 42 - fh, 84, fh); ctx.restore();
     const star = P.star(0, 0, 30, 0.5); ctx.fillStyle = ready ? '#FFC83D' : 'rgba(255,255,255,0.55)'; ctx.fill(star); ctx.lineWidth = 5; ctx.strokeStyle = INK.INKC; ctx.stroke(star);
     ctx.restore();
-    if (ready) { D.text(ctx, 'ULTRA READY!', ux + 70, uy - 12, { size: 34, color: '#FFC83D', outline: 9, align: 'left' }); D.text(ctx, 'press ENTER', ux + 70, uy + 22, { size: 26, color: '#fff', outline: 7, align: 'left' }); }
-    else D.text(ctx, 'ULTRA', ux + 66, uy, { size: 26, color: '#fff', outline: 7, align: 'left' });
+    if (ready) { D.text(ctx, 'ウルトラ じゅんびOK！', ux + 70, uy - 12, { size: 34, color: '#FFC83D', outline: 9, align: 'left' }); D.text(ctx, 'Enterを おしてね', ux + 70, uy + 22, { size: 26, color: '#fff', outline: 7, align: 'left' }); }
+    else D.text(ctx, 'ウルトラ', ux + 66, uy, { size: 26, color: '#fff', outline: 7, align: 'left' });
   }
   function drawVignette(ctx, v) {
     const g = ctx.createRadialGradient(VX, 500, 520, VX, 520, Math.max(v.w, v.h) * 0.75);
@@ -923,7 +923,7 @@
     // the summary fades out just before the (DOM) results card pops in so the two never stack
     const fade = U.clamp((3.1 - (S.endT || 0)) / 0.4, 0, 1), fit = Math.min(1, v.h / 1000, v.w / 1000), cy0 = v.y + v.h / 2 - 440 * fit;
     ctx.save(); ctx.globalAlpha = k * fade; ctx.translate(VX, cy0); ctx.scale(fit, fit); ctx.translate(-VX, -150);
-    D.text(ctx, S.endWin ? 'TURF WAR WON!' : 'TIME TO REFILL!', VX, 250, { size: 96, color: S.endWin ? S.pair[0] : '#B9A8F0', outline: 18 });
+    D.text(ctx, S.endWin ? 'まちが カラフルに！' : 'インクを ほじゅうしよう！', VX, 250, { size: 96, color: S.endWin ? S.pair[0] : '#B9A8F0', outline: 18 });
     const n = S.thumbs.length;
     S.thumbs.forEach((t, i) => {
       const reveal = U.clamp((S.endT - 0.5 - i * 0.55) / 0.5, 0, 1); if (reveal <= 0) return;
@@ -1035,7 +1035,7 @@
 @media (max-height:560px){.tm-tricky{display:none}.tm-results .ink-map{max-height:15vh}.tm-results h2{font-size:32px}}`;
     document.head.append(css);
     const box = document.createElement('div'); box.className = 'ink-team hidden';
-    const lbl = document.createElement('span'); lbl.textContent = 'TEAM COLOUR'; box.append(lbl);
+    const lbl = document.createElement('span'); lbl.textContent = 'チームの いろ'; box.append(lbl);
     const btns = [];
     for (let i = 0; i < 2; i++) {
       const pr = INK.STAGES[0].pairs[i], b = document.createElement('button');
@@ -1050,15 +1050,15 @@
 
   TM.game({
     id: 'ink-rush', name: 'Ink Rush', accent: C.ink2, bg: '#C9CCE0',
-    logoHTML: 'Ink<br>Rush', tagline: 'Splat the Gloops. Paint the town!',
+    logoHTML: 'Ink<br>Rush', tagline: 'グルーを たおして まちを ぬろう！',
     lifeIcon: TM.ui.heartSVG('#FF3EA5'),
     howto: [
-      'Grumpy grey <b>Gloops</b> have drained the colour from the town. You ride an ink scooter along the rails and they rush at you!',
-      'Type the first letter of a Gloop’s word to <b>lock on</b>. Every correct letter fires ink. Finish the word to <b>SPLAT</b> it: it turns into a happy critter and the world turns to your colours!',
-      '<b>Brolly Gloops</b> hide under an umbrella: type the shield word first. <b>Splitters</b> split in two. Flappy ones fly, Stilt ones are tall, tiny swarms have short words.',
-      'If a Gloop reaches you it only splats your goggles with goo, but you lose ink. Wrong keys cost a little ink too. When the tank is empty, you need a refill!',
-      'Chain words with no mistakes to fill the <b>ULTRA</b> star. When it is full, press <b>ENTER</b> for a giant paint wave that splats everything!',
-      'Paint the most turf in each stage. Beat the boss at the end of every stage. 4 stages to win the Turf War!',
+      'ふきげんな はいいろの <b>グルー</b>が まちの いろを うばった！ インクスクーターで レールを はしろう。',
+      'グルーの ことばの <b>さいしょの もじ</b>を うつと <b>ロックオン</b>。ただしく うつと インクが とぶよ。さいごまで うつと <b>ベチャッ！</b> グルーは ニコニコの どうぶつに もどって、まちが きみの いろに！',
+      '<b>かさグルー</b>は かさの ことばを さきに。<b>スプリッター</b>は 2つに わかれる。とぶ グルー、せの たかい グルー、みじかい ことばの ちいさい むれも いるよ。',
+      'グルーが ぶつかると インクが へるよ。まちがえても ちょっと へる。インクが ゼロに なったら ほじゅう！',
+      'ミスなしで つなげて <b>ウルトラ</b>の ほしを ためよう。いっぱいに なったら <b>Enter</b>で ペンキの なみ！',
+      'ステージごとに いちばん ぬろう。ステージの さいごは ボス！ 4ステージで まちを とりもどそう！',
     ],
     music: SONGS[0], reset, update, draw, onKey, onBack, onEnter,
     init(g) { G = g; INK.loadImages(); INK.preloadSfx(); buildTeamUI(g); },
@@ -1068,7 +1068,7 @@
       const total = INK.STAGES.reduce((a, s) => a + s.stops.length, 0);
       let done = 0; for (let i = 0; i < S.stage; i++) done += INK.STAGES[i].stops.length;
       done += S.stopI;
-      return { progress: done / total, right: `Stage ${S.stage + 1}: ${WS.def.name}` };
+      return { progress: done / total, right: `ステージ ${S.stage + 1}：${WS.def.name}` };
     },
   });
   // show the team picker only on the title screen

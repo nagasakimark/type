@@ -4,11 +4,11 @@
   const SS = window.SS, TM = window.TM, U = TM.U;
 
   SS.SECTORS = [
-    { name: 'Asteroid Alley', sub: 'Rocks and robo-drones!', sky: 'nebula', col: 'Blue', planets: [7, 5], ast: 26, tint: '#4fa8ff', tint2: '#9a7bff', rim1: '#2a6fd0', rim2: '#12307a', horizon: 7, map: 7, accent: '#58b4ff' },
-    { name: 'Comet Cloud', sub: 'Zig-zag zoomers ahead!', sky: 'galaxy', col: 'Green', planets: [1, 4], ast: 12, tint: '#5cf0a8', tint2: '#3fb6ff', rim1: '#1d9a74', rim2: '#0d3d5a', horizon: 1, map: 1, accent: '#4be3a0' },
-    { name: 'Rosy Nebula', sub: 'Shields up, sweepers!', sky: 'day', col: 'Red', planets: [2, 8], ast: 9, tint: '#ff7ab8', tint2: '#ffb86b', rim1: '#c64a8e', rim2: '#4a1f6b', horizon: 2, map: 2, accent: '#ff86c0' },
-    { name: 'Black Hole Gate', sky: 'dark', sub: 'Spooky saucers and splitters', col: 'Black', planets: [6, 9], ast: 16, tint: '#a58bff', tint2: '#ff5aa5', rim1: '#6a4fd0', rim2: '#1b1450', horizon: 9, map: 9, accent: '#b49cff' },
-    { name: 'Planet Pip', sub: 'Almost there! Save Pip!', sky: 'band', col: 'any', planets: [0, 4], ast: 8, tint: '#ffd86b', tint2: '#7fd3ff', rim1: '#e0a53a', rim2: '#5a2a1f', horizon: 4, map: 3, accent: '#ffd66b' },
+    { name: 'いんせき ストリート', sub: 'いわと ロボドローン！', sky: 'nebula', col: 'Blue', planets: [7, 5], ast: 26, tint: '#4fa8ff', tint2: '#9a7bff', rim1: '#2a6fd0', rim2: '#12307a', horizon: 7, map: 7, accent: '#58b4ff' },
+    { name: 'すいせい くも', sub: 'ジグザグ ひこうが くるよ！', sky: 'galaxy', col: 'Green', planets: [1, 4], ast: 12, tint: '#5cf0a8', tint2: '#3fb6ff', rim1: '#1d9a74', rim2: '#0d3d5a', horizon: 1, map: 1, accent: '#4be3a0' },
+    { name: 'ばらいろ せいうん', sub: 'シールドを はれ！', sky: 'day', col: 'Red', planets: [2, 8], ast: 9, tint: '#ff7ab8', tint2: '#ffb86b', rim1: '#c64a8e', rim2: '#4a1f6b', horizon: 2, map: 2, accent: '#ff86c0' },
+    { name: 'ブラックホール ゲート', sky: 'dark', sub: 'ぶきみな UFOと わかれる てき', col: 'Black', planets: [6, 9], ast: 16, tint: '#a58bff', tint2: '#ff5aa5', rim1: '#6a4fd0', rim2: '#1b1450', horizon: 9, map: 9, accent: '#b49cff' },
+    { name: 'ピップわくせい', sub: 'もうすこし！ ピップを たすけよう！', sky: 'band', col: 'any', planets: [0, 4], ast: 8, tint: '#ffd86b', tint2: '#7fd3ff', rim1: '#e0a53a', rim2: '#5a2a1f', horizon: 4, map: 3, accent: '#ffd66b' },
   ];
   SS.PIP = 3; // planet sprite index of the planet we rescue
 
@@ -31,11 +31,11 @@
   SS.MINIBOSS = ['ace9', 'ace4', 'ace3', 'ace2', 'ace8'];
 
   SS.BOSSES = [
-    { name: 'Rocket Rascal', spr: 'rocket2', scale: 0.52, rot: Math.PI, hr: 120, hoverY: 250, phases: 1, maxWords: 6, atk: ['bolts'], minions: null, glow: '#ff6a3c', engine: true },
-    { name: 'Saucer Sam', spr: 'st29', scale: 1.7, rot: 0, hr: 150, hoverY: 250, phases: 1, maxWords: 7, atk: ['bolts', 'missiles'], minions: 'ufo', glow: '#7fffd4' },
-    { name: 'Solar Satellite', spr: 'st17', scale: 0.62, rot: 0, hr: 130, hoverY: 280, phases: 2, maxWords: 7, atk: ['bolts', 'missiles', 'beam'], minions: 'kamikaze', glow: '#ffe066' },
-    { name: 'Void Wing', spr: 'ace5', scale: 1.3, rot: 0, hr: 150, hoverY: 270, phases: 2, maxWords: 8, atk: ['bolts', 'beam', 'missiles'], minions: 'mini', glow: '#b49cff' },
-    { name: 'Mega Cross', spr: 'st26', scale: 0.64, rot: 0, hr: 170, hoverY: 310, phases: 3, maxWords: 8, atk: ['bolts', 'missiles', 'beam'], minions: 'scout', glow: '#ff8a5c' },
+    { name: 'ロケットいたずらっこ', spr: 'rocket2', scale: 0.52, rot: Math.PI, hr: 120, hoverY: 250, phases: 1, maxWords: 6, atk: ['bolts'], minions: null, glow: '#ff6a3c', engine: true },
+    { name: 'UFOサム', spr: 'st29', scale: 1.7, rot: 0, hr: 150, hoverY: 250, phases: 1, maxWords: 7, atk: ['bolts', 'missiles'], minions: 'ufo', glow: '#7fffd4' },
+    { name: 'たいようえいせい', spr: 'st17', scale: 0.62, rot: 0, hr: 130, hoverY: 280, phases: 2, maxWords: 7, atk: ['bolts', 'missiles', 'beam'], minions: 'kamikaze', glow: '#ffe066' },
+    { name: 'ボイドウィング', spr: 'ace5', scale: 1.3, rot: 0, hr: 150, hoverY: 270, phases: 2, maxWords: 8, atk: ['bolts', 'beam', 'missiles'], minions: 'mini', glow: '#b49cff' },
+    { name: 'メガクロス', spr: 'st26', scale: 0.64, rot: 0, hr: 170, hoverY: 310, phases: 3, maxWords: 8, atk: ['bolts', 'missiles', 'beam'], minions: 'scout', glow: '#ff8a5c' },
   ];
 
   SS.POWER = {

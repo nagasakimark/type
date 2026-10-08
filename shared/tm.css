@@ -199,3 +199,4 @@ body.dark .tm-logo { filter: drop-shadow(4px 0 0 #fff) drop-shadow(-4px 0 0 #fff
 .tm-qr .qrcap { font: 700 22px var(--word); text-align: center; }
 .tm-qr .linkbox { flex: 1; min-width: 200px; display: flex; gap: 8px; }
 .tm-qr .linkbox input { flex: 1; min-width: 0; font: 500 14px var(--word); padding: 8px 10px; border: 3px solid var(--ink); border-radius: 12px; }
+.tm-modal.tm-fixed { width: 760px; max-width: none; max-height: none; }

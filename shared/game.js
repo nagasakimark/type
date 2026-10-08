@@ -234,7 +234,7 @@
 
     function openPicker() { TM.ui.picker(root, () => { title.refreshDeck(); g.newDealer(); if (def.reset) def.reset(g); }); }
     function howto() {
-      const card = el('div', { class: 'tm-card tm-modal tm-small' },
+      const card = el('div', { class: 'tm-card tm-modal tm-fixed' },
         el('header', {}, el('h2', {}, 'あそびかた'), el('button', { class: 'tm-btn icon', 'aria-label': 'とじる', onclick: () => m.close() }, '✕')),
         el('ol', { class: 'tm-howto' }, (def.howto || []).map((s) => el('li', { html: s }))),
         el('footer', {}, el('span'), el('button', { class: 'tm-btn primary', style: { fontSize: '28px', padding: '12px 30px 8px' }, onclick: () => { m.close(); start(); } }, 'あそぶ！')));

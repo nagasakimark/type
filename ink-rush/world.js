@@ -27,25 +27,25 @@
   /* ---------------- stage definitions ---------------- */
   INK.STAGES = [
     {
-      id: 'street', name: 'Squeaky Street', tag: 'The whole street has gone grey!', stops: [6, 24, 42, 60],
+      id: 'street', name: 'キュッキュ どおり', tag: 'どおりが ぜんぶ はいいろに！', stops: [6, 24, 42, 60],
       pairs: [['#FF3EA5', '#B8F03A'], ['#FF8A1F', '#2F9BFF']],
       pal: { skyT: '#B4B9D0', skyB: '#E6E8F4', skyTV: '#3FA9FF', skyBV: '#CDEFFF', outer: '#9EA2B4', outerV: '#8EDB6A', road: '#80849A', roadV: '#5C5F78', side: '#B7BACB', sideV: '#E9E6F5', far: '#A9AEC6', farV: '#8FA2E6', near: '#9499B4', nearV: '#6F7FD6' },
       dull: ['#CBC6DE', '#D9CEC6', '#C0D2DA', '#D0D8C4'],
     },
     {
-      id: 'harbour', name: 'Sunny Harbour', tag: 'The docks are drowning in grey goo!', stops: [6, 24, 42, 60],
+      id: 'harbour', name: 'ひなた みなと', tag: 'みなとが はいいろの ネバネバだらけ！', stops: [6, 24, 42, 60],
       pairs: [['#FFB11F', '#FF3EA5'], ['#8A5CFF', '#B8F03A']],
       pal: { skyT: '#B3BDCC', skyB: '#E4E9F0', skyTV: '#2FA8F5', skyBV: '#D5F5FF', outer: '#8896AC', outerV: '#1FB3E6', road: '#9C928C', roadV: '#B97C46', side: '#B2A9A3', sideV: '#E5B77C', far: '#A0AABD', farV: '#4DB6C9', near: '#8E98AC', nearV: '#2E8FA8' },
       dull: ['#CBC6DE', '#D9CEC6', '#C0D2DA', '#D0D8C4'],
     },
     {
-      id: 'skate', name: 'Skate Plaza', tag: 'Shred it back to colour!', stops: [6, 24, 42, 60],
+      id: 'skate', name: 'スケート ひろば', tag: 'いろを とりもどせ！', stops: [6, 24, 42, 60],
       pairs: [['#B8F03A', '#7B5CFF'], ['#FF4F5A', '#18C1C9']],
       pal: { skyT: '#BCB9CC', skyB: '#ECE8F2', skyTV: '#FFAA3D', skyBV: '#FFF0C4', outer: '#9AA39A', outerV: '#62C46C', road: '#8F8EA0', roadV: '#B9B4D6', side: '#B5B4C4', sideV: '#E2DFF0', far: '#AFA9C6', farV: '#E58E4C', near: '#9A94B4', nearV: '#C9684A' },
       dull: ['#CBC6DE', '#D9CEC6', '#C0D2DA', '#D0D8C4'],
     },
     {
-      id: 'roof', name: 'Rooftop Garden', tag: 'Even the plants are grumpy up here!', stops: [6, 24, 42, 60, 78],
+      id: 'roof', name: 'おくじょう ガーデン', tag: 'はっぱも ふきげん！', stops: [6, 24, 42, 60, 78],
       pairs: [['#2FE0C8', '#FF3EA5'], ['#FFD21F', '#7B5CFF']],
       pal: { skyT: '#B9B4CB', skyB: '#E8E3EC', skyTV: '#FF7BA8', skyBV: '#FFE0A6', outer: '#807F96', outerV: '#4B3F8E', road: '#8C8AA0', roadV: '#7F6BC4', side: '#B0AEC0', sideV: '#E8DDF5', far: '#9C98B4', farV: '#C25A8E', near: '#847FA0', nearV: '#8C3F86' },
       dull: ['#CBC6DE', '#D9CEC6', '#C0D2DA', '#D0D8C4'],

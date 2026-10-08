@@ -3,6 +3,11 @@
   'use strict';
   const TT = (window.TT = window.TT || {});
   const TAU = Math.PI * 2;
+  /* Shared jump / car constants (game.js + the overhead test use these). */
+  TT.GRAV = 27; TT.VY_MAX = 15.5; TT.VY_MIN = 11.5; TT.V_MAX = 100;
+  TT.AIR_DIST = Math.ceil(TT.V_MAX * (2 * TT.VY_MAX / TT.GRAV)) + 12;   // furthest a car can fly after leaving a ramp
+  TT.CAR = { hl: 2.3, hw: 1.15, h: 1.9 };                               // half length, half width, height incl. pitch margin
+  TT.launchVy = (slope, v) => Math.min(TT.VY_MAX, Math.max(TT.VY_MIN, Math.max(slope, 11 + v * 0.05)));
 
   /* pts are [x, z, y] in metres (x east, z south, y up). Closed loop, start line at pts[0]-ish.
      jumps: u = fraction of the lap, len = ramp length, h = ramp height.   pads: u = fraction of the lap. */
@@ -98,11 +103,56 @@
     const jumps = (def.jumps || []).map((j) => ({ s0: straightAt(j.u * L, j.len + 100, 0) + 20, len: j.len, h: j.h, w: def.width }));
     const pads = (def.pads || []).map((p) => ({ s0: straightAt(p.u * L, 30, 0), len: p.len || 18 }));
     const feats = {};
-    if (def.tunnel) feats.tunnel = { s0: straightAt(def.tunnel.u * L, def.tunnel.len, 0), len: def.tunnel.len };
-    if (def.bridge) feats.bridge = { s0: straightAt(def.bridge.u * L, 40, 0) + 10 };
+
+    /* ---- overhead props must never sit where a car can be in the air ----
+       zones = [launch - 8 m, launch + ramp + AIR_DIST]; tunnels, bridges, gantries and neon arches are placed OUTSIDE them. */
+    const zones = jumps.map((j) => [j.s0 - 8, j.s0 + j.len + TT.AIR_DIST]);
+    const taken = [];
+    const hit = (a0, a1, b0, b1) => { for (let k = -1; k <= 1; k++) { const o = k * L; if (a0 < b1 + o && a1 > b0 + o) return true; } return false; };
+    const inZone = (a, b) => zones.some((z) => hit(a, b, z[0], z[1]));
+    const roughness = (s1, need) => { let m = 0; const i0 = Math.floor(s1 / step), win = Math.round(need / step); for (let d = 0; d <= win; d++) { const q = (i0 + d) % N; m = Math.max(m, Math.abs(KB[q]) * 1000 + Math.abs(BANK[q]) * 30); } return m; };
+    /* nearest straight, jump-free stretch to the wanted distance; claims it so props never overlap each other */
+    const clearSpot = (s, need, gap) => {
+      gap = gap == null ? 30 : gap; let best = null, bc = 1e9;
+      for (let off = 0; off <= L / 2; off += 2) for (const sg of off ? [1, -1] : [1]) {
+        const s1 = s + sg * off; if (s1 < 40 || s1 + need > L - 40) continue;
+        if (inZone(s1 - 6, s1 + need + 6)) continue;
+        if (taken.some((t) => hit(s1 - gap, s1 + need + gap, t[0], t[1]))) continue;
+        const cost = roughness(s1, need) + off * 0.004;
+        if (cost < bc) { bc = cost; best = s1; }
+        if (cost < 3 + off * 0.004 && roughness(s1, need) < 3) { taken.push([s1, s1 + need]); return s1; }
+      }
+      if (best == null) best = straightAt(s, need, 0);
+      taken.push([best, best + need]); return best;
+    };
+    if (def.tunnel) feats.tunnel = { s0: clearSpot(def.tunnel.u * L, def.tunnel.len + 40, 10) + 20, len: def.tunnel.len };
+    if (def.bridge) feats.bridge = { s0: clearSpot(def.bridge.u * L, 30, 20) + 15 };
+    const gantries = [];
+    [0.24, 0.47, 0.7, 0.9].forEach((u, i) => { gantries.push({ s: clearSpot(u * L, 14, 40) + 7, h: 10, i }); });
+    const neon = [];
+    if (def.theme && def.theme.id === 'night') {
+      for (let s = 60, i = 0; s < L; s += 150, i++) {
+        const q = Math.floor(s / step) % N, tn = feats.tunnel;
+        if (Math.abs(KB[q]) > 0.006 || (tn && s > tn.s0 - 20 && s < tn.s0 + tn.len + 20) || inZone(s - 3, s + 3)) continue;
+        neon.push({ s, i });
+      }
+    }
 
     const t = {
-      def, N, step, L, width: def.width, X, Y, Z, FX, FZ, TH, K, KB, BANK, PITCH, jumps, pads, feats, straightAt, curve,
+      def, N, step, L, width: def.width, X, Y, Z, FX, FZ, TH, K, KB, BANK, PITCH, jumps, pads, feats, straightAt, curve, gantries, neon, zones,
+      overhead: [],
+      /* lowest underside (world y) of any overhead prop above the car's footprint, or Infinity */
+      ceilingAt(s, lat, halfLen) {
+        s = this.wrap(s); let c = Infinity; const hl = halfLen == null ? 2.3 : halfLen;
+        for (const o of this.overhead) {
+          let d = s - o.s0; if (d > L / 2) d -= L; else if (d < -L / 2) d += L;
+          if (d < -hl || d > o.s1 - o.s0 + hl) continue;
+          if (lat + TT.CAR.hw < o.latMin || lat - TT.CAR.hw > o.latMax) continue;
+          const b = o.R ? o.y + Math.sqrt(Math.max(0, o.R * o.R - lat * lat)) - 0.45 : o.y;
+          if (b < c) c = b;
+        }
+        return c;
+      },
       wrap(s) { s %= L; return s < 0 ? s + L : s; },
       /* sample at distance s; fills out */
       at(s, o) {
@@ -125,6 +175,23 @@
       roadY(s, lat) { return this.baseY(s) + this.wedge(s) - lat * Math.sin(this.bankAt(s)); },
       jumpAt(s) { s = this.wrap(s); for (const j of jumps) if (s >= j.s0 && s <= j.s0 + j.len) return j; return null; },
     };
+    /* ---- overhead catalogue (world y of each underside) - mirrors what world.js builds ---- */
+    {
+      const W = def.width, hw = W / 2, by = (q) => t.baseY(q);
+      for (const gn of gantries) t.overhead.push({ kind: 'gantry', s0: gn.s - 1.2, s1: gn.s + 1.2, latMin: -(W + 9) / 2 - 1, latMax: (W + 9) / 2 + 1, y: by(gn.s) + gn.h - 3.2 });
+      t.overhead.push({ kind: 'startGantry', s0: 5 - 1.2, s1: 5 + 1.2, latMin: -(W + 9) / 2 - 1, latMax: (W + 9) / 2 + 1, y: by(5) + 11.5 - 3.2 });
+      t.overhead.push({ kind: 'startLights', s0: 5 - 1.2, s1: 5 + 1.2, latMin: -7.5, latMax: 7.5, y: by(5) + 5.5 });
+      if (feats.bridge) {
+        const b0 = feats.bridge.s0;
+        t.overhead.push({ kind: 'bridge', s0: b0 - 7.5, s1: b0 + 7.5, latMin: -(W + 30) / 2, latMax: (W + 30) / 2, y: by(b0) + 9.2 });
+        t.overhead.push({ kind: 'bridgeSign', s0: b0 - 7.6, s1: b0 - 6.4, latMin: -7.2, latMax: 7.2, y: by(b0) + 5.9 });
+      }
+      if (feats.tunnel) {
+        const T0 = feats.tunnel.s0, T1 = T0 + feats.tunnel.len;
+        for (let q = T0; q < T1; q += 6) t.overhead.push({ kind: 'tunnel', s0: q, s1: q + 6, latMin: -hw - 4.5, latMax: hw + 4.5, y: Math.min(by(q), by(q + 6)) + 12.5 });
+      }
+      for (const n of neon) t.overhead.push({ kind: 'neon', s0: n.s - 0.6, s1: n.s + 0.6, latMin: -hw - 4, latMax: hw + 4, y: by(n.s), R: hw + 3.5 });
+    }
     // spatial hash for nearest-sample queries
     const CELL = 24, grid = new Map();
     const key = (cx, cz) => cx * 73856093 ^ cz * 19349663;

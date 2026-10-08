@@ -207,8 +207,10 @@
 
   /* ---------- banners ---------- */
   function addBanner(g, text, sub, icons, o = {}) {
-    S.banners.push({ text, sub, icons: icons || [], t: 0, life: o.life || 1.5, y: o.y || 330, big: !!o.big, color: o.color || '#FFD23F' });
-    if (S.banners.length > 4) S.banners.shift();
+    // one banner at a time (no stacking); a minor combo banner never replaces an active big one
+    const big = !!o.big, cur = S.banners[0];
+    if (cur && cur.big && !big && cur.t < cur.life * 0.8) return;
+    S.banners = [{ text, sub, icons: icons || [], t: 0, life: Math.min(o.life || 1.5, big ? 1.9 : 1.2), big, color: o.color || '#FFD23F' }];
   }
 
   /* ---------- keys ---------- */
@@ -267,9 +269,7 @@
     const ds = Math.min(f.size, 190);
     addDecal(f.x, f.y, juice, ds * U.rand(0.95, 1.25) * (boss ? 2.2 : 1), true);
     if (Math.random() < 0.5 || boss) addDecal(f.x + U.rand(-90, 90), f.y + U.rand(-60, 80), juice, ds * U.rand(0.4, 0.65), false);
-    WN.sndPick(['swish1', 'swish2', 'swish3'], { vol: 0.55, jitter: 0.12 });
-    WN.sndPick(['squelch1', 'squelch2'], { vol: 0.6, delay: 0.05 });
-    TM.sfx.slice();
+    WN.snd('slice', { vol: boss ? 0.8 : 0.5, rate: boss ? 0.7 : 1, jitter: 0.14 });
     g.fx.shake(boss ? 26 : 7, boss ? 0.45 : 0.09);
 
     if (demo) { g.wordDone(f.typer, f.x, f.y); S.botDelay = U.rand(0.35, 0.9); return; }
@@ -292,7 +292,7 @@
     const i = Math.min(6, c), bonus = 20 * c * (S.frenzy > 0 ? 2 : 1);
     g.score.add(bonus);
     addBanner(g, `${names[i]}  x${c}`, `Combo bonus +${bonus}`, icons[i], { life: 1.5 });
-    TM.sfx.combo(Math.min(6, c)); WN.snd('combo', { vol: 0.5, rate: 0.85 + c * 0.06 });
+    WN.snd('chime', { vol: 0.45, step: Math.min(9, c - 2), delay: 0.08, jitter: 0 });
     if (c >= 3 && c % 2 === 1 && !REDUCE()) { S.freeze = 0.08; S.slow = 0.55; g.fx.doFlash('#FFFFFF', 0.25); g.fx.shake(14, 0.2); }
     if (c >= 4) for (let k = 0; k < 8; k++) S.parts.push({ type: 'star', x: f.x + U.rand(-80, 80), y: f.y + U.rand(-80, 80), vx: U.rand(-300, 300), vy: U.rand(-500, -100), g: 800, rot: 0, vr: 4, life: 0.8, t: 0, size: U.rand(30, 60), color: '#FFE27A' });
   }
@@ -431,7 +431,7 @@
     // squashed on the floor
     floorSplat(f.x, K.juice, f.size * 1.2);
     for (let i = 0; i < 8; i++) S.parts.push({ type: 'drop', x: f.x, y: FLOOR_HIT, vx: U.rand(-300, 300), vy: U.rand(-450, -120), g: 1500, rot: 0, vr: 0, life: U.rand(0.4, 0.8), t: 0, size: U.rand(5, 12), color: K.juice });
-    WN.sndPick(['squelch1', 'squelch2'], { vol: 0.4, rate: 0.8 });
+    WN.snd('slice', { vol: 0.25, rate: 0.7 });
     if (g.demo || g.state !== 'play') return;
     if (f.type === 'golden' || f.type === 'ice') { g.fx.pop(f.x, FLOOR_HIT - 200, 'It got away!', { color: '#fff', size: 44, life: 1.1 }); S.resolved++; return; }
     S.resolved++;
@@ -490,7 +490,7 @@
       S.needBanner = false;
       const tier = g.ladder(stage()).tier;
       addBanner(g, `LEVEL ${S.level}`, tier === 1 ? 'Warm-up words' : tier === 2 ? 'Longer words and phrases' : 'Phrases and sentences', null, { big: true, y: 420, life: 2.3, color: '#FFD23F' });
-      TM.sfx.whoosh();
+      WN.snd('swish', { vol: 0.3 });
     }
     S.phaseT += dt;
     const alive = realAlive();
@@ -682,6 +682,7 @@
       D.pill(ctx, bx, by, Math.max(26, bw * k), 22, k > 0.3 ? '#7CE38B' : C.miss);
       D.text(ctx, 'Split the melon before time runs out!', B.x, by - 34, { size: 30, color: '#fff', outline: 8 });
     }
+    for (const bn of S.banners) drawBanner(g, ctx, bn, v);
     // chips (most urgent on top; locked on very top; others dim while locked)
     const chips = [];
     for (const f of S.fruits) { if (!f.alive || f.y > v.y + v.h + 60) continue; chips.push(chipFor(g, ctx, f, v)); }
@@ -712,7 +713,6 @@
     drawParts(ctx);
     g.fx.draw(ctx);
     drawMeters(g, ctx, v);
-    for (const b of S.banners) drawBanner(ctx, b, v);
   }
   function drawTrail(ctx, tr) {
     const k = tr.t / tr.life, head = Math.min(1, tr.t / 0.09), fade = 1 - U.ease.outCubic(k);
@@ -764,30 +764,33 @@
     if (S.frenzy > 0) { meter(ctx, cx, y, 520, S.frenzy / 8, 'FRENZY  x2 points', '#E39A00'); y += 52; }
     if (S.ice > 0) { meter(ctx, cx, y, 520, S.ice / 6.5, 'FREEZE', '#2C8AD8'); y += 52; }
   }
-  function drawBanner(ctx, b, v) {
-    const k = b.t / b.life, inK = Math.min(1, b.t / 0.28), outK = k > 0.75 ? (k - 0.75) / 0.25 : 0;
-    const e = U.ease.outBack(inK), al = 1 - outK;
-    const size = b.big ? 100 : 64;
-    ctx.save(); ctx.font = D.FONT_DISPLAY(size); const tw = ctx.measureText(b.text).width; ctx.restore();
-    ctx.font = D.FONT_DISPLAY(size * 0.42);
-    const icons = b.icons.map((n) => WN.kinds[n] ? WN.kinds[n].img : WN.img(n)).filter(Boolean);
-    const isz = b.big ? 120 : 84;
-    const w = Math.max(tw, 300) + 120 + (icons.length ? 2 * (isz + 40) : 0), h = size * 1.5 + (b.sub ? 40 : 0);
-    ctx.save(); ctx.globalAlpha = al; ctx.translate(W / 2, b.y - outK * 40); ctx.scale(e, e * (0.7 + 0.3 * e));
-    // paper scroll strip
-    const path = P.rr(-w / 2, -h / 2, w, h, 26);
-    ctx.fillStyle = 'rgba(31,26,61,0.28)'; ctx.save(); ctx.translate(0, 10); ctx.fill(path); ctx.restore();
+  function drawBanner(g, ctx, bn, v) {
+    // compact strip in the top safe zone, under the HUD and meters; drawn BEHIND fruit and word chips
+    const k = bn.t / bn.life, inK = Math.min(1, bn.t / 0.22), outK = k > 0.7 ? (k - 0.7) / 0.3 : 0;
+    const e = U.ease.outBack(inK), al = (1 - outK) * 0.94;
+    const size = bn.big ? 50 : 40, isz = bn.big ? 64 : 52;
+    ctx.save(); ctx.font = D.FONT_DISPLAY(size); const tw = ctx.measureText(bn.text).width; ctx.restore();
+    const icons = bn.icons.map((n) => WN.kinds[n] ? WN.kinds[n].img : WN.img(n)).filter(Boolean);
+    const iconSlot = icons.length ? isz + 18 : 0;
+    const sw = bn.sub ? Math.min(900, bn.sub.length * size * 0.2) : 0;
+    const w = Math.max(tw, sw, 220) + 70 + iconSlot * 2, h = size * 1.15 + (bn.sub ? size * 0.62 : 12) + 14;
+    let rows = 0; if (S.frenzy > 0) rows++; if (S.ice > 0) rows++;
+    const cy = hudBottom(g) + 12 + rows * 52 + h / 2;
+    ctx.save(); ctx.globalAlpha = al; ctx.translate(W / 2, cy - outK * 14); ctx.scale(e, e);
+    const path = P.rr(-w / 2, -h / 2, w, h, h / 2.6);
+    ctx.fillStyle = 'rgba(31,26,61,0.25)'; ctx.save(); ctx.translate(0, 5); ctx.fill(path); ctx.restore();
     const gr = ctx.createLinearGradient(0, -h / 2, 0, h / 2); gr.addColorStop(0, '#FFF6DC'); gr.addColorStop(1, '#F5DDA6');
-    ctx.fillStyle = gr; ctx.fill(path); ctx.lineWidth = 7; ctx.strokeStyle = C.ink; ctx.stroke(path);
-    ctx.fillStyle = '#C8372D'; ctx.fill(P.rr(-w / 2 + 12, -h / 2 + 12, 16, h - 24, 8)); ctx.fill(P.rr(w / 2 - 28, -h / 2 + 12, 16, h - 24, 8));
-    // icons
-    const n = Math.min(icons.length, 2);
-    if (n) { const im = icons[0], s = isz / Math.max(im.width, im.height); ctx.drawImage(im, -w / 2 + 52, -im.height * s / 2 - 6, im.width * s, im.height * s); const im2 = icons[icons.length - 1], s2 = isz / Math.max(im2.width, im2.height); ctx.drawImage(im2, w / 2 - 52 - im2.width * s2, -im2.height * s2 / 2 - 6, im2.width * s2, im2.height * s2); }
-    D.text(ctx, b.text, 0, b.sub ? -22 : 0, { size, color: b.color, outline: 14 });
-    if (b.sub) D.text(ctx, b.sub, 0, h / 2 - 34, { size: size * 0.36, color: C.ink });
+    ctx.fillStyle = gr; ctx.fill(path); ctx.lineWidth = 5; ctx.strokeStyle = C.ink; ctx.stroke(path);
+    if (icons.length) {
+      const im = icons[0], s1 = isz / Math.max(im.width, im.height); ctx.drawImage(im, -w / 2 + 20, -im.height * s1 / 2, im.width * s1, im.height * s1);
+      const i2 = icons[icons.length - 1], s2 = isz / Math.max(i2.width, i2.height); ctx.drawImage(i2, w / 2 - 20 - i2.width * s2, -i2.height * s2 / 2, i2.width * s2, i2.height * s2);
+    }
+    D.text(ctx, bn.text, 0, bn.sub ? -size * 0.28 : 0, { size, color: bn.color, outline: 9 });
+    if (bn.sub) D.text(ctx, bn.sub, 0, h / 2 - size * 0.45, { size: size * 0.46, color: C.ink });
     ctx.restore();
   }
 
+  WN._banner = (text, sub, icons, o) => addBanner(TM.current, text, sub, icons, o);
   WN._S = () => S;
   WN._spawn = (o) => spawnOne(TM.current, o);
   /* ---------- game ---------- */

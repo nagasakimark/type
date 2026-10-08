@@ -32,76 +32,98 @@
   }
   const isModalOpen = () => openCount > 0;
 
-  /* ---------- word-list picker ---------- */
+  /* ---------- word-list picker: textbook covers first, then that book's units ---------- */
   function picker(root, onDone) {
     const data = TM.data;
     let sel = new Set(TM.deck.ids());
-    const firstBook = data.decks[[...sel][0]]?.book || (data.books[0] && data.books[0].id);
-    let book = firstBook;
-    const tabs = el('div', { class: 'tm-tabs' });
-    const grid = el('div', { class: 'tm-grid' });
-    const count = el('span', { style: { font: '700 18px var(--word)' } });
+    let book = data.decks[[...sel][0]]?.book || (data.books[0] && data.books[0].id);
+    let view = 'books';
+    const stage = el('div', { class: 'tm-stage' });
+    const title = el('h2', {}, 'Choose your textbook');
+    const crumb = el('button', { class: 'tm-btn small tm-back hidden', onclick: () => { view = 'books'; render(); } }, '◀ Textbooks');
+    const count = el('span', { class: 'tm-count' });
     const shortT = el('input', { type: 'checkbox' }); shortT.checked = TM.settings.shortOnly;
+    const multi = el('input', { type: 'checkbox' });
+    const multiLbl = el('label', { class: 'tm-toggle' }, multi, 'Mix several lists');
+    const done = el('button', { class: 'tm-btn primary tm-play' }, 'Play these!');
 
-    function img(src) { return src ? root + src : ''; }
-    function renderTabs() {
-      tabs.innerHTML = '';
+    const img = (src) => (src ? root + src : '');
+    const bookOf = (id) => data.books.find((x) => x.id === id);
+    const selIn = (b) => b.decks.filter((id) => sel.has(id)).length;
+
+    function renderBooks() {
+      const grid = el('div', { class: 'tm-books', role: 'list' });
       for (const b of data.books) {
-        const t = el('button', { class: 'tm-tab' + (b.id === book ? ' on' : ''), onclick: () => { book = b.id; renderTabs(); renderGrid(); } },
-          el('img', { src: img(b.cover), alt: '', onerror: function () { this.style.display = 'none'; } }), b.name);
-        tabs.append(t);
+        const n = selIn(b);
+        const card = el('button', { class: 'tm-book' + (b.id === book ? ' cur' : ''), role: 'listitem', 'aria-label': b.name, onclick: () => { book = b.id; view = 'decks'; TM.sfx && TM.sfx.click(); render(); } },
+          el('div', { class: 'cover' }, el('img', { src: img(b.cover), alt: b.name, draggable: 'false' }), n ? el('span', { class: 'badge' }, `${n} picked`) : null),
+          el('div', { class: 'bn' }, b.name),
+          el('div', { class: 'bc' }, `${b.decks.length} lists`));
+        grid.append(card);
       }
+      stage.append(grid);
     }
-    function renderGrid() {
-      grid.innerHTML = '';
-      const b = data.books.find((x) => x.id === book);
+    function renderDecks() {
+      const b = bookOf(book);
       if (!b) return;
+      const grid = el('div', { class: 'tm-grid' });
       for (const id of b.decks) {
         const d = data.decks[id];
-        const tile = el('button', { class: 'tm-tile' + (sel.has(id) ? ' on' : '') });
         const pic = el('div', { class: 'img' });
-        if (d.image) {
-          const probe = new Image();
-          probe.onload = () => { pic.style.backgroundImage = `url("${img(d.image)}")`; };
-          probe.onerror = () => { pic.textContent = d.unit ? d.unit : '★'; };
-          probe.src = img(d.image);
-        } else pic.textContent = d.unit ? d.unit : '★';
-        tile.append(pic, el('div', { class: 't' },
-          el('div', { class: 'u' }, d.unit ? `Unit ${d.unit}` : d.label === d.title ? d.title : d.label),
-          el('div', { class: 'n' }, d.unit || d.label !== d.title ? d.title : ''),
-          el('div', { class: 'c' }, `${d.words.length} words${d.sentences && d.sentences.length ? ' · ' + d.sentences.length + ' sentences' : ''}`)),
+        const fallback = () => { pic.textContent = d.unit ? d.unit : '★'; };
+        if (d.image) pic.append(el('img', { src: img(d.image), alt: '', draggable: 'false', onerror: function () { this.remove(); fallback(); } })); else fallback();
+        const nS = d.sentences ? d.sentences.length : 0;
+        const tile = el('button', { class: 'tm-tile' + (sel.has(id) ? ' on' : ''), 'aria-pressed': sel.has(id) ? 'true' : 'false' },
+          pic,
+          el('div', { class: 't' },
+            el('div', { class: 'u' }, d.unit ? `Unit ${d.unit}` : d.label),
+            el('div', { class: 'n' }, d.unit || d.label !== d.title ? d.title : ' '),
+            el('div', { class: 'c' }, `${d.words.length} words`, nS ? ` · ${nS} sentences` : '')),
           el('div', { class: 'tick' }, '✓'));
         tile.onclick = (e) => {
           if (e.shiftKey || e.ctrlKey || e.metaKey || sel.size === 0 || multi.checked) { sel.has(id) ? sel.delete(id) : sel.add(id); }
           else { sel = new Set([id]); }
           TM.sfx && TM.sfx.click();
-          renderGrid(); renderCount();
+          const y = grid.scrollTop; render(); const g2 = stage.querySelector('.tm-grid'); if (g2) g2.scrollTop = y;
+          const t2 = stage.querySelectorAll('.tm-tile')[b.decks.indexOf(id)]; if (t2) t2.focus({ preventScroll: true });
         };
         grid.append(tile);
       }
+      stage.append(el('div', { class: 'tm-bookbar' }, el('img', { src: img(b.cover), alt: '' }), el('div', {}, el('b', {}, b.name), el('span', {}, 'Tap a unit. Tap more than one to mix them.'))), grid);
     }
-    const multi = el('input', { type: 'checkbox' });
+    function render() {
+      stage.innerHTML = '';
+      crumb.classList.toggle('hidden', view === 'books');
+      multiLbl.classList.toggle('hidden', view === 'books');
+      const b = bookOf(book);
+      title.textContent = view === 'books' ? 'Choose your textbook' : (b ? b.name : 'Choose words');
+      if (view === 'books') renderBooks(); else renderDecks();
+      renderCount();
+      const first = stage.querySelector('.tm-book.cur, .tm-tile.on, .tm-tile, .tm-book');
+      if (first && !stage.contains(document.activeElement)) first.focus({ preventScroll: true });
+    }
     function renderCount() {
-      let w = new Set(); for (const id of sel) for (const x of data.decks[id].words) w.add(x);
+      const w = new Set(); for (const id of sel) for (const x of data.decks[id].words) w.add(x);
       count.textContent = sel.size ? `${sel.size} list${sel.size > 1 ? 's' : ''} · ${w.size} words` : 'Pick at least one list';
       done.disabled = !sel.size; done.style.opacity = sel.size ? 1 : 0.5;
     }
-    const done = el('button', { class: 'tm-btn primary', style: { fontSize: '30px', padding: '12px 36px 8px' } }, 'Play these!');
-    const card = el('div', { class: 'tm-card tm-modal' },
-      el('header', {}, el('h2', {}, 'Choose words'), el('button', { class: 'tm-btn icon', title: 'Close', onclick: () => m.close() }, '✕')),
-      tabs, grid,
+    const card = el('div', { class: 'tm-card tm-modal tm-picker' },
+      el('header', {}, el('div', { class: 'tm-hl' }, crumb, title), el('button', { class: 'tm-btn icon', title: 'Close', 'aria-label': 'Close', onclick: () => m.close() }, '✕')),
+      stage,
       el('footer', {},
-        el('div', { class: 'tm-row', style: { justifyContent: 'flex-start' } },
-          el('label', { class: 'tm-toggle' }, multi, 'Mix several lists'),
-          el('label', { class: 'tm-toggle' }, shortT, 'Short words only')),
+        el('div', { class: 'tm-row', style: { justifyContent: 'flex-start' } }, multiLbl, el('label', { class: 'tm-toggle' }, shortT, 'Short words only')),
         el('div', { class: 'tm-row' }, count, done)));
     done.onclick = () => {
       if (!sel.size) return;
       TM.settings.shortOnly = shortT.checked; TM.saveSettings();
       TM.deck.set([...sel]); m.close(); onDone && onDone([...sel]);
     };
-    renderTabs(); renderGrid(); renderCount();
-    const m = modal(card, { keys: (e) => { if (e.key === 'Enter') { e.preventDefault(); done.click(); } } });
+    const m = modal(card, { keys: (e) => {
+      const tg = e.target && e.target.tagName;
+      if (e.key === 'Enter' && view === 'decks' && tg !== 'BUTTON' && tg !== 'INPUT') { e.preventDefault(); done.click(); }
+      else if (e.key === 'Backspace' && view === 'decks') { e.preventDefault(); view = 'books'; render(); }
+    } });
+    render();
     return m;
   }
 

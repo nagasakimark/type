@@ -46,33 +46,36 @@
     S.enemies = []; S.shots = []; S.critters = []; S.splats = []; S.goo = [];
     S.pair = WS.pair; S.shotI = 0; S.lock.release();
     S.moveSpd = 0; S.cov = 0; S.stageStart = g.playT;
-    S.banners.length = 0; S.amt = 0;
-    banner(g, `STAGE ${si + 1}`, WS.def.name, 2.8, 120);
-    if (g.state === 'countdown') S.banners[0].t = -3.3;
+    S.msg = null; S.amt = 0;
+    msg(g, `STAGE ${si + 1}`, { sub: WS.def.name, life: 1.8, pri: 3, delay: g.state === 'countdown' ? 3.3 : 0 });
     if (g.state === 'play' && !g.demo) TM.audio.startMusic(SONGS[si]);
   }
 
   function reset(g) {
     G = g;
     S = {
-      team: team(), stage: 0, stopI: 0, cz: 0, phase: 'move', t: 0, enemies: [], shots: [], critters: [], splats: [], goo: [], floaters: [], banners: [], queue: [], qt: 0,
+      team: team(), stage: 0, stopI: 0, cz: 0, phase: 'move', t: 0, enemies: [], shots: [], critters: [], splats: [], goo: [], msg: null, chipRects: [], msgRect: null, queue: [], qt: 0,
       tank: 100, ultra: 0, ultraFx: null, lock: new TM.LockOn(), bot: { acc: 0 }, recoil: 0, aim: 0, pair: ['#FF3EA5', '#B8F03A'], shotI: 0, hitFlash: 0, wipe: null, amt: 0, cov: 0, stageCov: [],
       splatted: 0, ultras: 0, bossesDown: 0, thumbs: [], turf: [], lowT: 0, comboShown: 0, lastDmgT: -9, topY: 110, muzzle: { x: VX + 430, y: H - 200 }, ending: false, stats: { glob: 0 },
     };
     parts.clear(); INK.quality = 0; slowN = 0;
     newStage(g, Math.min(NSTAGE - 1, +(TM.U.qs('stage') || 0)));
-    if (g.demo) S.banners.length = 0;
   }
 
   /* ---------------- helpers ---------------- */
   const colOf = (i) => S.pair[i % 2];
-  function banner(g, text, sub, life = 1.6, size = 100, col) {
-    S.banners.push({ text, sub, t: 0, life, size, col: col || S.pair[0] });
-    if (S.banners.length > 4) S.banners.shift();
+  /* ---------- single message manager ----------
+     One message at a time; a new one replaces the old (a lower-priority one never bumps a fresh higher-priority one).
+     Messages live in safe zones only (top strip under the turf meter, top corners, lower-left corner) and are
+     re-placed every frame so they never overlap an enemy, a word chip or the gun. */
+  function msg(g, text, o = {}) {
+    if (g.demo || !S) return;
+    const pri = o.pri || 1, cur = S.msg;
+    if (cur && cur.t < cur.life * 0.55 && cur.pri > pri) return;
+    S.msg = { text, sub: o.sub || '', t: o.delay ? -o.delay : 0, life: o.life || 1.1, col: o.col || S.pair[0], pri, modal: !!o.modal };
   }
-  function floater(text, x, y, o = {}) {
-    S.floaters.push({ text, x, y, t: 0, life: o.life || 0.9, size: o.size || 60, col: o.col || S.pair[0], rot: o.rot ?? U.rand(-0.14, 0.14), vy: o.vy ?? -60 });
-  }
+  const banner = (g, text, sub, life, size, col) => msg(g, text, { sub, life: Math.min(life || 1.4, 2.2), col, pri: 3 });
+  const aliveEnemies = () => S.enemies.filter((q) => q.alive);
   const diffK = () => (G.diff === 'gentle' ? 0 : G.diff === 'turbo' ? 2 : 1);
   function perKey() { return [0.95, 0.62, 0.42][diffK()]; }
   function baseTime() { return [7.5, 5.6, 4.2][diffK()]; }
@@ -159,7 +162,7 @@
       col: INK.GREY[type], spots: [], sq: 0, phase: 0, locked: false, danger: 999, hurt: 0, near: false, blink: 0, look: 0, kick: 0, dmg: 30, doomT: 0, nph, kidsGone: 0, globT: 6, slam: 0, stagger: 0, addsT: 0, tPhase: 0, cape: '#A95C7A',
     };
     S.boss = e; S.enemies.push(e);
-    banner(g, 'BOSS!', BOSS_NAME[S.stage], 2.4, 130, '#FF5A5F');
+    msg(g, 'BOSS!', { sub: BOSS_NAME[S.stage], life: 1.6, col: '#FF5A5F', pri: 3 });
     TM.sfx.big(); G.fx.shake(10, 0.3);
     setPhaseSpeed(e);
   }
@@ -234,8 +237,10 @@
   function onWordDone(g, e, sh) {
     const typer = sh.typer;
     const col = sh.col, s = eScreen(e);
-    const pts = g.wordDone(typer, null, null, { bonus: e.boss ? 2 : 1, color: col });
-    if (!g.demo && pts) floater('+' + pts, s.x, s.y - 90 * Math.min(2, s.sc / 60), { size: 54, col: '#FFC83D', life: 0.9 });
+    const fxPop = g.fx.pop; // framework would drop a big COMBO banner mid-screen: route it to the single message manager
+    g.fx.pop = (x, y, t) => { if (/^COMBO/.test(t)) msg(g, t.replace('!', ''), { life: 0.8, pri: 2, col: S.pair[1] }); };
+    let pts; try { pts = g.wordDone(typer, null, null, { bonus: e.boss ? 2 : 1, color: col }); } finally { g.fx.pop = fxPop; }
+    S.lastPts = pts || 0;
     S.ultra = Math.min(100, S.ultra + (e.boss ? 14 : 8) + (g.score.mult - 1) * 2);
     S.tank = Math.min(100, S.tank + (e.boss ? 6 : 2.2));
     comboCheck(g);
@@ -244,7 +249,7 @@
       e.idx++; e.typer = new TM.Typer(e.items[e.idx]); e.state = 'walk'; e.dizzy = false; e.shield = false;
       INK.snd('shield', 0.8, 1.3); TM.sfx.zap();
       for (let i = 0; i < 12; i++) parts.add({ type: 'drop', x: s.x + U.rand(-60, 60), y: s.y - 60 * Math.min(2, s.sc / 60), vx: U.rand(-500, 500), vy: U.rand(-700, -100), color: i % 2 ? e.canopy : e.canopy2, size: U.rand(8, 16), g: 1700, life: 0.7 });
-      floater('POP!', s.x, s.y - 100, { size: 60, col: '#FFC83D' });
+      msg(g, 'POP!', { life: 0.7, col: '#FFC83D' });
       return;
     }
     splatEnemy(g, e, col, false);
@@ -256,8 +261,8 @@
     const s = eScreen(e), sc = s.sc;
     const c2 = colOf(S.shotI + 1);
     // the big splat billboard + droplets
-    const size = U.clamp(sc * s.T.wh * 2.0, 160, 700);
-    S.splats.push({ x: s.x, y: s.y, k: U.pick(INK.SPLATS), col, size, t: 0, life: 0.7, rot: U.rand(0, 6.28) });
+    const size = U.clamp(sc * s.T.wh * 1.25, 110, e.boss ? 520 : 300);
+    S.splats.push({ x: s.x, y: s.y, k: U.pick(INK.SPLATS), col, size, t: 0, life: 0.5, rot: U.rand(0, 6.28) });
     S.splats.push({ x: s.x + U.rand(-1, 1) * size * 0.25, y: s.y + U.rand(-0.5, 0.5) * size * 0.2, k: U.pick(INK.SPLATS), col: c2, size: size * 0.6, t: -0.05, life: 0.65, rot: U.rand(0, 6.28) });
     parts.burst(s.x, s.y, col, { count: 34, speed: [300, 1100], color2: c2, size: [8, 24], up: 200 });
     parts.sprite('circle_02', s.x, s.y, size * 0.5, { color: col, life: 0.45, grow: size * 1.3, add: true, a: 0.9 });
@@ -270,7 +275,7 @@
     INK.paintNear(WS, S.cz, e.z, 14, S.pair, e.boss ? 6 : 2, Math.sign(e.x));
     // critter!
     spawnCritter(g, e, col);
-    if (!g.demo) { S.splatted++; floater(U.pick(CALLOUTS), s.x, s.y - 40, { size: Math.min(110, 50 + sc * 0.3), col, rot: U.rand(-0.2, 0.2) }); }
+    if (!g.demo) { S.splatted++; if (!byUltra) msg(g, U.pick(CALLOUTS) + (S.lastPts ? '  +' + S.lastPts : ''), { life: 0.75, col, pri: 1 }); S.lastPts = 0; }
     INK.snd('slime', 0.8, U.rand(0.9, 1.2)); TM.sfx.splat(); INK.snd('pep', 0.6, U.rand(0.95, 1.25));
     g.fx.shake(e.boss ? 18 : 6 + Math.min(8, sc * 0.05), 0.12);
     if (e.type === 'split') { // the Splitter splits in two before turning happy
@@ -282,7 +287,7 @@
     if (g.demo) return;
     const c = g.score.combo;
     if (COMBO_TXT[c] || (c > 50 && c % 25 === 0)) {
-      banner(g, COMBO_TXT[c] || 'UNSTOPPA-BLOB!', `COMBO x${c}`, 1.3, 84, S.pair[c % 2]);
+      msg(g, COMBO_TXT[c] || 'UNSTOPPA-BLOB!', { sub: 'x' + c, life: 1.0, col: S.pair[c % 2], pri: 2 });
       INK.snd('combo', 0.8, 1 + Math.min(0.5, c * 0.01));
     }
   }
@@ -296,7 +301,7 @@
     parts.sprite('circle_02', s.x, s.y, 200, { color: sh.col, life: 0.5, grow: 700, add: true });
     INK.groundSplat(WS, e.x, S.cz + e.z, 3, sh.col); INK.paintNear(WS, S.cz, e.z, 14, S.pair, 3);
     INK.snd('slime', 1, 0.8); TM.sfx.big(); g.fx.shake(16, 0.2);
-    g.fx.pop(VX, 330, `${['OUCH-IE!', 'WOBBLE!', 'DIZZY!', 'SPLAT!'][Math.min(3, e.idx)]}`, { size: 90, color: sh.col, life: 1 });
+    msg(g, ['OUCH-IE!', 'WOBBLE!', 'DIZZY!', 'SPLAT!'][Math.min(3, e.idx)], { life: 0.9, col: sh.col, pri: 2 });
     e.idx++;
     e.col = INK.mix(INK.GREY[e.type], S.pair[0], Math.min(0.75, e.idx / e.nph * 0.8));
     if (e.idx >= e.nph) { bossDefeated(g, e); return; }
@@ -317,8 +322,7 @@
     INK.groundSplat(WS, 0, S.cz + e.z, 5, S.pair[0]); INK.groundSplat(WS, 2, S.cz + e.z + 2, 4, S.pair[1]);
     INK.paintAllVisible(WS, S.cz, S.pair);
     g.score.add(500 + S.stage * 250);
-    floater('+' + (500 + S.stage * 250), s.x, s.y - 160, { size: 80, col: '#FFC83D', life: 1.4 });
-    banner(g, 'BOSS SPLATTED!', BOSS_NAME[S.stage] + ' is happy now', 2.4, 100, '#FFC83D');
+        msg(g, 'BOSS SPLATTED!', { sub: BOSS_NAME[S.stage] + ' is happy now', life: 1.8, col: '#FFC83D', pri: 3 });
     for (const q of S.enemies) if (q.alive && q !== e) { splatEnemy(g, q, S.pair[0], true); }
     S.queue.length = 0;
     startRush(g);
@@ -344,14 +348,14 @@
     const v = g.vw();
     for (let i = 0; i < 3; i++) {
       const edge = U.randi(0, 3), t = Math.random();
-      const x = edge === 0 ? v.x + v.w * U.rand(0.02, 0.2) : edge === 1 ? v.x + v.w * U.rand(0.8, 0.98) : v.x + v.w * t, y = edge === 2 ? v.y + v.h * U.rand(0.02, 0.2) : edge === 3 ? v.y + v.h * U.rand(0.8, 0.98) : v.y + v.h * t;
-      S.goo.push({ x, y, r: U.rand(150, 260) * (e.boss ? 1.4 : 1), k: U.pick(INK.SPLAT_ROUND), t: 0, life: 3.2, rot: U.rand(0, 6.28), col: i % 2 ? GOO : GOO2, drip: U.rand(20, 60) });
+      const x = edge === 0 ? v.x + v.w * U.rand(0.0, 0.08) : edge === 1 ? v.x + v.w * U.rand(0.92, 1.0) : v.x + v.w * t, y = edge === 2 ? v.y + v.h * U.rand(0, 0.05) : edge === 3 ? v.y + v.h * U.rand(0.94, 1.0) : v.y + v.h * t;
+      S.goo.push({ x, y, r: U.rand(90, 150) * (e.boss ? 1.3 : 1), k: U.pick(INK.SPLAT_ROUND), t: 0, life: 1.5, rot: U.rand(0, 6.28), col: i % 2 ? GOO : GOO2, drip: U.rand(20, 60) });
     }
     
     S.hitFlash = 1; g.fx.shake(e.boss ? 30 : 20, 0.3);
     INK.snd('hit', 0.9, 1); INK.snd('slime', 1, 0.7); TM.sfx.hurt();
     parts.burst(s.x, Math.min(s.y, H - 80), GOO, { count: 24, speed: [300, 900], up: 400, color2: GOO2 });
-    floater('SPLORT!', VX, v.y + v.h * 0.4, { size: 150, col: '#B9A8F0', life: 1.2, rot: -0.08 });
+    msg(g, 'SPLORT!', { life: 0.8, col: '#9B86E8', pri: 2 });
     if (g.demo || g.state !== 'play') return;
     g.missWord(e.typer.item);
     const dmg = e.dmg * [0.35, 1, 1.35][diffK()];
@@ -361,6 +365,8 @@
   function outOfInk(g) {
     if (S.ending) return; S.ending = true;
     S.lock.release(); S.queue.length = 0;
+    for (const q of S.enemies) { if (q.alive) { const p = eScreen(q); parts.burst(p.x, p.y, GOO2, { count: 10, speed: [150, 500], up: 100 }); q.alive = false; } }
+    S.enemies = []; S.msg = null;
     finish(g, false);
   }
 
@@ -371,9 +377,9 @@
     S.ultraFx = { t: 0, dur: 1.5, killed: new Set() };
     g.fx.doFlash('#ffffff', 0.7); g.fx.shake(26, 0.7);
     INK.snd('ultra', 1, 1); INK.snd('boom', 0.7, 0.9); INK.snd('rumble', 0.8, 1); TM.sfx.boost();
-    banner(g, 'ULTRA SPLAT!', 'Paint wave!', 1.8, 140, S.pair[0]);
+    msg(g, 'ULTRA SPLAT!', { sub: 'Paint wave!', life: 1.4, pri: 4 });
     const v = g.vw();
-    for (let i = 0; i < 40; i++) S.splats.push({ x: v.x + Math.random() * v.w, y: v.y + v.h * (0.15 + Math.random() * 0.85), k: U.pick(INK.SPLATS), col: colOf(i), size: U.rand(300, 640), t: -(Math.random() * 0.9), life: 1.0, rot: U.rand(0, 6.28) });
+    for (let i = 0; i < 20; i++) S.splats.push({ x: VX + (Math.random() - 0.5) * Math.min(v.w, W * 1.1), y: v.y + v.h * (0.3 + Math.random() * 0.7), k: U.pick(INK.SPLATS), col: colOf(i), size: U.rand(200, 400), t: -(Math.random() * 0.7), life: 0.7, rot: U.rand(0, 6.28) });
     for (let i = 0; i < 6; i++) parts.sprite('circle_02', VX, v.y + v.h, 200, { color: colOf(i), life: 0.9, grow: 3200, add: true, a: 0.8, g: 0 });
     for (let i = 0; i < 12; i++) INK.groundSplat(WS, U.rand(-5, 5), S.cz + U.rand(3, 34), U.rand(2, 3.4), colOf(i));
     INK.paintAllVisible(WS, S.cz, S.pair);
@@ -409,7 +415,7 @@
     const stars = stageStars(cov);
     if (!g.demo) {
       g.score.add(Math.round(cov * 600) + Math.round(S.tank * 4) + 200);
-      banner(g, 'TURF CAPTURED!', `${WS.def.name}: ${Math.round(cov * 100)}%  ${'★'.repeat(stars)}${'☆'.repeat(3 - stars)}`, 3.0, 110, '#FFC83D');
+      msg(g, 'TURF CAPTURED!', { sub: `${WS.def.name}: ${Math.round(cov * 100)}%  ${'★'.repeat(stars)}${'☆'.repeat(3 - stars)}`, life: 2.6, col: '#FFC83D', pri: 4, modal: true });
       g.fx.confetti(VX, 360, 70); INK.snd('clear', 1, 1); TM.sfx.win();
       S.tank = Math.min(100, S.tank + 30);
     }
@@ -435,7 +441,7 @@
         }
         if (!S.queue.length && !S.enemies.some((q) => q.alive) && !S.shots.length) {
           S.phase = 'clearing'; S.clearT = 0;
-          if (!g.demo) { floater('CLEAR!', VX, 330, { size: 120, col: S.pair[0], life: 1.2 }); S.tank = Math.min(100, S.tank + 10); INK.snd('up', 0.8, 1); }
+          if (!g.demo) { msg(g, 'CLEAR!', { life: 0.9, pri: 2 }); S.tank = Math.min(100, S.tank + 10); INK.snd('up', 0.8, 1); }
         }
       } else {
         if (S.stopT > 1.2 && !S.bossStarted) { S.bossStarted = true; startBoss(g); }
@@ -462,15 +468,15 @@
       }
     } else if (S.phase === 'wipe') {
       S.wipe.t += dt;
-      if (S.wipe.t > 0.7 && !S.wipe.swapped) { S.wipe.swapped = true; const w = S.wipe; const keep = { wipe: w, ult: S.ultraFx }; newStage(g, S.stage + 1); S.phase = 'wipe'; S.wipe = w; S.ultraFx = null; S.banners.length = 0; banner(g, `STAGE ${S.stage + 1}`, WS.def.name, 2.8, 120); }
+      if (S.wipe.t > 0.7 && !S.wipe.swapped) { S.wipe.swapped = true; const w = S.wipe; const keep = { wipe: w, ult: S.ultraFx }; newStage(g, S.stage + 1); S.phase = 'wipe'; S.wipe = w; S.ultraFx = null; msg(g, `STAGE ${S.stage + 1}`, { sub: WS.def.name, life: 1.8, pri: 4 }); }
       if (S.wipe.t > 1.5) { S.wipe = null; S.phase = 'move'; }
     }
   }
   function arrive(g) {
     const isBoss = S.stopI === WS.def.stops.length - 1;
     S.bossStarted = false;
-    if (!isBoss) { queueStop(g); if (!g.demo) { banner(g, S.stopI === 0 ? 'GET READY!' : 'HERE THEY COME!', null, 1.3, 90); } }
-    else if (!g.demo) banner(g, 'WARNING!', 'Something big is coming...', 1.6, 100, '#FF5A5F');
+    if (!isBoss) { queueStop(g); if (!g.demo) { msg(g, S.stopI === 0 ? 'GET READY!' : 'HERE THEY COME!', { life: 1.0, pri: 2 }); } }
+    else if (!g.demo) msg(g, 'WARNING!', { sub: 'Something big is coming', life: 1.3, col: '#FF5A5F', pri: 3 });
     S.ultraWarn = false;
   }
 
@@ -541,10 +547,7 @@
     parts.update(dt);
     S.recoil = Math.max(0, S.recoil - dt * 7); S.hitFlash = Math.max(0, S.hitFlash - dt * 2.4);
     S.amt = U.lerp(S.amt, S.cov, Math.min(1, dt * 2.5));
-    for (const f of S.floaters) { f.t += dt; f.y += f.vy * dt; }
-    S.floaters = S.floaters.filter((f) => f.t < f.life);
-    for (const b of S.banners) b.t += dt;
-    S.banners = S.banners.filter((b) => b.t < b.life);
+    if (S.msg) { if (!(window.INK_DEBUG && window.INK_DEBUG.hold)) S.msg.t += dt; if (S.msg.t >= S.msg.life) S.msg = null; }
     for (const sp of S.splats) sp.t += dt;
     S.splats = S.splats.filter((sp) => sp.t < sp.life);
     for (const o of S.goo) o.t += dt;
@@ -634,7 +637,7 @@
       e.sq = Math.sin(e.t * 3) * 0.025;
       if (e.type === 'squid') { // the squid flicks goo globs at you
         e.globT -= dt;
-        if (e.globT <= 0) { e.globT = [9, 6.5, 5][diffK()] + U.rand(0, 2); const gl = mkEnemy(g, 'glob', { x: e.x + U.rand(-1.2, 1.2), z: e.z + 0.5 }); gl.y = 1.4; S.stats.glob++; floater('FLICK!', eScreen(e).x, eScreen(e).y, { size: 54, col: GOO2 }); INK.snd('shot', 0.4, 0.6); }
+        if (e.globT <= 0) { e.globT = [9, 6.5, 5][diffK()] + U.rand(0, 2); const gl = mkEnemy(g, 'glob', { x: e.x + U.rand(-1.2, 1.2), z: e.z + 0.5 }); gl.y = 1.4; S.stats.glob++; msg(g, 'FLICK!', { life: 0.7, col: '#9B86E8' }); INK.snd('shot', 0.4, 0.6); }
       }
       if (e.type === 'king' && e.idx >= 2 && S.queue.length === 0 && S.enemies.filter((q) => q.alive && !q.boss).length === 0 && e.tPhase > 5) { for (let i = 0; i < 2; i++) S.queue.push({ t: S.qt + 0.3 + i * 1.8, type: U.pick(['jelly', 'jumper', 'tiny']) }); }
       if (e.z <= 4.3) { // big stomp: harmless splat on you, boss bounces back
@@ -697,50 +700,138 @@
     if (z > 60) ctx.globalAlpha = U.clamp((90 - z) / 30, 0, 1);
     INK.drawCritter(ctx, c, S.t + c.seed); ctx.restore();
   }
-  function drawChip(ctx, g, e, v, placed) {
+  /* ---------------- word chips: tidy layout + messages in safe zones ---------------- */
+  const BOXW = { stilt: 0.6, flyer: 1.25, big: 1.0, squid: 1.1, king: 1.0, mama: 1.0 };
+  function enemyBox(e) {
+    const T = INK.TYPES[e.type], sc = F / Math.max(0.8, e.z), gy = INK.gy(e.z), x = INK.sx(e.x, e.z);
+    const ww = (BOXW[e.type] || 0.95) * T.wh * sc, hh = T.wh * sc, yb = gy - e.y * sc;
+    return { l: x - ww / 2, r: x + ww / 2, t: yb - hh, b: yb, x, e };
+  }
+  const hit = (a, b, gap = 0) => a.l < b.r + gap && a.r > b.l - gap && a.t < b.b + gap && a.b > b.t - gap;
+  function chipInfo(ctx, g, e, v) {
     const T = INK.TYPES[e.type], z = Math.max(1, e.z), sc = F / z;
-    const topY = INK.gy(z) - (e.y + T.wh) * sc;
-    const x = INK.sx(e.x, z);
-    let size = e.boss ? 56 : U.clamp(30 + (1 - (z - Z_ATK) / (Z_FAR - Z_ATK)) * 26, 32, 58);
-    if (e.type === 'tiny' || e.type === 'glob') size = Math.min(size, 44);
+    let size = e.boss ? 56 : U.clamp(32 + (1 - (z - Z_ATK) / (Z_FAR - Z_ATK)) * 26, 34, 60);
+    if (e.type === 'tiny' || e.type === 'glob') size = Math.min(size, 46);
     const cs = D.chipSize(ctx, e.typer, size);
     let scale = 1; const maxW = Math.min(1700, v.w - 60); if (cs.w > maxW) scale = maxW / cs.w;
-    const w = cs.w * scale, h = cs.h * scale;
-    let cx = U.clamp(x, 30 + w / 2, W - 30 - w / 2), cy = e.boss ? INK.gy(z) - (e.y + T.wh * 0.3) * sc : topY - h / 2 - 10;
-    cy = Math.max(cy, S.topY + 56 + h / 2);
-    for (let i = 0; i < 10; i++) { // sidestep (or rise) if it overlaps a nearer chip
-      let hit = null;
-      for (const r of placed) if (Math.abs(r.x - cx) < (r.w + w) / 2 + 4 && Math.abs(r.y - cy) < (r.h + h) / 2 + 2) { hit = r; break; }
-      if (!hit) break;
-      const right = hit.x + (hit.w + w) / 2 + 8, left = hit.x - (hit.w + w) / 2 - 8;
-      const okR = right + w / 2 < W - 20, okL = left - w / 2 > 20;
-      const pickRight = okR && (!okL || Math.abs(right - x) < Math.abs(left - x));
-      if ((pickRight || okL) && i < 4) cx = pickRight ? right : left;
-      else cy = Math.max(S.topY + 56 + h / 2, hit.y - (hit.h + h) / 2 - 4);
-    }
-    placed.push({ x: cx, y: cy, w, h });
     const locked = S.lock.locked === e;
-    const acc = e.type === 'brolly' && e.shield ? '#8A6D3B' : accentOf(S.pair[0]);
-    D.chip(ctx, cx, cy, e.typer, { size, accent: locked ? accentOf(S.pair[0]) : acc, locked, hint: g.hint && (locked || (!S.lock.locked && e === nearest())), scale });
-    if (e.boss) { D.text(ctx, `${e.idx + 1}/${e.nph}`, cx - w / 2 - 34, cy, { size: 40, color: '#fff', outline: 9 }); }
-    else if (e.type === 'brolly' && e.shield) D.text(ctx, 'SHIELD!', cx, cy - h / 2 - 16, { size: 26, color: '#FFC83D', outline: 7 });
+    const k = scale * (locked ? 1.08 : 1);
+    const hint = !!(g.hint && e.typer.item.hint && (locked || (!S.lock.locked && e === S.nearestE)));
+    const hintH = hint ? Math.round(size * 0.52) * 1.7 + 6 : 0;
+    const eb = enemyBox(e);
+    return { e, size, scale, locked, hint, w: cs.w * k + 10, h: cs.h * k + 6, hintH, eb, ex: eb.x,
+      x0: INK.sx(e.x, z), y0: e.boss ? INK.gy(z) - (e.y + T.wh * 0.3) * sc : eb.t - 10 - (cs.h * k) / 2 };
   }
-  function bannerPlate(ctx, b, cx, cy) {
-    const k = b.t / b.life, tin = Math.min(1, b.t / 0.28), tout = Math.max(0, (b.t - (b.life - 0.3)) / 0.3);
-    const off = (1 - U.ease.outBack(tin)) * -1100 + tout * 1100;
-    ctx.save(); ctx.translate(cx + off, cy); ctx.rotate(-0.06);
-    ctx.font = D.FONT_DISPLAY(b.size, 800); const tw = ctx.measureText(b.text).width + b.size * 0.9;
-    let sw = 0; if (b.sub) { ctx.font = D.FONT_DISPLAY(Math.round(b.size * 0.36), 800); sw = ctx.measureText(b.sub).width + 80; }
-    const pw = Math.max(tw, sw), ph = b.size * 1.0 + (b.sub ? b.size * 0.42 : 0);
-    ctx.transform(1, 0, -0.22, 1, 0, 0);
-    // plate: ink drop shadow, team colour plate, white stripe
-    ctx.fillStyle = INK.INKC; ctx.fill(P.rr(-pw / 2 + 12, -ph * 0.5 + 14, pw, ph, 18));
-    ctx.fillStyle = b.col; ctx.fill(P.rr(-pw / 2, -ph * 0.5, pw, ph, 18)); ctx.lineWidth = 9; ctx.strokeStyle = INK.INKC; ctx.stroke(P.rr(-pw / 2, -ph * 0.5, pw, ph, 18));
-    ctx.fillStyle = 'rgba(255,255,255,0.28)'; ctx.fill(P.rr(-pw / 2 + 14, -ph * 0.5 + 10, pw * 0.5, ph * 0.12, 6));
-    const ty = b.sub ? -b.size * 0.22 : 0;
-    D.text(ctx, b.text, 0, ty + 3, { size: b.size, color: '#ffffff', outline: Math.max(12, b.size * 0.16) });
-    if (b.sub) D.text(ctx, b.sub, 0, b.size * 0.5, { size: Math.round(b.size * 0.36), color: '#ffffff', outline: 8 });
+  function layoutChips(ctx, g, v) {
+    const out = S.chipRects; out.length = 0;
+    S.nearestE = nearest();
+    const list = S.enemies.filter((e) => e.alive && e.state !== 'doomed' && e.z < Z_FAR + 4)
+      .sort((a, b) => (S.lock.locked === a ? -1 : S.lock.locked === b ? 1 : a.z - b.z));
+    const xL = VX - W / 2 + 24, xR = VX + W / 2 - 24, yMin = S.topY + 104, yMax = Math.max(H, v.y + v.h) - 260;
+    const infos = list.map((e) => chipInfo(ctx, g, e, v));
+    for (const c of infos) {
+      let bx = U.clamp(c.x0, xL + c.w / 2, xR - c.w / 2), by = Math.max(c.y0, yMin + c.h / 2), best = null, bc = 1e9;
+      const step = c.w * 0.5 + 10;
+      for (let j = -3; j <= 6 && bc > 0; j++) {
+        const y = by - j * (c.h + c.hintH * 0.0 + 8);
+        if (y - c.h / 2 < yMin - 1 || y + c.h / 2 + c.hintH > yMax) continue;
+        for (let kx = 0; kx <= 12; kx++) {
+          for (const sgn of kx ? [1, -1] : [1]) {
+            const x = bx + sgn * kx * step; if (x - c.w / 2 < xL || x + c.w / 2 > xR) continue;
+            const r = { l: x - c.w / 2, r: x + c.w / 2, t: y - c.h / 2, b: y + c.h / 2 + c.hintH };
+            let bad = false; for (const o of out) if (hit(r, o, 6)) { bad = true; break; }
+            if (bad) continue;
+            let cost = kx * step * 0.8 + (j < 0 ? -j * 220 : j * c.h * 0.9);
+            for (const o of infos) if (o !== c && hit(r, o.eb, 0)) cost += 160;
+            if (c.e.boss) cost -= 0; if (cost < bc) { bc = cost; best = { x, y, r }; }
+          }
+        }
+      }
+      if (!best) { const x = U.clamp(bx, xL + c.w / 2, xR - c.w / 2); best = { x, y: by, r: { l: x - c.w / 2, r: x + c.w / 2, t: by - c.h / 2, b: by + c.h / 2 + c.hintH } }; }
+      c.cx = best.x; c.cy = best.y; c.r = best.r;
+      out.push(Object.assign(best.r, { info: c }));
+    }
+    return infos;
+  }
+  function drawChip(ctx, g, c) {
+    const e = c.e, acc = e.type === 'brolly' && e.shield ? '#8A6D3B' : accentOf(S.pair[0]);
+    // tether from the chip to its Gloop when the chip had to move aside
+    const eb = c.eb, offX = Math.abs(c.cx - c.ex) > c.w * 0.45, offY = c.cy + c.h / 2 + 14 < eb.t - 4;
+    if (!e.boss && (offX || offY)) {
+      const ty = Math.max(eb.t + 6, c.cy + c.h / 2); ctx.save(); ctx.lineCap = 'round';
+      ctx.strokeStyle = INK.INKC; ctx.lineWidth = 9; ctx.beginPath(); ctx.moveTo(c.cx, c.cy + c.h / 2 - 2); ctx.lineTo(c.ex, ty); ctx.stroke();
+      ctx.strokeStyle = '#fff'; ctx.lineWidth = 4; ctx.stroke(); ctx.restore();
+    }
+    // readable on any backdrop: soft dark halo behind the chip
+    ctx.save(); ctx.fillStyle = 'rgba(31,26,61,0.28)'; ctx.fill(P.rr(c.cx - c.w / 2 - 5, c.cy - c.h / 2 - 3, c.w + 10, c.h + 10, c.h / 2 + 4)); ctx.restore();
+    D.chip(ctx, c.cx, c.cy, e.typer, { size: c.size, accent: c.locked ? accentOf(S.pair[0]) : acc, locked: c.locked, hint: c.hint, scale: c.scale });
+    if (e.boss) D.text(ctx, `${e.idx + 1}/${e.nph}`, c.cx - c.w / 2 - 34, c.cy, { size: 40, color: '#fff', outline: 9 });
+  }
+  /* the one message plate: small pill, pops in/out in place, never slides across the play field */
+  function placeMsg(ctx, g, v, m) {
+    const k = U.clamp(m.t / 0.16, 0, 1), ts = m.modal ? 54 : 36, ss = Math.round(ts * 0.62);
+    ctx.font = D.FONT_DISPLAY(ts, 800); const tw = ctx.measureText(m.text).width;
+    let sw = 0; if (m.sub) { ctx.font = D.FONT_DISPLAY(ss, 800); sw = ctx.measureText(m.sub).width; }
+    const padX = ts * 0.55, padY = m.modal ? ts * 0.34 : ts * 0.2;
+    let w, h;
+    if (m.modal) { w = Math.max(tw, sw) + padX * 2; h = ts * 1.2 + (m.sub ? ss * 1.5 : 0) + padY * 2; }
+    else { w = tw + (m.sub ? sw + ss * 0.8 : 0) + padX * 2; h = ts * 1.12 + padY * 2; }
+    let fit = 1; const maxW = v.w * 0.9, maxH = v.h * 0.5; if (w > maxW) fit = Math.min(fit, maxW / w); if (h > maxH) fit = Math.min(fit, maxH / h);
+    w *= fit; h *= fit;
+    const obst = [];
+    for (const e of S.enemies) if (e.alive && e.z < Z_FAR + 8) obst.push(enemyBox(e));
+    for (const r of S.chipRects) obst.push(r);
+    const gunR = { l: VX + 230, r: VX + 720, t: Math.max(H, v.y + v.h) - 320, b: v.y + v.h + 10 };
+    obst.push(gunR);
+    const free = (r) => { for (const o of obst) if (hit(r, o, 10)) return false; return true; };
+    const cands = [];
+    const sy = S.topY + 46, bot = Math.max(H, v.y + v.h);
+    if (m.modal && obst.length <= 1) cands.push({ x: VX, y: v.y + v.h * 0.36 });
+    cands.push({ x: VX, y: sy + h / 2 }, { x: VX - W / 2 + 40 + w / 2, y: sy + h / 2 }, { x: VX + W / 2 - 40 - w / 2, y: sy + h / 2 },
+      { x: VX - W / 2 + 40 + w / 2, y: bot - 190 - h / 2 });
+    for (const c of cands) {
+      const r = { l: c.x - w / 2, r: c.x + w / 2, t: c.y - h / 2, b: c.y + h / 2 };
+      if (free(r)) return { r, fit, w, h, tw, sw, ts, ss, padX, k, cx: c.x, cy: c.y };
+    }
+    return null;
+  }
+  function drawMsg(ctx, g, v) {
+    S.msgRect = null; const m = S.msg; if (!m || m.t < 0 || g.demo) return;
+    const p = placeMsg(ctx, g, v, m); if (!p) return;
+    const life = m.life, out = U.clamp((life - m.t) / 0.25, 0, 1), sc = U.ease.outBack(p.k) * (0.9 + 0.1 * out);
+    S.msgRect = p.r; S.msgRect.modal = m.modal && p.cy > S.topY + 150;
+    ctx.save(); ctx.globalAlpha = Math.min(1, out * 1.2); ctx.translate(p.cx, p.cy); ctx.scale(sc * p.fit, sc * p.fit);
+    const w = p.w / p.fit, h = p.h / p.fit;
+    ctx.fillStyle = INK.INKC; ctx.fill(P.rr(-w / 2 + 5, -h / 2 + 7, w, h, h * 0.4));
+    ctx.fillStyle = m.col; ctx.fill(P.rr(-w / 2, -h / 2, w, h, h * 0.4)); ctx.lineWidth = 6; ctx.strokeStyle = INK.INKC; ctx.stroke(P.rr(-w / 2, -h / 2, w, h, h * 0.4));
+    ctx.fillStyle = 'rgba(255,255,255,0.28)'; ctx.fill(P.rr(-w / 2 + 12, -h / 2 + 7, w * 0.45, h * 0.1, 5));
+    if (m.modal) {
+      D.text(ctx, m.text, 0, m.sub ? -p.ss * 0.7 : 0, { size: p.ts, color: '#fff', outline: 12 });
+      if (m.sub) D.text(ctx, m.sub, 0, p.ts * 0.62, { size: p.ss, color: '#fff', outline: 8 });
+    } else {
+      const total = p.tw + (m.sub ? p.sw + p.ss * 0.8 : 0), x0 = -total / 2;
+      D.text(ctx, m.text, x0 + p.tw / 2, 2, { size: p.ts, color: '#fff', outline: 10 });
+      if (m.sub) D.text(ctx, m.sub, x0 + p.tw + p.ss * 0.8 + p.sw / 2, 4, { size: p.ss, color: '#FFF8EC', outline: 7 });
+    }
     ctx.restore();
+  }
+  /* ---------- automated overlap audit (read by the test bot via INK_DEBUG.audit) ---------- */
+  const AUDIT = { frames: 0, msgFrames: 0, msgHidden: 0, msgEnemy: 0, msgChip: 0, msgGun: 0, chipChip: 0, modalWithEnemies: 0, chipOffscreen: 0, log: [] };
+  function auditFrame(g, v) {
+    if (g.state !== 'play' && g.state !== 'over') return;
+    AUDIT.frames++;
+    const rs = S.chipRects, note = (k, d) => { AUDIT[k]++; if (AUDIT.log.length < 40) AUDIT.log.push({ k, d, stage: S.stage, t: +S.t.toFixed(2) }); };
+    for (let i = 0; i < rs.length; i++) {
+      for (let j = i + 1; j < rs.length; j++) if (hit(rs[i], rs[j], 0)) note('chipChip', [rs[i].info.e.typer.text, rs[j].info.e.typer.text]);
+      if (rs[i].l < v.x || rs[i].r > v.x + v.w) note('chipOffscreen', rs[i].info.e.typer.text);
+    }
+    if (S.msg && S.msg.t > 0.05 && !S.msgRect) AUDIT.msgHidden++;
+    const m = S.msgRect; if (!m) return;
+    AUDIT.msgFrames++;
+    for (const e of S.enemies) if (e.alive && e.z < Z_FAR + 8 && hit(m, enemyBox(e), 0)) note('msgEnemy', [S.msg && S.msg.text, e.type]);
+    for (const r of rs) if (hit(m, r, 0)) note('msgChip', [S.msg && S.msg.text, r.info.e.typer.text]);
+    if (m.modal && S.enemies.some((q) => q.alive)) note('modalWithEnemies', S.msg && S.msg.text);
+    if (m.r > VX + 230 && m.l < VX + 720 && m.b > Math.max(H, v.y + v.h) - 320) note('msgGun', S.msg && S.msg.text);
   }
   function drawGun(ctx, g, v) {
     const b = S.gunB || { x: VX + 470, y: Math.max(H, v.y + v.h) - 80 };
@@ -783,14 +874,14 @@
     D.text(ctx, `TURF ${Math.round(S.amt * 100)}%`, VX, my + mh / 2 + 2, { size: 28, color: '#fff', outline: 8 });
     // stage pips
     for (let i = 0; i < NSTAGE; i++) { const px = mx + mw + 34 + i * 30; ctx.fillStyle = i < S.stage ? '#FFC83D' : i === S.stage ? S.pair[0] : 'rgba(255,255,255,0.6)'; ctx.beginPath(); ctx.arc(px, my + mh / 2, 10, 0, 7); ctx.fill(); ctx.lineWidth = 4; ctx.strokeStyle = INK.INKC; ctx.stroke(); }
-    // boss bar (bottom centre so it never hides the boss word)
+    // boss bar: top-left under the score (never near the enemies or their words)
     if (S.boss && S.boss.alive) {
-      const e = S.boss, bw = 520, bx = VX + 70 - bw / 2, by = v.y + v.h - 84;
-      D.pill(ctx, bx - 4, by - 4, bw + 8, 34, INK.INKC);
+      const e = S.boss, bw = 500, bx = VX - W / 2 + 44, by = topY, bh = 38;
+      D.pill(ctx, bx - 4, by - 4, bw + 8, bh + 8, INK.INKC);
       const seg = bw / e.nph;
-      for (let i = 0; i < e.nph; i++) { ctx.fillStyle = i >= e.idx ? '#FF5A5F' : 'rgba(255,255,255,0.25)'; ctx.fill(P.rr(bx + i * seg + 3, by + 3, seg - 6, 20, 10)); }
-      const cur = e.typer.progress; if (e.idx < e.nph) { ctx.fillStyle = '#FFC83D'; ctx.fill(P.rr(bx + e.idx * seg + 3, by + 3, Math.max(8, (seg - 6) * (1 - cur)), 20, 10)); }
-      D.text(ctx, BOSS_NAME[S.stage], bx + bw / 2, by - 26, { size: 30, color: '#fff', outline: 8 });
+      for (let i = 0; i < e.nph; i++) { ctx.fillStyle = i >= e.idx ? '#FF5A5F' : 'rgba(255,255,255,0.25)'; ctx.fill(P.rr(bx + i * seg + 3, by + 3, seg - 6, bh - 6, 10)); }
+      const cur = e.typer.progress; if (e.idx < e.nph) { ctx.fillStyle = '#FFC83D'; ctx.fill(P.rr(bx + e.idx * seg + 3, by + 3, Math.max(8, (seg - 6) * (1 - cur)), bh - 6, 10)); }
+      D.text(ctx, BOSS_NAME[S.stage], bx + bw / 2, by + bh / 2 + 2, { size: 24, color: '#fff', outline: 7 });
     }
     // bottom-left: ink gauge + ultra
     const bl = 44, bb = v.y + v.h - 36;
@@ -822,8 +913,10 @@
     // the Turf War results screen played out on the canvas right before the result card
     const k = U.clamp((S.endT || 0) / 0.6, 0, 1);
     ctx.fillStyle = `rgba(31,26,61,${0.55 * k})`; ctx.fillRect(v.x, v.y, v.w, v.h);
-    ctx.save(); ctx.globalAlpha = k;
-    bannerPlate(ctx, { text: S.endWin ? 'TURF WAR WON!' : 'TIME TO REFILL!', sub: null, size: 130, col: S.endWin ? S.pair[0] : '#7B5CFF', t: 0.5, life: 99 }, VX, 260);
+    // the summary fades out just before the (DOM) results card pops in so the two never stack
+    const fade = U.clamp((3.1 - (S.endT || 0)) / 0.4, 0, 1), fit = Math.min(1, v.h / 1000, v.w / 1000), cy0 = v.y + v.h / 2 - 440 * fit;
+    ctx.save(); ctx.globalAlpha = k * fade; ctx.translate(VX, cy0); ctx.scale(fit, fit); ctx.translate(-VX, -150);
+    D.text(ctx, S.endWin ? 'TURF WAR WON!' : 'TIME TO REFILL!', VX, 250, { size: 96, color: S.endWin ? S.pair[0] : '#B9A8F0', outline: 18 });
     const n = S.thumbs.length;
     S.thumbs.forEach((t, i) => {
       const reveal = U.clamp((S.endT - 0.5 - i * 0.55) / 0.5, 0, 1); if (reveal <= 0) return;
@@ -879,29 +972,20 @@
     for (const o of S.goo) {
       const im = INK.splat(o.k, o.col); if (!im) continue; const k = o.t / o.life;
       const sz = o.r * 2 * U.ease.outBack(Math.min(1, o.t / 0.15)), a = k > 0.6 ? 1 - (k - 0.6) / 0.4 : 1;
-      ctx.save(); ctx.globalAlpha = a * 0.92; ctx.translate(o.x, o.y + o.t * o.drip); ctx.rotate(o.rot); ctx.scale(1, 1 + k * 0.25); ctx.drawImage(im, -sz / 2, -sz / 2, sz, sz); ctx.restore();
+      ctx.save(); ctx.globalAlpha = a * 0.7; ctx.translate(o.x, o.y + o.t * o.drip); ctx.rotate(o.rot); ctx.scale(1, 1 + k * 0.25); ctx.drawImage(im, -sz / 2, -sz / 2, sz, sz); ctx.restore();
     }
-    // word chips on top of everything in the world
-    const placed = [];
-    const list = S.enemies.filter((e) => e.alive && e.state !== 'doomed' && e.z < Z_FAR + 4).sort((a, b) => a.z - b.z);
-    for (const e of list) if (S.lock.locked !== e) drawChip(ctx, g, e, v, placed);
-    if (S.lock.locked && S.lock.locked.alive && S.lock.locked.state !== 'doomed') drawChip(ctx, g, S.lock.locked, v, placed);
+    // word chips on top of everything in the world (laid out so they never overlap each other)
+    const chips = layoutChips(ctx, g, v);
+    for (let i = chips.length - 1; i >= 0; i--) if (!chips[i].locked) drawChip(ctx, g, chips[i]);
+    for (const c of chips) if (c.locked) drawChip(ctx, g, c);
     drawGun(ctx, g, v);
     // ultra sweep shine
     if (S.ultraFx) { const k = S.ultraFx.t / 0.9; ctx.save(); ctx.globalAlpha = Math.max(0, 0.5 * (1 - k)); ctx.fillStyle = '#fff'; const fy = v.y + v.h - v.h * 0.95 * Math.min(1, k); ctx.fillRect(v.x, fy - 20, v.w, 40); ctx.restore(); }
-    // floaters (Splatoon-ish lettering)
-    for (const f of S.floaters) {
-      const k = f.t / f.life, sc = k < 0.18 ? U.ease.outBack(k / 0.18) : 1;
-      ctx.save(); ctx.globalAlpha = k > 0.7 ? 1 - (k - 0.7) / 0.3 : 1; ctx.translate(f.x, f.y); ctx.rotate(f.rot); ctx.scale(sc, sc); ctx.transform(1, 0, -0.16, 1, 0, 0);
-      D.text(ctx, f.text, 0, 0, { size: f.size, color: f.col, outline: Math.max(10, f.size * 0.2), stroke: INK.INKC });
-      ctx.restore();
-    }
     if (S.hitFlash > 0) { ctx.save(); ctx.globalAlpha = S.hitFlash * 0.18; ctx.fillStyle = GOO; ctx.fillRect(v.x, v.y, v.w, v.h); ctx.restore(); }
     g.fx.draw(ctx);
     drawHUD(ctx, g, v);
-    // banners
-    let by = 0;
-    for (const b of S.banners) { if (b.t < 0) continue; bannerPlate(ctx, b, VX, Math.max(S.topY + 190, 330) + by); by += b.size * 0.9 + 20; }
+    drawMsg(ctx, g, v);
+    auditFrame(g, v);
     // stage wipe: ink curtain
     if (S.wipe) {
       const t = S.wipe.t, cover = t < 0.7 ? t / 0.7 : Math.max(0, 1 - (t - 0.8) / 0.7);
@@ -925,7 +1009,23 @@
 .ink-team button:hover{transform:translateY(-2px)}
 .ink-team button.on{outline:4px solid #fff;background:#FFF8EC;box-shadow:0 0 0 3px var(--ink)}
 .ink-team i{display:inline-block;width:26px;height:26px;border-radius:50%;border:3px solid var(--ink)}
-@media (max-height:560px){.ink-team{bottom:6px;transform:translateX(-50%) scale(.8)}}`;
+@media (max-height:560px){.ink-team{bottom:6px;transform:translateX(-50%) scale(.8)}}
+/* results card: never clip the buttons on short / small windows (buttons stay pinned, the middle scrolls if it must) */
+.tm-results{display:flex;flex-direction:column;overflow-y:auto;max-height:96vh}
+.tm-results>.tm-row{position:sticky;bottom:-4px;z-index:2;margin-top:auto;padding:10px 0 4px;background:linear-gradient(rgba(255,248,236,0),var(--paper,#FFF8EC) 28%)}
+.tm-results .ink-map{max-height:18vh;width:auto!important;max-width:100%!important;object-fit:contain}
+@media (max-height:900px),(max-width:900px){
+.tm-results{padding:12px 20px 10px}
+.tm-results h2{font-size:42px;-webkit-text-stroke:8px var(--ink);margin:0}
+.tm-results .sub{font-size:16px;margin-bottom:2px}
+.tm-results .ink-map{max-height:17vh;margin:4px auto 6px!important;border-width:4px!important}
+.tm-stars{margin:2px 0}.tm-stars svg{width:44px;height:44px}.tm-stars svg:nth-child(2){width:50px;height:50px;margin-top:-8px}
+.tm-score{font-size:42px}.tm-newbest{font-size:16px}
+.tm-stats{margin:8px 0;gap:8px;grid-template-columns:repeat(4,1fr)}.tm-stats div{padding:5px 4px 3px;border-width:3px;border-radius:12px}.tm-stats b{font-size:24px}.tm-stats span{font-size:12px}
+.tm-tricky{margin:2px 0 6px}.tm-tricky h3{font-size:15px;margin:0 0 4px}.tm-wchip{font-size:15px;padding:2px 10px;border-width:3px}
+.tm-results>.tm-row{gap:10px}.tm-results .tm-btn{font-size:20px;padding:8px 18px 5px}.tm-results .tm-btn.primary{font-size:22px;padding:9px 22px 6px}
+}
+@media (max-height:560px){.tm-tricky{display:none}.tm-results .ink-map{max-height:15vh}.tm-results h2{font-size:32px}}`;
     document.head.append(css);
     const box = document.createElement('div'); box.className = 'ink-team hidden';
     const lbl = document.createElement('span'); lbl.textContent = 'TEAM COLOUR'; box.append(lbl);
@@ -966,5 +1066,5 @@
   });
   // show the team picker only on the title screen
   setInterval(() => { if (G && G.__teamBox) G.__teamBox.classList.toggle('hidden', G.state !== 'title' || (window.TM.ui.isModalOpen && window.TM.ui.isModalOpen())); }, 120);
-  window.INK_DEBUG = { G: () => G, S: () => S, WS: () => WS, parts, spawn: (t, x, z) => mkEnemy(G, t, { x, z }), boss: () => startBoss(G), stage: (i) => { newStage(G, i); }, setCz: (c) => { S.cz = c; } };
+  window.INK_DEBUG = { audit: AUDIT, finish: (w) => finish(G, w), msg: (t, o) => msg(G, t, o), nextKey: () => { if (!S) return null; const t = S.lock.locked || nearest(); return t && !t.typer.done ? t.typer.nextReq() : null; }, G: () => G, S: () => S, WS: () => WS, parts, spawn: (t, x, z) => mkEnemy(G, t, { x, z }), boss: () => startBoss(G), stage: (i) => { newStage(G, i); }, setCz: (c) => { S.cz = c; } };
 })();

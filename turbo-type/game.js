@@ -24,6 +24,7 @@
   let S = null;          // everything about the current race / demo
   let world = null, g = null, def = null;
   const ST = { ready: false, loading: true, noGL: false, trackIdx: 0, laps: 3, track: null, tracks: [], pendingTrack: false };
+  TT.debug = { ST, get S() { return S; }, get world() { return world; }, get g() { return g; } };
   const o1 = {}, o2 = {}, o3 = {};
   const _v = new THREE.Vector3(), _q = new THREE.Quaternion(), _e = new THREE.Euler(), _up = new THREE.Vector3(0, 1, 0);
 
@@ -35,13 +36,11 @@
       try {
         const AC = window.AudioContext || window.webkitAudioContext; if (!AC) { this.failed = true; return; }
         this.ctx = new AC(); const c = this.ctx;
-        this.master = c.createGain(); this.master.gain.value = 0; this.master.connect(c.destination);
-        const e = {}; e.o1 = c.createOscillator(); e.o1.type = 'sawtooth'; e.o2 = c.createOscillator(); e.o2.type = 'square'; e.o3 = c.createOscillator(); e.o3.type = 'triangle';
-        e.f = c.createBiquadFilter(); e.f.type = 'lowpass'; e.f.frequency.value = 600; e.f.Q.value = 2;
-        e.g1 = c.createGain(); e.g2 = c.createGain(); e.g3 = c.createGain(); e.out = c.createGain(); e.out.gain.value = 0;
-        e.o1.connect(e.g1); e.o2.connect(e.g2); e.o3.connect(e.g3); e.g1.connect(e.f); e.g2.connect(e.f); e.g3.connect(e.f); e.f.connect(e.out); e.out.connect(this.master);
-        e.g1.gain.value = 0.5; e.g2.gain.value = 0.18; e.g3.gain.value = 0.0;
-        e.o1.start(); e.o2.start(); e.o3.start(); this.eng = e;
+        // master bus -> gentle limiter -> speakers (everything the game plays goes through it)
+        this.master = c.createGain(); this.master.gain.value = 0.8;
+        const lim = c.createDynamicsCompressor(); lim.threshold.value = -10; lim.knee.value = 8; lim.ratio.value = 8; lim.attack.value = 0.003; lim.release.value = 0.2;
+        this.master.connect(lim); lim.connect(c.destination);
+        this.eng = TT.EngineAudio.create(c, this.master);
         for (const n of ['nitro', 'land', 'thud', 'jump', 'pad', 'stumble', 'lap', 'whoosh']) {
           fetch('../assets/kenney/turbo-type/audio/' + n + '.ogg').then((r) => r.arrayBuffer()).then((b) => c.decodeAudioData(b, (d) => { this.buf[n] = d; }, () => { })).catch(() => { });
         }
@@ -49,20 +48,19 @@
     },
     play(n, vol = 1, rate = 1) {
       const c = this.ctx, b = this.buf[n]; if (!c || !b || TM.settings.sfx <= 0) return;
-      const s = c.createBufferSource(); s.buffer = b; s.playbackRate.value = rate; const gn = c.createGain(); gn.gain.value = vol * TM.settings.sfx * 0.8; s.connect(gn); gn.connect(c.destination); s.start();
+      const s = c.createBufferSource(); s.buffer = b; s.playbackRate.value = rate; const gn = c.createGain(); gn.gain.value = vol * TM.settings.sfx * 0.55; s.connect(gn); gn.connect(this.master); s.start();
     },
-    engine(on, v, thr, boost) {
+    /* called every sim step with the player's state; `on` false (pause / results / title) fades everything out */
+    engine(on, car, thr, boost, dt) {
       const c = this.ctx, e = this.eng; if (!c || !e) return;
-      const vol = on ? TM.settings.sfx : 0;
-      const t = c.currentTime;
-      const base = 38 + v * 2.1 + boost * 28;
-      e.o1.frequency.setTargetAtTime(base, t, 0.05); e.o2.frequency.setTargetAtTime(base * 2.01, t, 0.05); e.o3.frequency.setTargetAtTime(base * 5, t, 0.05);
-      e.g3.gain.setTargetAtTime(0.08 * boost + 0.02 * clamp(v / 60, 0, 1), t, 0.1);
-      e.f.frequency.setTargetAtTime(380 + v * 22 + thr * 500 + boost * 900, t, 0.08);
-      e.out.gain.setTargetAtTime(vol * (0.05 + 0.09 * clamp(v / 60, 0, 1) + 0.04 * thr + 0.05 * boost), t, 0.08);
-      this.master.gain.setTargetAtTime(on ? 1 : 0, t, 0.1);
+      const lateral = Math.abs(car.dirLat || 0);
+      e.update({ v: car.v, thr, boost, air: car.air ? 1 : 0, skid: clamp((lateral - 20) / 30, 0, 1), on: on ? 1 : 0, vol: TM.settings.sfx }, dt, c.currentTime);
     },
+    mute() { const e = this.eng; if (e && this.ctx) e.update({ v: 0, thr: 0, boost: 0, air: 0, skid: 0, on: 0, vol: 0 }, 0.016, this.ctx.currentTime); },
+    thump(str) { if (this.eng && this.ctx && TM.settings.sfx > 0) this.eng.thump(str, this.ctx.currentTime); },
   };
+  /* the framework paints a 260 px countdown digit over the middle of the road; our start lights already count down */
+  { const _t = D.text; D.text = function (ctx, txt, x, y, o) { if (o && o.size === 260 && g && g.state === 'countdown') return; return _t.apply(this, arguments); }; }
   const gesture = () => { Aud.init(); if (Aud.ctx && Aud.ctx.state === 'suspended') Aud.ctx.resume(); };
   window.addEventListener('keydown', gesture, { capture: true });
   window.addEventListener('pointerdown', gesture, { capture: true });
@@ -194,7 +192,12 @@
     for (let i = 0; i < 50; i++) emitFlame(P, 1.6);
     S.score && 0;
   }
-  function banner(text, color, life = 1.2, sub) { if (!S) return; S.banners.push({ text, color, life, t: 0, sub }); if (S.banners.length > 2) S.banners.shift(); }
+  /* One small banner at a time (never stacked). Long, important ones (lap / finish) are not interrupted by quick ones. */
+  function banner(text, color, life = 1.2, sub) {
+    if (!S) return; const cur = S.banners[0];
+    if (cur && cur.life >= 1.8 && cur.t < cur.life * 0.7 && life < 1.8) return;
+    S.banners = [{ text, color, life: Math.min(life, 2.2), t: 0, sub }];
+  }
 
   /* ====================================================================== particles */
   const rearPos = (c, back, side, up) => { _v.set(side, up, -back).applyQuaternion(c.mesh.q1); return _v.add(c.mesh.p1); };
@@ -291,19 +294,28 @@
       if (c.y - gy > 0.5 && vyG > 2.2 && c.v > 4) {
         // launch!
         const slope = vyG;
-        c.air = true; c.vy = clamp(Math.max(slope, 11 + c.v * 0.05), 11.5, 19); c.airT = 0; c.airTotal = (2 * c.vy) / GRAV; c.trickOn = c.airTotal > 1.05; c.rollTrick = 0; c.jumps++;
+        c.air = true; c.vy = TT.launchVy(slope, c.v); c.airT = 0; c.airTotal = (2 * c.vy) / GRAV; c.trickOn = c.airTotal > 1.05; c.rollTrick = 0; c.jumps++;
         if (c.isPlayer && !S.demo) { Aud.play('jump', 0.8); S.shake = Math.max(S.shake, 0.25); S.camBumpV += 4; banner('JUMP!', '#2F9BFF', 0.9); }
       } else c.y += (gy - c.y) * Math.min(1, dt * 40) * 0 + (gy - c.y); // follow ground exactly
     }
     if (c.air) {
       c.airT += dt; c.vy -= GRAV * dt; c.y += c.vy * dt;
+      // safety net: never fly through a gantry / bridge / arch - squash against its underside with a gentle bump
+      const ceil = tr.ceilingAt(c.dist, c.lat) - TT.CAR.h - 0.1;
+      if (c.y > ceil) {
+        c.y = ceil;
+        if (c.vy > 0) {
+          if (c.isPlayer && !S.demo && c.vy > 3) { S.camBumpV -= 2.5; S.shake = Math.max(S.shake, 0.3); Aud.play('thud', 0.35); }
+          c.vy = -Math.min(3, c.vy * 0.3); c.sqV += 3;
+        }
+      }
       if (c.trickOn) c.rollTrick = (Math.PI * 2) * smooth(0.08, c.airTotal * 0.92, c.airT);
       if (c.y <= gy && c.vy < 0) {
         c.y = gy; c.air = false; c.rollTrick = 0; c.prevY = gy; c.sqV -= 5;
         const str = clamp(c.airT / 1.2, 0.2, 1.4);
         c.pos.set(o1.x + o1.rx * c.lat, gy, o1.z + o1.rz * c.lat); landingDust(c, str);
         if (c.isPlayer && !S.demo) {
-          S.shake = Math.max(S.shake, 0.6 + str * 0.5); S.camBumpV -= 6 * str; Aud.play('land', 0.9); Aud.play('thud', 0.5 * str);
+          S.shake = Math.max(S.shake, 0.6 + str * 0.5); S.camBumpV -= 6 * str; Aud.play('land', 0.45); Aud.thump(str);
           if (c.airT > 0.85) { S.bigAir++; const bonus = Math.round(50 + c.airT * 60); g.score.add(bonus); banner('BIG AIR!', '#FFC83D', 1.4, '+' + bonus); }
           S.jumpsDone++;
         }
@@ -340,6 +352,7 @@
     const kk = o1.k, spd = c.v;
     c.sq += c.sqV * dt; c.sqV += (-90 * c.sq - 10 * c.sqV) * dt;
     const lateral = kk * spd * spd;           // lateral accel (+ right)
+    c.dirLat = lateral;
     const tgtYaw = -clamp(kk * spd * 0.55, -0.3, 0.3) * (c.air ? 0.2 : 1) + (c.stumble > 0 ? Math.sin(c.stumble * 40) * 0.22 * Math.min(1, c.stumble * 2) : 0) - clamp(c.vLat * 0.02, -0.12, 0.12);
     c.yawSlip += (tgtYaw - c.yawSlip) * Math.min(1, dt * 7);
     c.yaw = Math.atan2(o1.fx, o1.fz) + c.yawSlip;
@@ -423,7 +436,7 @@
     S.tickT = performance.now();
     // phase transitions
     if (g.state === 'countdown' && S.phase !== 'grid') setupRace(false);
-    if (S.phase === 'grid' && g.state === 'play') { S.phase = 'race'; S.raceT = 0; S.player.v = 8; S.player.kick = 6; S.cars.forEach((c) => { c.lapStart = 0; }); S.goT = 0; Aud.play('whoosh', 0.5); }
+    if (S.phase === 'grid' && g.state === 'play') { S.phase = 'race'; S.raceT = 0; S.player.v = 8; S.player.kick = 6; S.cars.forEach((c) => { c.lapStart = 0; }); S.goT = 0; Aud.play('whoosh', 0.5); banner('GO!', '#2BD96B', 1.0); }
     if (g.state === 'title' && !S.demo) setupRace(true);
     if (g.state === 'countdown' && S.phase === 'grid' && S.demo) setupRace(false);
     const racing = S.phase === 'race' || S.phase === 'finish' || S.demo;
@@ -460,7 +473,7 @@
     if (world.pads) world.pads.forEach((m, i) => { m.material.map.offset.y -= dt * 1.4; });
     // audio
     const P = S.player, on = g.state === 'play' || (g.state === 'over' && S.phase === 'finish') || g.state === 'countdown';
-    Aud.engine(on && !S.demo, P.v, clamp(P.rate / 5, 0, 1), S.boostK);
+    Aud.engine(on && !S.demo && g.state !== 'paused', P, clamp(P.rate / 5, 0, 1), S.boostK, dt);
     S.hintPulse += dt;
   }
 
@@ -527,6 +540,7 @@
       const fx = c.pos.x + (o3.fx * 9 + o3.rx * 6 * Math.sin(S.finishT * 0.7)), fz = c.pos.z + (o3.fz * 9 + o3.rz * 6 * Math.sin(S.finishT * 0.7));
       px = lerp(px, fx, w); pz = lerp(pz, fz, w); py = lerp(py, c.pos.y + 3.2, w); lx = c.pos.x; lz = c.pos.z; ly = c.pos.y + 1; fov = lerp(fov, 55, w);
     }
+    { const cl = tr.ceilingAt(cs, clat, 1.5) - 0.7; if (py > cl) py = cl; }   // camera never rises into a gantry / bridge
     // shake
     const sh = S.shake * (TM.settings.reduceMotion ? 0.15 : 1);
     if (sh > 0) { px += (Math.random() - 0.5) * sh * 0.7; py += (Math.random() - 0.5) * sh * 0.5; pz += (Math.random() - 0.5) * sh * 0.7; }
@@ -578,7 +592,7 @@
       wc.position.lerpVectors(cam.p0, cam.p1, alpha); wc.quaternion.slerpQuaternions(cam.q0, cam.q1, alpha);
       world.baseFov = lerp(cam.f0, cam.f1, alpha); world.fovKick = 0; world.applyFov();
     }
-    const v2 = g.vw(); world.setViewShift(g.state === 'title' ? 0 : panelHeightPx(v2) * 0.42);
+    const v2 = g.vw(); world.setViewShift(g.state === 'title' ? 0 : panelHeightPx(v2) * 0.55);
     if (!ST.skipRender) world.render(alpha, g.t);
     // adaptive quality
     if (lastFrameT) { const dtm = now - lastFrameT; if (dtm > 26) { slowFrames++; fastFrames = 0; } else { slowFrames = Math.max(0, slowFrames - 1); fastFrames++; } if (slowFrames > 50 && qualityLevel > 0) { qualityLevel--; slowFrames = 0; world.setQuality(qualityLevel); } }
@@ -692,22 +706,17 @@
     D.text(ctx, String(Math.round(kmh)), cx, cy - 6 * sc, { size: 62 * sc, color: '#fff' });
     D.text(ctx, 'km/h', cx, cy + 40 * sc, { size: 24 * sc, color: 'rgba(255,255,255,0.7)' });
     // nitro bar (right of the dial)
-    const bx = cx + r + 26, bh = 40 * sc, by = cy - bh / 2 + r * 0.45, bw = 330 * sc;
+    const bx = cx + r + 26, bh = 40 * sc, by = cy - bh / 2 + r * 0.45, bw = 236 * sc;
     D.pill(ctx, bx, by, bw, bh, 'rgba(31,26,61,0.88)');
     const nf = S.nitroT > 0 ? clamp(S.nitroT / 3.4, 0, 1) : clamp(S.nitro, 0, 1);
     if (nf > 0.01) D.pill(ctx, bx + 5, by + 5, Math.max(bh - 10, (bw - 10) * nf), bh - 10, S.nitroT > 0 || S.nitro > 0.85 ? '#FFC83D' : C.turbo);
     D.text(ctx, S.nitroT > 0 ? 'NITRO!!' : S.nitro > 0.85 ? 'NITRO READY' : 'NITRO', bx + bw / 2, by + bh / 2 + 2, { size: 26 * sc, color: '#fff', outline: 7 });
     ctx.restore();
-    // position numeral
-    const rk = S.player.rank;
-    const px = hudR(v) - 140 * sc, py = (S.panelTop || bottom - 200) - 100 * sc;
-    D.text(ctx, ORD[rk].toUpperCase(), px, py, { size: 130 * sc, color: rk === 0 ? '#FFC83D' : '#fff', outline: 18, font: D.FONT_DISPLAY(130 * sc, 800) });
-    D.text(ctx, 'of ' + S.cars.length, px, py + 78 * sc, { size: 34 * sc, color: '#fff', outline: 8 });
   }
 
   /* ---- standings ---- */
   function drawStandings(ctx, v) {
-    const sc = scaleHud(v), x = hudL(v) + 28, y = v.y + 122 + (sc > 1 ? 40 : 0), rowH = 62 * sc, w = 360 * sc;
+    const sc = scaleHud(v), x = hudL(v) + 28, y = Math.max(v.y + 122 + (sc > 1 ? 40 : 0), v.y + 92 / Math.min(window.innerWidth / W, window.innerHeight / H)), rowH = 62 * sc, w = 360 * sc;
     const r = S.cars.slice().sort((a, b) => a.rank - b.rank);
     ctx.save();
     D.pill(ctx, x, y - 8, w, 40 * sc, 'rgba(31,26,61,0.84)'); D.text(ctx, 'RACE', x + 64 * sc, y + 12 * sc, { size: 24 * sc, color: '#fff' }); D.text(ctx, 'WPM', x + w - 56 * sc, y + 12 * sc, { size: 22 * sc, color: 'rgba(255,255,255,0.7)' });
@@ -764,17 +773,25 @@
 
   /* ---- banners ---- */
   function drawBanners(ctx, v) {
-    const y0 = v.y + v.h * 0.37;
-    S.banners.forEach((b, i) => {
-      const k = b.t / b.life, s = k < 0.14 ? U.ease.outBack(k / 0.14) : 1, a = k > 0.75 ? 1 - (k - 0.75) / 0.25 : 1;
-      ctx.save(); ctx.globalAlpha = a; ctx.translate(W / 2, y0 + i * 128 - k * 24); ctx.scale(s * 0.9, s * 0.9);
-      D.text(ctx, b.text, 0, 0, { size: 88, color: b.color, outline: 18, font: D.FONT_DISPLAY(88, 800) });
-      if (b.sub) D.text(ctx, b.sub, 0, 62, { size: 36, color: '#fff', outline: 10 });
+    /* compact pill under the lap box: sky / horizon band, never over the road, the car or the words */
+    const sc = scaleHud(v), tall = sc0(v);
+    /* widescreen: pill sits LEFT of the lap box (cars fly up the middle of the screen); tall windows: just under it */
+    const cy = tall ? v.y + 250 + 44 : v.y + 110 + 38 * sc, bx = tall ? W / 2 : W / 2 - 145 * sc - 22 - 0;
+    const b = S.banners[0];
+    if (b) {
+      const k = b.t / b.life, s = k < 0.12 ? U.ease.outBack(k / 0.12) : 1, a = k > 0.75 ? 1 - (k - 0.75) / 0.25 : 1;
+      const fs = 36 * sc, sfs = 21 * sc; ctx.font = D.FONT_DISPLAY(fs, 800);
+      const w = Math.max(ctx.measureText(b.text).width + 56 * sc, b.sub ? (ctx.font = D.FONT_WORD(sfs, 600), ctx.measureText(b.sub).width + 48 * sc) : 0), h = (b.sub ? 86 : 62) * sc;
+      ctx.save(); ctx.globalAlpha = a; ctx.translate(tall ? bx : bx - w / 2, cy); ctx.scale(s, s);
+      ctx.fillStyle = 'rgba(31,26,61,0.88)'; ctx.fill(D.P.rr(-w / 2, -h / 2, w, h, 26 * sc)); ctx.lineWidth = 4; ctx.strokeStyle = b.color; ctx.stroke(D.P.rr(-w / 2, -h / 2, w, h, 26 * sc));
+      D.text(ctx, b.text, 0, b.sub ? -14 * sc : 2 * sc, { size: fs, color: b.color, font: D.FONT_DISPLAY(fs, 800) });
+      if (b.sub) D.text(ctx, b.sub, 0, 20 * sc, { size: sfs, color: '#fff', font: D.FONT_WORD(sfs, 600) });
       ctx.restore();
-    });
-    if (S.phase === 'race' && S.raceT < 6 && S.player.rate < 0.5 && S.chunkCount === 0 && !S.banners.length) {
-      const k = 0.8 + Math.sin(S.hintPulse * 6) * 0.06;
-      ctx.save(); ctx.translate(W / 2, y0); ctx.scale(k, k); D.text(ctx, 'TYPE TO GO!', 0, 0, { size: 96, color: '#fff', outline: 18 }); ctx.restore();
+    } else if (S.phase === 'race' && S.raceT < 6 && S.player.rate < 0.5 && S.chunkCount === 0) {
+      const k = 1 + Math.sin(S.hintPulse * 6) * 0.04;
+      ctx.save(); ctx.translate(tall ? bx : bx - 150 * sc, cy); ctx.scale(k, k);
+      const w = 300 * sc, h = 62 * sc; ctx.fillStyle = 'rgba(31,26,61,0.88)'; ctx.fill(D.P.rr(-w / 2, -h / 2, w, h, 26 * sc)); ctx.lineWidth = 4; ctx.strokeStyle = '#fff'; ctx.stroke(D.P.rr(-w / 2, -h / 2, w, h, 26 * sc));
+      D.text(ctx, 'TYPE TO GO!', 0, 2 * sc, { size: 36 * sc, color: '#fff' }); ctx.restore();
     }
   }
 
@@ -958,6 +975,7 @@
     function loop() {
       requestAnimationFrame(loop);
       if (!S || !g) return;
+      if (g.state === 'paused' || document.hidden) Aud.mute();   // the sim loop is frozen while paused, so silence the engine here
       if (g.state === 'countdown') { if (lastState !== 'countdown') t0 = performance.now(); const e = (performance.now() - t0) / 1000; S.lightsOn = e < 0.05 ? 0 : Math.min(3, Math.floor(e + 0.95)); }
       else if (g.state === 'play') S.lightsOn = 4;
       lastState = g.state;

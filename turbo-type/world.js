@@ -605,7 +605,7 @@
         const ban2 = ban.clone(); ban2.rotation.y = Math.PI; ban2.position.z = -0.85; g.add(ban2);
         // orient so local +z = forward travel
         g.rotation.set(0, Math.atan2(o.fx, o.fz), 0);
-        root.add(g); return g;
+        g.userData.overhead = true; root.add(g); return g;
       };
       // start/finish gantry with countdown lights
       const sg = mkBeam(5, 11.5, 'TURBO TYPE  •  START / FINISH', '#1b1840', '#ffd23f');
@@ -621,7 +621,7 @@
       // other gantries
       const spots = [0.24, 0.47, 0.7, 0.9];
       const texts = ['SPEED ZONE', 'KEEP TYPING!', 'NITRO AHEAD', 'GO GO GO!'];
-      spots.forEach((u, i) => { const s = track.straightAt(u * track.L, 20, 0.004) + 6; mkBeam(s, 10, texts[i], i % 2 ? '#0e6bd6' : '#e8472b', '#ffffff'); });
+      (track.gantries || []).forEach((gn) => { mkBeam(gn.s, gn.h, texts[gn.i], gn.i % 2 ? '#0e6bd6' : '#e8472b', '#ffffff'); });
       // jump markers: pylons + signs on both sides ahead of the ramp
       this.jumpMarkers = [];
       // overpass
@@ -639,7 +639,7 @@
         for (const px of [-1, 1]) { const pil = new THREE.Mesh(new THREE.BoxGeometry(2.4, 12, 3), conc); pil.position.set(px * (hw + 6.5), 4, sx * 4); pil.castShadow = true; g.add(pil); }
       }
       const tex = bannerTex('TYPE FAST!', '#ffc83d', '#1f1a3d', 512, 128); const ban = new THREE.Mesh(new THREE.PlaneGeometry(14, 3.4), new THREE.MeshBasicMaterial({ map: tex, toneMapped: false })); ban.position.set(0, 7.6, -7.05); ban.rotation.y = Math.PI; g.add(ban);
-      root.add(g);
+      g.userData.overhead = true; root.add(g);
     }
     buildTunnel(track, s0, len, theme) {
       const o = {}, hw = track.width / 2, N = Math.ceil(len / 2), ring = 16, root = this.root;
@@ -662,7 +662,7 @@
         if (i % 3 === 0) lightPos.push([o.x, o.y + wallH + R * 0.8 - 0.5, o.z]);
       }
       const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setAttribute('color', new THREE.Float32BufferAttribute(col, 3)); g.setIndex(idx); g.computeVertexNormals();
-      const mesh = new THREE.Mesh(g, new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.9, side: THREE.DoubleSide })); mesh.castShadow = true; mesh.receiveShadow = true; root.add(mesh);
+      const mesh = new THREE.Mesh(g, new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.9, side: THREE.DoubleSide })); mesh.castShadow = true; mesh.receiveShadow = true; mesh.userData.overhead = true; root.add(mesh);
       // light strips along the ceiling
       const lg = new Particles(lightPos.length + 1, true);
       for (const p of lightPos) lg.emitStatic(p[0], p[1], p[2], 3.2, 1, 0.92, 0.7, 0.9);
@@ -670,7 +670,7 @@
       // portals: facade rings at both ends
       const portalMat = new THREE.MeshStandardMaterial({ color: theme.night ? 0x7a62ff : 0xe86a6a, roughness: 0.6 });
       for (const sEnd of [s0, s0 + len]) {
-        track.at(sEnd, o); const tor = new THREE.Mesh(new THREE.TorusGeometry(R * 0.98, 0.7, 8, 28, Math.PI), portalMat); tor.position.set(o.x, o.y + wallH * 0.0 + wallH, o.z); tor.rotation.y = Math.atan2(o.fx, o.fz) + Math.PI; root.add(tor);
+        track.at(sEnd, o); const tor = new THREE.Mesh(new THREE.TorusGeometry(R * 0.98, 0.7, 8, 28, Math.PI), portalMat); tor.position.set(o.x, o.y + wallH * 0.0 + wallH, o.z); tor.rotation.y = Math.atan2(o.fx, o.fz) + Math.PI; tor.userData.overhead = true; root.add(tor);
         tor.scale.set(1, 0.82, 1);
       }
       this.tunnel = { s0, s1: s0 + len };
@@ -678,11 +678,11 @@
     buildNeon(track, theme) {
       if (!theme.night) return;
       const o = {}, hw = track.width / 2, root = this.root, cols = [0x39e6ff, 0xff4fd8, 0xffe14a];
-      for (let s = 60, i = 0; s < track.L; s += 150, i++) {
-        track.at(s, o); if (Math.abs(o.kb) > 0.006 || (track.feats.tunnel && s > track.feats.tunnel.s0 - 20 && s < track.feats.tunnel.s0 + track.feats.tunnel.len + 20)) continue;
+      for (const nn of (track.neon || [])) {
+        const s = nn.s, i = nn.i; track.at(s, o);
         const mat = new THREE.MeshBasicMaterial({ color: cols[i % 3], toneMapped: false });
         const t = new THREE.Mesh(new THREE.TorusGeometry(hw + 3.5, 0.35, 8, 32, Math.PI), mat);
-        t.position.set(o.x, o.y, o.z); t.rotation.y = Math.atan2(o.fx, o.fz) + Math.PI; root.add(t);
+        t.position.set(o.x, o.y, o.z); t.rotation.y = Math.atan2(o.fx, o.fz) + Math.PI; t.userData.overhead = true; root.add(t);
         const g2 = new Particles(1, true); g2.emitStatic(o.x, o.y + hw + 3.5, o.z, 22, (cols[i % 3] >> 16) / 255, ((cols[i % 3] >> 8) & 255) / 255, (cols[i % 3] & 255) / 255, 0.35); g2.update(0); root.add(g2.points);
       }
     }

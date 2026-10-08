@@ -21,22 +21,29 @@
     const shipY = bottom - 160 - (kb ? 215 * pxv : 0);
     const impactY = shipY - 70, spawnY = top - 170;
     const half = Math.min(v.w / 2 - 150, 2600);
-    return { v, top, bottom, pxv, shipY, impactY, spawnY, fs: clamp((impactY - spawnY) / 940, 1, 2.1), xmin: SX - half, xmax: SX + half, wf: Math.max(1, half / 950), hudTop: v.y + 92 * pxv };
+    return { v, top, bottom, pxv, shipY, impactY, spawnY, fs: clamp((impactY - spawnY) / 940, 1, 2.1), xmin: SX - half, xmax: SX + half, wf: Math.max(1, half / 950), hudTop: v.y + 92 * pxv, safeTop: v.y + 92 * pxv + 104 };
   }
 
   /* ---------- state ---------- */
   function perSectorFor(g) { return g.diff === 'gentle' ? 3 : 4; }
   function reset(g) {
     SS.fx.clear();
+    const popFn = (x, y, str, o) => {
+      o = o || {};
+      if (/^COMBO/.test(str)) { if (S) S.comboFlash = { t: 0, text: str.replace('!', ''), color: o.color || '#ffd23f' }; return; }
+      if (S) { if (S.pops.length > 14) S.pops.shift(); S.pops.push({ x, y, str, t: 0, life: o.life || 0.9, color: o.color || C.gold, size: Math.min(o.size || 54, 56), ox: 0, oy: 0 }); }
+    };
     S = {
+      popFn,
       t: 0, mode: 'fight', sector: 0, wave: 0, perSector: perSectorFor(g), L: 0, plan: null, queue: [], spawnT: 2, uid: 0,
       enemies: [], bolts: [], shots: [], F: null,
       lockT: null, lastFire: { e: null, t: -9 },
       ship: { x: SX, y: 880, rot: 0, slide: 0, recoil: 0, shieldHit: 0, hullHit: 0, hitAng: 0, gunSide: 1, flamePh: 0 },
       shield: 100, hull: 100, shieldDelay: 0, inv: 0, slow: 0, dbl: 0, timeScale: 1, slowmo: 0, pace: 1,
-      pulse: 1, flash: { a: 0, c: '#fff' }, banner: null, warp: 0, clearT: 0, map: null, vt: 0, dying: 0, boss: null, bossFx: [],
+      pulse: 1, flash: { a: 0, c: '#fff' }, banner: null, bq: [], bGap: 0, pops: [], comboFlash: null, audit: null, warp: 0, clearT: 0, map: null, vt: 0, dying: 0, boss: null, bossFx: [],
       puCool: 14, kills: 0, escaped: 0, hurtVig: 0, comboLostT: 0, lastCombo: 0, mapPlanets: [], victory: null, botT: 0, botRate: 5.5, nextTip: 0,
     };
+    g.fx.pop = popFn;
     S.diffSpd = g.diff === 'gentle' ? 0.78 : g.diff === 'turbo' ? 1.25 : 1;
     S.diffDmg = g.diff === 'gentle' ? 0.5 : g.diff === 'turbo' ? 1.35 : 1;
     S.paceMax = g.diff === 'gentle' ? 1.0 : g.diff === 'turbo' ? 1.35 : 1.25;
@@ -45,6 +52,27 @@
   }
   const progress01 = () => clamp(S.L / 19, 0, 1);
   const capL = () => 4 + Math.floor(S.L * 0.38);
+
+  /* ---------- banner manager: ONE banner at a time, parked in the strip under the HUD (never over targets) ---------- */
+  function banner(b) {
+    b.t = 0;
+    if (S.banner && S.banner.key === b.key) { S.banner = b; return; }
+    if (!S.banner) { S.banner = b; return; }
+    S.bq.push(b);
+  }
+  function updateBanner(dt) {
+    if (S.banner) { S.banner.t += dt; if (S.banner.t > S.banner.dur) { S.banner = null; S.bGap = 0.25; } }
+    else if (S.bq.length) { if ((S.bGap = (S.bGap || 0) - dt) <= 0) S.banner = S.bq.shift(); }
+  }
+  /* ---------- one visibility rule: an enemy is "seen" (word chip drawn AND typable, same frame) once its whole sprite is
+     below the HUD safe line. Until then it flies in fast and shows no word; once seen it stays seen. ---------- */
+  function topEdge(e) { return (e.type === 'ufo' ? e.cy - e.R * 0.5 : e.y) - e.hh - (e.isAce ? 42 : 0); }
+  function canType(e) { return e.alive && !e.doomed && e.seen && e.targetable && e.delay <= 0; }
+  function clampTop(e, F) {
+    if (!e.seen) return;
+    const lim = F.safeTop - 2 + e.hh + (e.isAce ? 42 : 0);
+    if (e.type === 'ufo') { const m = lim + e.R * 0.5; if (e.cy < m) e.cy = m; if (e.y < lim) e.y = lim; } else if (e.y < lim) e.y = lim;
+  }
 
   /* ---------- waves ---------- */
   function startWave(g) {
@@ -55,7 +83,8 @@
     const sec = SS.SECTORS[S.sector];
     const boss = S.plan.kind === 'boss';
     const title = boss ? 'BOSS!' : S.plan.kind === 'elite' ? `WAVE ${S.wave + 1}` : `WAVE ${S.wave + 1}`;
-    S.banner = { t: 0, dur: boss ? 3.2 : 2.6, title: boss ? 'WARNING!' : title, top: S.wave === 0 ? `SECTOR ${S.sector + 1}` : null, sub: boss ? SS.BOSSES[S.sector].name : S.wave === 0 ? sec.name : S.plan.kind === 'elite' ? 'Mini-boss incoming!' : sec.name, boss, color: boss ? '#ff5a5f' : sec.accent };
+    S.bq.length = 0;
+    banner({ key: 'wave', dur: boss ? 3.0 : 2.2, title: boss ? 'WARNING!' : title, top: S.wave === 0 ? `SECTOR ${S.sector + 1}` : null, sub: boss ? SS.BOSSES[S.sector].name : S.wave === 0 ? sec.name : S.plan.kind === 'elite' ? 'Mini-boss incoming!' : sec.name, boss, color: boss ? '#ff5a5f' : sec.accent });
     if (!demo) { snd(boss ? 'lowThreeTone' : 'wave', { vol: 0.5 }); snd('warp', { vol: 0.35, jitter: false }); }
     if (!demo && SS.snd.musicOn()) SS.snd.musicMode(boss ? 3 : S.wave === 0 ? 2 : 2, boss);
   }
@@ -74,17 +103,19 @@
           S.spawnT = S.plan.interval / (1 + (F0().wf - 1) * 0.55) * rnd(0.7, 1.2) * (tok === 'swarm' ? 1.6 : 1) / (S.pace > 1 ? S.pace * 0.5 + 0.5 : 1);
         }
       } else if (waveDone() && !g.demo) {
-        S.mode = 'clear'; S.clearT = 2.8;
+        S.mode = 'clear'; S.clearT = 2.6;
         const bonus = 60 * (S.L + 1);
-        g.score.add(bonus); g.fx.pop(SX, S.F.top + 420, `Wave clear! +${bonus}`, { color: SS.SECTORS[S.sector].accent, size: 66, life: 1.6 });
-        S.banner = { t: 0, dur: 2.2, title: S.plan.kind === 'boss' ? 'SECTOR CLEAR!' : 'WAVE CLEAR!', color: '#7dff9b', sub: null };
+        g.score.add(bonus);
+        const lastOfSector = S.wave + 1 >= S.perSector;
+        if (lastOfSector) { S.clearT = 1.6; g.fx.pop(SX, S.F.bottom - 330, `Sector clear! +${bonus}`, { color: SS.SECTORS[S.sector].accent, size: 56, life: 1.5 }); }
+        else { S.clearT = 2.6; banner({ key: 'clear', dur: 2.0, title: 'WAVE CLEAR!', sub: `+${bonus}`, color: '#7dff9b', clear: true }); }
         snd('clear', { vol: 0.6 });
         S.hull = Math.min(100, S.hull + 4); S.shield = Math.min(100, S.shield + 30);
         if (S.pace < 1) S.pace = Math.min(1, S.pace + 0.1);
       } else if (waveDone() && g.demo) { S.wave++; startWave(g); }
     } else if (S.mode === 'clear') {
       S.clearT -= dt;
-      if (S.clearT <= 0) {
+      if (S.clearT <= 0 && !S.banner && !S.bq.length) {
         if (S.wave + 1 < S.perSector) { S.wave++; startWave(g); }
         else if (S.sector + 1 >= SS.SECTORS.length) beginVictory(g);
         else beginMap(g);
@@ -108,7 +139,7 @@
     startWave(g);
   }
   function beginVictory(g) {
-    S.mode = 'victory'; S.vt = 0; S.enemies.length = 0; S.queue.length = 0; S.shots.length = 0; S.warp = 0;
+    S.mode = 'victory'; S.banner = null; S.bq.length = 0; S.vt = 0; S.enemies.length = 0; S.queue.length = 0; S.shots.length = 0; S.warp = 0;
     S.flash = { a: 0.9, c: '#fff6c8' };
     snd('hugeBoom', { vol: 0.6 }); snd('zapThreeToneUp', { vol: 0.7, delay: 0.3 });
     if (SS.snd.musicOn()) SS.snd.musicMode(2, false);
@@ -135,7 +166,7 @@
   }
   function spawnToken(g, tok) {
     const F = S.F;
-    if (tok === 'swarm') { const cx = rnd(F.xmin + 250, F.xmax - 250); for (let i = 0; i < 3; i++) spawn(g, 'kamikaze', { x: cx + (i - 1) * 190, y: F.spawnY - Math.abs(i - 1) * 60, delay: i * 0.12 }); S.banner2 = { t: 0, text: 'SWARM!' }; snd('lowThreeTone', { vol: 0.3 }); }
+    if (tok === 'swarm') { const cx = rnd(F.xmin + 250, F.xmax - 250); for (let i = 0; i < 3; i++) spawn(g, 'kamikaze', { x: cx + (i - 1) * 190, y: F.top - 130 - Math.abs(i - 1) * 60, delay: i * 0.12 }); g.fx.pop(SX, F.bottom - 330, 'SWARM!', { color: '#ff8a8a', size: 60, life: 1.2 }); snd('lowThreeTone', { vol: 0.3 }); }
     else if (tok === 'shower') { for (let i = 0; i < 4; i++) S.queue.unshift('meteor'); S.spawnT = 0.4; S.plan.cap += 1; }
     else if (tok === 'powerup') spawnPower(g);
     else if (tok === 'boss') spawnBoss(g);
@@ -163,13 +194,13 @@
     e.x0 = e.x; e.x1 = clamp(lerp(e.x, SX, rnd(0.03, 0.3)), F.xmin, F.xmax);
     e.spr = T.spr(col);
     let item;
-    if (type === 'ufo') { e.spr = 'ufo' + U.pick(['Blue', 'Green', 'Red', 'Yellow']); e.R = rnd(70, 105); e.cy = F.spawnY - e.R; e.spinDir = Math.random() < 0.5 ? 1 : -1; e.x0 = clamp(e.x0, F.xmin + 100, F.xmax - 100); e.x1 = clamp(lerp(e.x0, SX, 0.25), F.xmin + 100, F.xmax - 100); }
+    if (type === 'ufo') { e.spr = 'ufo' + U.pick(['Blue', 'Green', 'Red', 'Yellow']); e.R = rnd(70, 105); e.cy = 0; e.spinDir = Math.random() < 0.5 ? 1 : -1; e.x0 = clamp(e.x0, F.xmin + 100, F.xmax - 100); e.x1 = clamp(lerp(e.x0, SX, 0.25), F.xmin + 100, F.xmax - 100); }
     if (type === 'meteor') {
       const big = Math.random() < 0.7; e.big = big;
       e.spr = U.pick(big ? SS.METEORS : SS.METEORS_SMALL); e.sc = big ? rnd(1.15, 1.45) : rnd(1.1, 1.4); e.hrMul = 1; e.vx = rnd(-55, 55); e.spin = rnd(-0.8, 0.8); e.spdMul = rnd(0.95, 1.2);
       item = wordFor(g, 'meteor', big);
     } else if (type === 'kamikaze') {
-      e.spr = U.pick(['missile21', 'missile22', 'missile23']); e.v = 0; e.hx = 0; e.hy = 1; e.sc = 2.0; e.armT = o.arm ?? 0.9;
+      e.spr = U.pick(['missile21', 'missile22', 'missile23']); e.v = 0; e.hx = 0; e.hy = 1; e.sc = 2.0; e.armT = o.arm ?? 1.3;
       item = wordFor(g, type);
     } else if (type === 'mini') {
       e.vx = o.vx || 0; e.vy = o.vy || 0; item = wordFor(g, type);
@@ -179,7 +210,8 @@
     } else item = wordFor(g, type);
     e.item = item; e.typer = new TM.Typer(item); e.col = col; e.debris = COLNAME[col] || 'gray';
     const sz = sprSize(e); e.hw = sz[0] / 2; e.hh = sz[1] / 2; e.hr = (T.hr / T.scale) * e.sc * (type === 'meteor' ? 0.9 : 1);
-    if (type === 'ufo') { e.y = e.cy; }
+    if (type === 'ufo') { e.cy = (o.y ?? F.top - 30) - e.hh - e.R * 0.5; e.y = e.cy; }
+    else if (o.y == null) e.y = F.top - e.hh - 24;
     e.chx = e.x; e.chy = e.y; e.chipSize = type === 'mini' ? 36 : 40;
     S.enemies.push(e); return e;
   }
@@ -191,6 +223,7 @@
     need.push('bomb', 'slow', 'double', 'shield');
     kind = forceKind || U.pick(need);
     const e = { id: ++S.uid, type: 'powerup', T: SS.TYPES.powerup, kind, alive: true, doomed: false, x: x ?? rnd(F.xmin + 80, F.xmax - 80), y: y ?? F.spawnY, t: 0, flash: 0, locked: false, spdMul: 1, sc: 1.9, rot: 0, targetable: true, stun: 0, ph: rnd(0, 6), hitsPending: 0, delay: 0, spr: SS.POWER[kind].base, hw: 36, hh: 36, hr: 44 };
+    if (y == null) e.y = F.top - e.hh - 24;
     e.x0 = e.x; e.item = pickItem(g, 'word', { maxLen: 4, minLen: 2 }); e.typer = new TM.Typer(e.item); e.chx = e.x; e.chy = e.y; e.chipSize = 38;
     S.enemies.push(e); S.puCool = 16;
     snd('highUp', { vol: 0.25 });
@@ -204,7 +237,7 @@
     const mw = def.maxWords - (g.diff === 'gentle' ? 2 : 0) + (g.diff === 'turbo' ? 1 : 0);
     const phases = []; for (let i = 0; i < nPh; i++) phases.push(mkPhrase(g, Math.max(3, mw - (i === 0 && nPh > 1 ? 1 : 0))));
     const e = mkBigShip(g, 'boss', def.spr, def.scale, def.rot, phases, def);
-    e.def = def; e.name = def.name; e.x = SX; e.y = F.top - 380; e.hoverY = Math.min(F.top + 190 + e.hh, F.impactY - 150 - e.hh); e.entry = 0; e.targetable = false; e.atkT = 5; e.minT = 8; e.charge = 0;
+    e.def = def; e.name = def.name; e.x = SX; e.y = F.top - e.hh - 40; e.y0 = e.y; e.hoverY = Math.min(F.safeTop + 20 + e.hh, F.impactY - 150 - e.hh); e.entry = 0; e.targetable = false; e.atkT = 5; e.minT = 8; e.charge = 0;
     e.glow = def.glow; e.hr = def.hr; e.totalLetters = phases.reduce((a, p) => a + p.len, 0); e.typed = 0; e.hpShown = 1; e.grace = 0; e.beam = null; e.queueAtk = [];
     S.boss = e; return e;
   }
@@ -220,7 +253,7 @@
     const mw = (g.diff === 'gentle' ? 3 : 4) + (S.sector > 2 ? 1 : 0);
     const ph = [mkPhrase(g, mw)];
     const e = mkBigShip(g, 'ace', spr, 0.78, 0, ph, null);
-    e.x = e.x0 = pickX(F, 360); e.y = F.spawnY - 40; e.name = 'ace'; e.atkT = 5; e.spdMul = 1; e.keepProgress = true; e.typed = 0; e.totalLetters = ph[0].len; e.hpShown = 1; e.isAce = true; e.chipSize = 38;
+    e.x = e.x0 = pickX(F, 360); e.y = F.top - e.hh - 70; e.name = 'ace'; e.atkT = 5; e.spdMul = 1; e.keepProgress = true; e.typed = 0; e.totalLetters = ph[0].len; e.hpShown = 1; e.isAce = true; e.chipSize = 38;
     e.hr = Math.max(e.hw, e.hh) * 0.7;
     return e;
   }
@@ -233,7 +266,10 @@
     if (e.typer.shake > 0) e.typer.shake = Math.max(0, e.typer.shake - dt * 3);
     if (e.push) { e.y -= e.push * dt; e.push *= Math.exp(-3.2 * dt); if (e.push < 6) e.push = 0; }
     if (e.stun > 0) { e.stun -= dt; if (e.type === 'ufo') e.cy = e.y - Math.sin(e.ph + e.t * 1.3 * e.spinDir) * e.R * 0.5; return; }
-    const spd = T.speed * e.spdMul * S.pace * S.diffSpd * F.fs * ts;
+    if (!e.seen) { if (topEdge(e) >= F.safeTop) markSeen(e); }
+    const room = Math.max(300, F.impactY - F.safeTop - e.hh * 2);
+    const minVis = e.item && e.item.kind === 'sentence' ? 8 : 5.5;
+    const spd = e.seen ? Math.min(T.speed * e.spdMul * S.pace * S.diffSpd * F.fs, room / minVis) * ts : 380 * ts;
     const u = clamp((e.y - F.spawnY) / (F.impactY - F.spawnY), 0, 1);
     switch (e.type) {
       case 'scout': case 'splitter': case 'shielded':
@@ -245,18 +281,18 @@
         e.x = e.x0 + (e.x1 - e.x0) * u + w * e.amp * 1.1; e.rot = Math.cos(e.t * 1.25 + e.ph) * 0.35 * (Math.cos(e.t * 1.25 + e.ph) > 0 ? 1 : 1); break;
       }
       case 'ufo': {
-        e.cy += spd * 0.85 * dt; const th = e.ph + e.t * 1.3 * e.spinDir;
+        e.cy += spd * (e.seen ? 0.85 : 1) * dt; const th = e.ph + e.t * 1.3 * e.spinDir;
         const cx = e.x0 + (e.x1 - e.x0) * clamp((e.cy - F.spawnY) / (F.impactY - F.spawnY), 0, 1);
         e.x = cx + Math.cos(th) * e.R; e.y = e.cy + Math.sin(th) * e.R * 0.5; e.ox = cx; e.rot = e.t * 0.8 * e.spinDir; break;
       }
       case 'kamikaze': {
-        if (e.armT > 0) { e.armT -= dt * ts; e.y += 70 * F.fs * ts * dt; e.hx = 0; e.hy = 1; e.rot = Math.PI; }
+        if (e.armT > 0) { if (e.seen) e.armT -= dt * ts; e.y += (e.seen ? 70 : 380) * ts * dt; e.hx = 0; e.hy = 1; e.rot = Math.PI; }
         else {
           const dx = SX + S.ship.slide - e.x, dy = S.ship.y - e.y, d = Math.hypot(dx, dy) || 1;
           const want = Math.atan2(dy / d, dx / d), cur = Math.atan2(e.hy, e.hx);
           let da = want - cur; while (da > Math.PI) da -= Math.PI * 2; while (da < -Math.PI) da += Math.PI * 2;
           const na = cur + clamp(da, -2.4 * dt * ts, 2.4 * dt * ts); e.hx = Math.cos(na); e.hy = Math.sin(na);
-          e.v = Math.min(e.v + 260 * dt * ts, 330 * S.diffSpd * S.pace * (F.fs > 1 ? 1 + (F.fs - 1) * 0.4 : 1));
+          e.v = Math.min(e.v + 260 * dt * ts, Math.min(300 * S.diffSpd * S.pace * (F.fs > 1 ? 1 + (F.fs - 1) * 0.4 : 1), room / 3.6));
           e.x += e.hx * e.v * dt * ts; e.y += e.hy * e.v * dt * ts; e.rot = Math.atan2(e.hx, -e.hy);
           if (Math.random() < dt * 40 * ts) SS.fx.emit({ spr: 'p_flame5', x: e.x - e.hx * 30, y: e.y - e.hy * 30, vx: -e.hx * 90, vy: -e.hy * 90, rot: e.rot + Math.PI, life: 0.28, s0: 40, s1: 14, a0: 0.9, a1: 0, add: true, tint: '#ff9a3c' });
         }
@@ -268,17 +304,22 @@
       }
       case 'powerup': e.y += spd * dt; e.x = e.x0 + Math.sin(e.t * 1.3 + e.ph) * 70; e.rot = Math.sin(e.t * 2 + e.ph) * 0.12; break;
       case 'ace': {
-        const target = F.top + 330 + S.sector * 10;
-        e.y += (e.y < target ? 140 : spd * 0.6) * ts * dt; e.x = e.x0 + Math.sin(e.t * 0.7 + e.ph) * 200; e.x = clamp(e.x, F.xmin + 60, F.xmax - 60);
-        e.atkT -= dt * ts; if (e.atkT <= 0 && e.y > F.top + 80) { e.atkT = (g.diff === 'gentle' ? 5.5 : 4.2) * rnd(0.85, 1.2); enemyFire(g, e, 'bolts', 1); }
+        const target = F.safeTop + 150 + S.sector * 10;
+        e.y += (!e.seen ? 380 * ts : e.y < target ? 140 : spd * 0.6) * dt; e.x = e.x0 + Math.sin(e.t * 0.7 + e.ph) * 200; e.x = clamp(e.x, F.xmin + 60, F.xmax - 60);
+        e.atkT -= dt * ts; if (e.atkT <= 0 && e.seen) { e.atkT = (g.diff === 'gentle' ? 5.5 : 4.2) * rnd(0.85, 1.2); enemyFire(g, e, 'bolts', 1); }
         e.rot = Math.sin(e.t * 0.7 + e.ph) * 0.08; break;
       }
     }
+    if (e.type !== 'kamikaze') clampTop(e, F);
+    e.x = clamp(e.x, F.v.x + e.hw + 8, F.v.x + F.v.w - e.hw - 8);
     e.danger = e.y + (e.type === 'kamikaze' ? 500 : 0) + (e.type === 'powerup' ? -900 : 0) + (e.big ? -200 : 0);
   }
 
   /* ---------- input / locking ---------- */
-  function firstVisible(e, F) { return e.chy > F.top + 20 && e.y > F.top - 60; }
+  function markSeen(e) {
+    e.seen = true; e.seenT = 0; e.seenAt = S.t; e.chy = undefined; e.chx = e.type === "ufo" ? (e.ox || e.x) : e.x;
+    if (e.type !== 'powerup') { const y = e.type === 'ufo' ? e.cy : e.y; SS.fx.ring(e.x, y, 150 + e.hw, '#bfe8ff', 0.35); }
+  }
   function release(keepProgress) {
     const e = S.lockT; if (!e) return;
     e.locked = false; S.lockT = null;
@@ -292,7 +333,7 @@
     let res, tgt;
     if (t) { tgt = t; res = t.typer.feed(k); }
     else {
-      const c = S.enemies.filter((e) => e.alive && !e.doomed && e.targetable && e.delay <= 0 && firstVisible(e, F) && e.typer.wouldAccept(k) && (e.typer.pos === 0 || e.keepProgress));
+      const c = S.enemies.filter((e) => canType(e) && e.typer.wouldAccept(k) && (e.typer.pos === 0 || e.keepProgress));
       if (!c.length) { g.keyResult('miss'); missFire(); return; }
       c.sort((a, b) => (b.danger || 0) - (a.danger || 0));
       tgt = c[0]; res = tgt.typer.feed(k);
@@ -397,7 +438,7 @@
     g.fx.pop(e.x, e.y - e.hh - 20, `Armor cracked! ${e.pi}/${e.phases.length - 1}`.replace(/ \d+\/\d+/, ''), { color: '#ffd06b', size: 62, life: 1.4 });
     g.wordDone(b.o.typer, e.x, e.y + e.hh * 0.2, { bonus: 3 * (S.dbl > 0 ? 2 : 1), color: '#ffcf4a' });
     SS.fx.confettiStars(e.x, e.y, 16);
-    for (const q of S.enemies) if (q.alive && q !== e && q.type !== 'powerup' && q.type !== 'boss') { q.doomed = true; kill(g, q, { silent: true }); }
+    for (const q of S.enemies) if (q.alive && q.seen && q !== e && q.type !== 'powerup' && q.type !== 'boss') { q.doomed = true; kill(g, q, { silent: true }); }
     S.shots.length = 0;
     spawnPower(g, e.x, e.y + 40);
   }
@@ -491,7 +532,7 @@
     } else g.fx.shake(7, 0.15);
   }
   function die(g) {
-    S.mode = 'dying'; S.dying = 0; S.lockT = null; S.shots.length = 0;
+    S.mode = 'dying'; S.banner = null; S.bq.length = 0; S.dying = 0; S.lockT = null; S.shots.length = 0;
     S.lockT = null; for (const e of S.enemies) e.locked = false;
     snd('hugeBoom', { vol: 0.6 }); snd('lose', { vol: 0.5, delay: 0.4 });
     const sector = S.sector + 1, wave = S.wave + 1;
@@ -533,7 +574,7 @@
     S.flash = { a: 0.75, c: '#ffe9b0' }; g.fx.shake(26, 0.5); snd('hugeBoom', { vol: 0.7 }); snd('laserLarge1', { vol: 0.4, rate: 0.7 });
     SS.fx.ring(sh.x, sh.y, 2400, '#ffd37a', 0.9, 'p_circle3'); SS.fx.ring(sh.x, sh.y, 1800, '#ffffff', 0.7);
     for (const e of S.enemies) {
-      if (!e.alive || e.type === 'powerup' || e.doomed) continue;
+      if (!e.alive || e.type === 'powerup' || e.doomed || !e.seen) continue;
       if (e.type === 'boss') { e.grace = Math.max(e.grace, 2.0); e.pending = null; e.beam = null; e.flash = 1; continue; }
       if (e.type === 'ace') { e.stun = 2.5; e.flash = 1; continue; }
       e.doomed = true; e.bombT = Math.hypot(e.x - sh.x, e.y - sh.y) / 1900; e.killT = 9;
@@ -544,9 +585,9 @@
     if (S.pulse <= 0 || (S.mode !== 'fight')) return;
     S.pulse = 0; const sh = S.ship; snd('shieldUp', { vol: 0.5 }); snd('field', { vol: 0.5 });
     SS.fx.ring(sh.x, sh.y, 2000, '#7fdcff', 0.8, 'p_circle3'); SS.fx.ring(sh.x, sh.y, 1300, '#ffffff', 0.6); g.fx.shake(10, 0.25); S.flash = { a: 0.25, c: '#8fe0ff' };
-    for (const e of S.enemies) if (e.alive && e.type !== 'powerup' && e.type !== 'boss') { e.stun = 2.6; e.push = 520; e.flash = 1; }
+    for (const e of S.enemies) if (e.alive && e.seen && e.type !== 'powerup' && e.type !== 'boss') { e.stun = 2.6; e.push = 520; e.flash = 1; }
     for (const s of S.shots) { s.dead = true; SS.fx.sparks(s.x, s.y, 4, '#ffffff', 300, 20); }
-    g.fx.pop(SX, S.F.top + 480, 'PULSE! Breathe...', { color: '#8fe0ff', size: 60, life: 1.4 });
+    g.fx.pop(SX, S.F.bottom - 330, 'PULSE! Breathe...', { color: '#8fe0ff', size: 60, life: 1.4 });
   }
 
   /* ---------- update ---------- */
@@ -563,7 +604,7 @@
     e.t += dt * ts;
     if (e.entry < 1) {
       e.entry = Math.min(1, e.entry + dt / 3.4); const k = U.ease.outCubic(e.entry);
-      e.y = lerp(F.top - 380, e.hoverY, k); e.x = SX; if (e.entry > 0.85) e.targetable = true;
+      e.y = lerp(e.y0, e.hoverY, k); e.x = SX; if (!e.seen && e.y - e.hh >= F.safeTop) { markSeen(e); e.targetable = true; }
     } else { e.x = SX + Math.sin(e.t * 0.42) * Math.min(260, (F.xmax - SX) * 0.4); e.y = e.hoverY + Math.sin(e.t * 0.9) * 14; }
     const hp = clamp(1 - e.typed / e.totalLetters, 0, 1);
     e.hpShown += (hp - e.hpShown) * (1 - Math.exp(-dt * 3.5));
@@ -584,7 +625,7 @@
     while (A.acc >= 1) {
       A.acc -= 1;
       let t = S.lockT;
-      if (!t || !t.alive || t.doomed) { const c = S.enemies.filter((e) => e.alive && !e.doomed && e.targetable && e.delay <= 0 && firstVisible(e, F)); c.sort((a, b) => (b.danger || 0) - (a.danger || 0)); t = c[0]; A.acc -= A.think; }
+      if (!t || !t.alive || t.doomed) { const c = S.enemies.filter((e) => canType(e)); c.sort((a, b) => (b.danger || 0) - (a.danger || 0)); t = c[0]; A.acc -= A.think; }
       if (!t) { A.acc = Math.min(A.acc, 0); continue; }
       let k = t.typer.nextReq(); if (!k) continue;
       if (Math.random() < A.err) k = 'abcdefghijklmnopqrstuvwxyz'[Math.floor(Math.random() * 26)];
@@ -596,8 +637,10 @@
     const F = (S.F = field(g));
     SS.bg.update(dt, S.warp); SS.fx.update(dt);
     S.flash.a = Math.max(0, S.flash.a - dt * 2.3); S.hurtVig = Math.max(0, S.hurtVig - dt * 1.6);
-    if (S.banner) { S.banner.t += dt; if (S.banner.t > S.banner.dur) S.banner = null; }
-    if (S.banner2) { S.banner2.t += dt; if (S.banner2.t > 1.4) S.banner2 = null; }
+    if (g.fx.pop !== S.popFn) g.fx.pop = S.popFn;
+    for (const p of S.pops) p.t += dt;
+    S.pops = S.pops.filter((p) => p.t < p.life);
+    if (S.comboFlash) { S.comboFlash.t += dt; if (S.comboFlash.t > 1.1) S.comboFlash = null; }
     if (S.mode === 'fight' || S.mode === 'clear') S.warp = Math.max(0, S.warp - dt * 0.55);
     if (S.mode === 'map') S.warp = clamp(S.map.t < 0.8 ? S.map.t / 0.8 : S.map.t > 5.4 ? 1 : 0.55, 0, 1);
     SS.bg.pipGrow = S.mode === 'victory' ? 0 : S.sector === 4 ? clamp(0.15 + (S.wave + (S.mode === 'clear' ? 1 : 0)) / (S.perSector * 1.3), 0, 1) : 0;
@@ -605,6 +648,7 @@
     sh.recoil = Math.max(0, sh.recoil - dt * 9); sh.shieldHit = Math.max(0, sh.shieldHit - dt * 2.2); sh.hullHit = Math.max(0, sh.hullHit - dt * 2.5);
     if (!SS.ready || g.state === 'countdown') { shipAim(g, dt, null); return; }
     const live = g.live || g.demo;
+    if (g.state === 'play' || g.demo) updateBanner(dt);
     // music
     if (!g.demo && g.state === 'play' && !SS.snd.musicOn() && TM.settings.music > 0 && SS.snd.musicCtxReady !== false) SS.snd.musicStart(S.sector, 2, S.plan && S.plan.kind === 'boss');
     if ((g.state === 'over' || g.state === 'title') && SS.snd.musicOn()) SS.snd.musicStop();
@@ -632,7 +676,7 @@
         S.botT -= iv;
         let t = S.lockT;
         if (!t || !t.alive || t.doomed) {
-          const c = S.enemies.filter((e) => e.alive && !e.doomed && e.targetable && e.delay <= 0 && firstVisible(e, F) && e.type !== 'boss' && e.type !== 'ace'); c.sort((a, b) => (b.danger || 0) - (a.danger || 0)); t = c[0]; S.botT -= 0.1;
+          const c = S.enemies.filter((e) => canType(e) && e.type !== 'boss' && e.type !== 'ace'); c.sort((a, b) => (b.danger || 0) - (a.danger || 0)); t = c[0]; S.botT -= 0.1;
         }
         if (t) { const k = t.typer.nextReq(); if (k) press(g, k); }
       }
@@ -644,18 +688,24 @@
       if (e.type === 'boss') { updateBoss(g, e, dt, F); continue; }
       stepEnemy(g, e, dt, F);
       if (e.delay > 0) continue;
+      if (e.seen) e.seenT += dt;
       if (e.bombT !== undefined) { e.bombT -= dt; if (e.bombT <= 0) kill(g, e, { bomb: true }); continue; }
       if (e.doomed && e.killT !== undefined) { e.killT -= dt; if (e.killT <= 0) { kill(g, e, { typer: e.typer }); continue; } }
       if (e.totalLetters != null) e.hpShown += (1 - e.typed / e.totalLetters - e.hpShown) * (1 - Math.exp(-dt * 4));
       // impact
-      if (e.type === 'powerup') { if (e.y > F.bottom + 70) { e.alive = false; if (S.lockT === e) release(true); } }
+      if (e.type === 'powerup') { if (e.y > F.impactY - 20) { e.alive = false; SS.fx.ring(e.x, e.y, 160, "#ffffff", 0.3); if (S.lockT === e) release(true); } }
       else if (e.y >= F.impactY || (e.type === 'kamikaze' && e.armT <= 0 && Math.hypot(e.x - sh.x, e.y - sh.y) < 70)) {
         if (e.doomed) kill(g, e, { typer: e.typer }); else impact(g, e, F);
         continue;
       }
       // chip anchor
       const ax = e.type === 'ufo' ? e.ox || e.x : e.x, ay = e.type === 'ufo' ? e.cy + e.R * 0.5 : e.y;
-      e.chx += (ax - e.chx) * (1 - Math.exp(-dt * 12)); e.chy = ay + e.hh + (e.type === 'powerup' ? 60 : e.big ? 58 : 42);
+      e.chx += (ax - e.chx) * (1 - Math.exp(-dt * 12));
+      { // chip sits under the ship; near the defence line it hops above so it never sinks into the planet / bottom HUD
+        const off = e.type === 'powerup' ? 60 : e.big ? 58 : 42; const below = ay + e.hh + off;
+        const want = below > F.impactY - 10 ? Math.max(F.safeTop + 40, ay - e.hh - off) : below;
+        if (!e.seen || e.chy === undefined) e.chy = want; else e.chy += (want - e.chy) * (1 - Math.exp(-dt * 16));
+      }
     }
     S.enemies = S.enemies.filter((e) => e.alive);
     if (S.lockT && !S.lockT.alive) { S.lockT = null; }
@@ -806,17 +856,55 @@
     const x = clamp(e.chx, F.v.x + info.w / 2 + 14, F.v.x + F.v.w - info.w / 2 - 14);
     return { x, y: e.chy, size: sz };
   }
+  function chipRect(ctx, g, e, c) {
+    const info = D.chipSize(ctx, e.typer, c.size); const sc = e.locked ? 1.08 : 1;
+    let x0 = c.x - info.w / 2 * sc - 4, x1 = c.x + info.w / 2 * sc + 4, y0 = c.y - info.h / 2 * sc - 4, y1 = c.y + info.h / 2 * sc + 8;
+    if (g.hint && e.typer.item.hint) { const hs = Math.round(c.size * 0.52); ctx.font = D.FONT_JA(hs); const tw = ctx.measureText(e.typer.item.hint).width + hs; y1 = c.y + info.h / 2 * sc + hs * 1.7; x0 = Math.min(x0, c.x - tw / 2); x1 = Math.max(x1, c.x + tw / 2); }
+    return { x0, y0, x1, y1 };
+  }
   function drawChips(ctx, g, F) {
-    const list = S.enemies.filter((e) => e.alive && e.delay <= 0 && e.chy > F.top - 30);
+    const list = S.enemies.filter((e) => e.alive && e.seen && e.delay <= 0);
     list.sort((a, b) => (a.locked ? 1 : 0) - (b.locked ? 1 : 0));
+    S.chipRects = [];
     for (const e of list) {
-      if (e.doomed && e.typer.done && e.type !== 'boss') { /* fading */ }
       const c = chipFor(ctx, g, e, F); const accent = e.type === 'shielded' && !e.shieldGone ? '#2F7BFF' : e.T.accent;
-      const fade = e.type === 'boss' && !e.targetable ? 0 : 1;
-      if (fade <= 0) continue;
+      if (e.type === 'boss' && !e.targetable && !e.dyingBoss) continue;
+      if (e.type === 'boss' && e.dyingBoss) continue;
+      S.chipRects.push(Object.assign(chipRect(ctx, g, e, c), { id: e.id, type: e.type, ey: e.y, typable: canType(e) }));
       if (e.type === 'shielded' && !e.shieldGone) { D.text(ctx, 'SHIELD!', c.x, c.y - 44, { font: KV(18), size: 18, color: '#bfe6ff', outline: 7 }); }
-      if (e.type === 'shielded' && e.shieldGone) { /* second word */ }
-      D.chip(ctx, c.x, c.y, e.typer, { size: c.size, accent, locked: e.locked, hint: g.hint, alpha: e.doomed ? 0.5 : 1, dim: false });
+      D.chip(ctx, c.x, c.y, e.typer, { size: c.size, accent, locked: e.locked, hint: g.hint, alpha: (e.doomed ? 0.5 : 1) * Math.min(1, 0.4 + e.seenT * 6), dim: false });
+    }
+  }
+  /* floating score / info pops: drawn here (not by the shared FX) so they can slide out of the way of word chips and live ships */
+  function popRect(ctx, p, x, y) {
+    ctx.font = `800 ${p.size}px "Baloo 2", sans-serif`; const w = ctx.measureText(p.str).width + 24, h = p.size * 1.15;
+    return { x0: x - w / 2, x1: x + w / 2, y0: y - h / 2, y1: y + h / 2 };
+  }
+  const hit = (a, b) => a.x0 < b.x1 && a.x1 > b.x0 && a.y0 < b.y1 && a.y1 > b.y0;
+  function popFree(r, F) {
+    if (r.y0 < F.safeTop || r.x0 < F.v.x + 8 || r.x1 > F.v.x + F.v.w - 8 || r.y1 > F.bottom - 260) return false;
+    for (const c of S.chipRects) if (hit(r, c)) return false;
+    for (const e of S.enemies) if (e.alive && e.seen && e.type !== 'boss' && !e.doomed && hit(r, { x0: e.x - e.hw, x1: e.x + e.hw, y0: e.y - e.hh, y1: e.y + e.hh })) return false;
+    return true;
+  }
+  function drawPops(ctx, g, F) {
+    S.popRects = [];
+    for (const p of S.pops) {
+      const k = p.t / p.life; const rise = k * 50;
+      let x = p.x + p.ox, y = p.y + p.oy - rise;
+      let r = popRect(ctx, p, x, y);
+      if (!popFree(r, F)) {
+        let best = null, bd = 1e9;
+        for (let dy = -420; dy <= 420; dy += 60) for (let dx = -600; dx <= 600; dx += 100) {
+          const q = popRect(ctx, p, p.x + dx, p.y - rise + dy); const d = dx * dx * 0.5 + dy * dy;
+          if (d < bd && popFree(q, F)) { bd = d; best = [dx, dy]; }
+        }
+        if (best) { p.ox = best[0]; p.oy = best[1]; x = p.x + p.ox; y = p.y + p.oy - rise; r = popRect(ctx, p, x, y); }
+      }
+      S.popRects.push(r);
+      const sc = k < 0.2 ? U.ease.outBack(k / 0.2) : 1;
+      ctx.save(); ctx.globalAlpha = (k > 0.7 ? 1 - (k - 0.7) / 0.3 : 1) * 0.95; ctx.translate(x, y); ctx.scale(sc, sc);
+      D.text(ctx, p.str, 0, 0, { size: p.size, color: p.color, outline: 10 }); ctx.restore();
     }
   }
   function drawReticle(ctx, g, F) {
@@ -864,6 +952,7 @@
     ctx.restore();
     D.text(ctx, 'x' + mult, cx, cy - 8, { font: BD(54), size: 54, color: mc, outline: 10 });
     D.text(ctx, combo >= 2 ? `COMBO ${combo}` : 'COMBO', cx, cy + 32, { font: BD(21, 700), size: 21, color: '#fff', outline: 6 });
+    if (S.comboFlash) { const f = S.comboFlash, kk = f.t / 1.1; ctx.save(); ctx.globalAlpha = kk > 0.7 ? 1 - (kk - 0.7) / 0.3 : 1; D.text(ctx, f.text + '!', cx, cy - 150 - kk * 20, { font: KV(34), size: 34, color: f.color, outline: 9 }); ctx.restore(); }
     if (S.comboLostT > 0) D.text(ctx, 'combo lost', cx, cy - 92, { size: 28, color: '#ff9a9a', outline: 8 });
     // pulse indicator + power-up timers
     let px = cx - 120;
@@ -880,7 +969,7 @@
     D.text(ctx, pr ? 'ENTER = PULSE' : 'pulse used', W - 60, F.bottom - 188, { font: KV(17), size: 17, color: pr ? '#8fe9ff' : 'rgba(255,255,255,0.4)', align: 'right', outline: 6 });
     // boss bar
     const b = S.boss;
-    if (b && b.alive && !b.dyingBoss && b.entry > 0.2) drawBossBar(ctx, g, F, b);
+    if (b && b.alive && !b.dyingBoss && b.seen && !S.banner) drawBossBar(ctx, g, F, b);
     if (S.mode === 'fight' && S.plan && !g.demo) { /* sector progress is in the DOM HUD */ }
   }
   function drawBossBar(ctx, g, F, b) {
@@ -901,25 +990,23 @@
     if (b.phases.length > 1) D.text(ctx, `ARMOR ${b.pi + 1}/${b.phases.length}`, x + w, y - 22, { font: KV(15), size: 15, color: '#ffd06b', align: 'right', outline: 6 });
   }
 
+  /* small plate in the strip between the HUD and the play field; F.safeTop guarantees no word chip is ever drawn here */
+  function bannerRect(F) { const w = 620, h = 84; return { x0: SX - w / 2, x1: SX + w / 2, y0: F.hudTop + 10, y1: F.hudTop + 10 + h }; }
   function drawBanner(ctx, g, F) {
-    const b = S.banner; if (b && !g.demo) {
-      const t = b.t, k = t < 0.35 ? U.ease.outBack(t / 0.35) : 1; const a = t < 0.2 ? t / 0.2 : t > b.dur - 0.5 ? clamp((b.dur - t) / 0.5, 0, 1) : 1;
-      const cy = F.top + (F.bottom - F.top) * 0.3;
-      ctx.save(); ctx.globalAlpha = a;
-      if (b.boss) {
-        const bh = 210; ctx.fillStyle = 'rgba(200,20,30,0.55)'; ctx.fillRect(F.v.x - 100, cy - bh / 2, F.v.w + 200, bh);
-        ctx.save(); ctx.beginPath(); ctx.rect(F.v.x - 100, cy - bh / 2 - 26, F.v.w + 200, 26); ctx.rect(F.v.x - 100, cy + bh / 2, F.v.w + 200, 26); ctx.clip();
-        ctx.fillStyle = '#ffd23f'; ctx.fillRect(F.v.x - 100, cy - bh / 2 - 26, F.v.w + 200, 52 + bh); ctx.fillStyle = '#1b1020';
-        for (let x = F.v.x - 200 + ((S.t * 90) % 90); x < F.v.x + F.v.w + 200; x += 90) { ctx.beginPath(); ctx.moveTo(x, cy - bh / 2 - 26); ctx.lineTo(x + 45, cy - bh / 2 - 26); ctx.lineTo(x + 45 - 30, cy + bh / 2 + 26); ctx.lineTo(x - 30, cy + bh / 2 + 26); ctx.fill(); }
-        ctx.restore(); ctx.fillStyle = 'rgba(120,10,20,0.78)'; ctx.fillRect(F.v.x - 100, cy - bh / 2, F.v.w + 200, bh);
-      }
-      ctx.translate(SX, cy); ctx.scale(k, k);
-      if (b.top) D.text(ctx, b.top, 0, -92, { font: KV(34), size: 34, color: '#fff', outline: 10 });
-      D.text(ctx, b.title, 0, b.boss ? -26 : 0, { font: KV(b.boss ? 96 : 110), size: 100, color: '#fff', outline: 20 });
-      if (b.sub) D.text(ctx, b.sub, 0, b.boss ? 78 : 104, { size: b.boss ? 56 : 52, color: b.boss ? '#ffe9a8' : (b.color || '#fff'), outline: 12 });
-      ctx.restore();
-    }
-    const c = S.banner2; if (c && !g.demo) { const t = c.t; ctx.save(); ctx.globalAlpha = t > 1 ? 1 - (t - 1) / 0.4 : 1; ctx.translate(SX, F.top + 400); const s = U.ease.outBack(Math.min(1, t / 0.3)); ctx.scale(s, s); D.text(ctx, c.text, 0, 0, { font: KV(80), size: 80, color: '#ff6a6a', outline: 16 }); ctx.restore(); }
+    const b = S.banner; S.bannerRect = null;
+    if (!b || g.demo || (g.state !== 'play' && g.state !== 'paused')) return;
+    const r = bannerRect(F); S.bannerRect = r;
+    const t = b.t, k = t < 0.3 ? U.ease.outBack(t / 0.3) : 1; const a = t < 0.15 ? t / 0.15 : t > b.dur - 0.35 ? clamp((b.dur - t) / 0.35, 0, 1) : 1;
+    const cx = SX, cy = (r.y0 + r.y1) / 2, w = r.x1 - r.x0, h = r.y1 - r.y0;
+    ctx.save(); ctx.globalAlpha = a; ctx.translate(cx, cy); ctx.scale(k, k);
+    const plate = P.rr(-w / 2, -h / 2, w, h, 30);
+    ctx.fillStyle = b.boss ? 'rgba(150,12,26,0.88)' : 'rgba(10,14,48,0.78)'; ctx.fill(plate);
+    ctx.lineWidth = 5; ctx.strokeStyle = b.boss ? '#ffd23f' : (b.color || '#fff'); ctx.stroke(plate);
+    if (b.boss) { ctx.save(); ctx.clip(plate); ctx.fillStyle = '#ffd23f'; for (let x = -w / 2 - 60 + ((S.t * 60) % 60); x < w / 2; x += 60) { ctx.beginPath(); ctx.moveTo(x, -h / 2); ctx.lineTo(x + 22, -h / 2); ctx.lineTo(x + 2, -h / 2 + 8); ctx.lineTo(x - 20, -h / 2 + 8); ctx.fill(); ctx.beginPath(); ctx.moveTo(x, h / 2); ctx.lineTo(x + 22, h / 2); ctx.lineTo(x + 2, h / 2 - 8); ctx.lineTo(x - 20, h / 2 - 8); ctx.fill(); } ctx.restore(); }
+    const main = b.top ? `${b.top} · ${b.title}` : b.title;
+    if (b.sub) { D.text(ctx, main, 0, -14, { font: KV(36), size: 36, color: '#fff', outline: 10 }); D.text(ctx, b.sub, 0, 22, { size: 26, color: b.boss ? '#ffe9a8' : (b.color || '#fff'), outline: 8 }); }
+    else D.text(ctx, main, 0, 0, { font: KV(40), size: 40, color: '#fff', outline: 10 });
+    ctx.restore();
   }
 
   function drawOverlays(ctx, g, F) {
@@ -1003,13 +1090,16 @@
     drawShip(ctx, g, F);
     SS.fx.draw(ctx, false); drawBolts(ctx); SS.fx.draw(ctx, true);
     if (S.bombFx) { const k = S.bombFx.t / 1.1; ctx.save(); ctx.globalCompositeOperation = 'lighter'; ctx.strokeStyle = U.hexA('#ffe0a0', 1 - k); ctx.lineWidth = 60 * (1 - k) + 6; ctx.beginPath(); ctx.arc(S.bombFx.x, S.bombFx.y, k * 2300, 0, 7); ctx.stroke(); ctx.restore(); }
+    drawHUD(ctx, g, F);
+    S.chipRects = [];
     if (S.mode !== 'map' && S.mode !== 'victory') { drawReticle(ctx, g, F); drawChips(ctx, g, F); }
     if (S.mode === 'victory') drawVictory(ctx, g, F);
     g.fx.draw(ctx);
-    drawHUD(ctx, g, F);
+    drawPops(ctx, g, F);
     drawOverlays(ctx, g, F);
     if (S.mode === 'map') drawMap(ctx, g, F);
     drawBanner(ctx, g, F);
+    if (window.__ssAudit) window.__ssAudit(g, F);
   }
 
   /* ---------- input ---------- */
@@ -1048,10 +1138,16 @@
     speed: (n) => { S.devSpeed = n; },
     kill: () => { for (const e of S.enemies) if (e.alive && e.type !== 'boss') { e.doomed = true; kill(G, e, { silent: true }); } },
   };
+  window.__SS_AUDIT_DATA = function () {
+    if (!S || !S.F) return null; const F = S.F;
+    return { t: S.t, mode: S.mode, state: G.state, top: F.top, safeTop: F.safeTop, hudTop: F.hudTop, vx: F.v.x, vw: F.v.w, bottom: F.bottom, impactY: F.impactY, banner: S.banner ? { key: S.banner.key, title: S.banner.title, t: S.banner.t, rect: S.bannerRect } : null, bq: S.bq.length,
+      chips: S.chipRects || [], pops: S.popRects || [],
+      enemies: S.enemies.filter((e) => e.alive).map((e) => ({ id: e.id, type: e.type, seen: !!e.seen, typable: canType(e), doomed: !!e.doomed, spriteTop: topEdge(e), x: e.x, hw: e.hw, delay: e.delay })) };
+  };
   /* test hook (read-only snapshot used by the Playwright bot) */
   window.__SS_STATE = function () {
     if (!S) return null;
     return { mode: S.mode, sector: S.sector, wave: S.wave, shield: S.shield, hull: S.hull, lock: S.lockT ? S.lockT.id : null, pace: S.pace, boss: S.boss ? { hp: 1 - S.boss.typed / S.boss.totalLetters, name: S.boss.name } : null, fxCount: SS.fx.count(),
-      enemies: S.enemies.filter((e) => e.alive && !e.doomed).map((e) => ({ id: e.id, type: e.type, text: e.typer.text, next: e.typer.nextReq(), pos: e.typer.pos, y: Math.round(e.y), x: Math.round(e.x), danger: e.danger, ok: e.targetable && e.delay <= 0 && e.chy > (S.F ? S.F.top + 20 : 20), locked: e.locked, keep: !!e.keepProgress })) };
+      enemies: S.enemies.filter((e) => e.alive && !e.doomed).map((e) => ({ id: e.id, type: e.type, text: e.typer.text, next: e.typer.nextReq(), pos: e.typer.pos, y: Math.round(e.y), x: Math.round(e.x), danger: e.danger, ok: canType(e), seen: !!e.seen, locked: e.locked, keep: !!e.keepProgress })) };
   };
 })();

@@ -8,6 +8,10 @@
   const ALL_COLORS = HERO_COLORS;
   const LEVELS = 5;
   const GRAV = 2600;
+  const PACE_ON = new URLSearchParams(location.search).get('pace') !== '0';   // ?pace=0 turns adaptive pacing off (for comparisons)
+  const LOOKAHEAD = PACE_ON ? 1250 : 2300;      // how far ahead of the hero a word can be typed (px)
+  const MIN_PACE = 0.55;        // slow typists: hero eases off slightly instead of arriving early and waiting
+  const MAX_PACE = 2.0;        // top run-speed multiplier when the player has typed ahead
   const clamp = U.clamp;
   const ease = U.ease;
 
@@ -43,7 +47,11 @@
       heroCol: URLQ.get('hero') && ALL_COLORS.includes(URLQ.get('hero')) ? URLQ.get('hero') : HERO_COLORS[Math.floor(Math.random() * HERO_COLORS.length)],
       t: 0, parts: [], phase: 'play', phaseT: 0, banner: null, cam: { x: 0, y: 0, ty: 0 }, fade: 1, proj: { z: 1, gl: 800, vx: 0, vy: 0, sc: 1, anchor: 520 },
       coinsAll: 0, coinTotAll: 0, starsAll: 0, levelStars: [], lvl: null, bot: new TM.Bot(7.5), botJit: 0, runT: 0, shakeX: 0,
+      toast: null, chipRects: [], dbgOverlap: 0,
+      pc: { speed: 1, ts: 1, cpc: 0.4, react: 0.8, lastKeyT: -9, lastDoneT: 0, snap: 0, snapX: 0, snapY: 0, lead: 0, tw: 0, bt: false },
     };
+    // every popup (ours and the framework's) goes through one small, non-stacking toast in a safe zone
+    g.fx.pop = (x, y, str, o) => toast(str, o || {});
     loadLevel(g, S.li, true);
   }
 
@@ -58,7 +66,7 @@
     S.lvl = { keys: 0, bad: 0, lost: 0, coins: 0 };
     S.phase = 'play'; S.phaseT = 0; S.fade = first ? 0 : 1;
     S.banner = { t: 0, text: 'Level ' + (li + 1), sub: L.biome.name };
-    S.anyKey = false;
+    S.anyKey = false; S.toast = null; if (S.pc) { S.pc.speed = 1; S.pc.ts = 1; S.pc.lastDoneT = S.runT; S.pc.lastKeyT = -9; }
     if (!first && GG && GG.state === 'play' && !g.demo) TM.audio.startMusic(songs[L.biome.music % songs.length]);
     WJ.preloadSounds();
   }
@@ -99,6 +107,29 @@
     if (c.kind !== 'coin') { const v = w2v(c.x, c.y - 30); g.fx.pop(v.x, v.y, '+' + 10 * val, { color: '#FFD93D', size: 44, life: 0.8 }); }
   }
 
+  /* ---- popups: ONE small toast, parked in the safe zone left of the hero (words only ever live ahead/right of him) ---- */
+  function toast(str, o) {
+    const prio = o.prio != null ? o.prio : /COMBO|Bonk|Splash|Checkpoint|heart/.test(str) ? 3 : /Speedy/.test(str) ? 2 : /^\+\d/.test(str) && o.size < 50 ? 0 : 1;
+    const cur = S.toast;
+    if (cur && prio < cur.prio && cur.t < cur.life * 0.7) return;   // never stack: a more important message wins, small ones are dropped
+    S.toast = { str, color: o.color || '#FFD93D', size: Math.min(o.size || 40, /COMBO/.test(str) ? 54 : 44), t: 0, life: Math.min(o.life || 0.9, 1.1), prio };
+  }
+  function drawToast(ctx, v) {
+    const T = S.toast; if (!T || S.phase !== 'play') return;
+    const h = S.hero, hv = w2v(h.x, h.surfY), k = T.t / T.life;
+    const w = T.str.length * T.size * 0.56 + 30, hh = T.size + 20;
+    let cx = Math.max(v.x + w / 2 + 20, hv.x - 120 - w / 2), cy = hv.y - 230;
+    for (let tries = 0; tries < 5; tries++) { // belt and braces: slide away from any word chip
+      const r = { x: cx - w / 2, y: cy - hh / 2, w, h: hh };
+      if (!S.chipRects.some((c) => r.x < c.x + c.w && r.x + r.w > c.x && r.y < c.y + c.h && r.y + r.h > c.y)) break;
+      S.dbgOverlap++; cy += 90; if (tries === 4) return;
+    }
+    const s = k < 0.18 ? ease.outBack(k / 0.18) : 1;
+    ctx.save(); ctx.globalAlpha = k > 0.7 ? 1 - (k - 0.7) / 0.3 : 1; ctx.translate(cx, cy - k * 30); ctx.scale(s, s);
+    D.text(ctx, T.str, 0, 0, { size: T.size, color: T.color, outline: 8 });
+    ctx.restore();
+  }
+
   /* ============================================================ obstacle logic */
   function nextOb() { const o = S.L.obs; while (S.oi < o.length && (o[S.oi].status === 'cleared' || o[S.oi].status === 'skipped')) S.oi++; return o[S.oi] || null; }
 
@@ -107,19 +138,22 @@
     for (let i = S.oi; i < obs.length; i++) {
       const o = obs[i];
       if (!o.item || o.status !== 'todo') continue;
-      if (o.launchX - h.x > 2300) return null;
+      if (o.launchX - h.x > LOOKAHEAD) return null;
       return o;
     }
     return null;
   }
   function targetsTwo() {
     const h = S.hero, obs = S.L.obs; const r = [];
-    for (let i = S.oi; i < obs.length && r.length < 2; i++) { const o = obs[i]; if (o.item && o.status === 'todo' && o.launchX - h.x < 2600) r.push(o); }
+    for (let i = S.oi; i < obs.length && r.length < 2; i++) { const o = obs[i]; if (o.item && o.status === 'todo' && o.launchX - h.x < LOOKAHEAD + 300) r.push(o); }
     return r;
   }
 
   function completeWord(g, ob) {
     ob.status = 'ready'; ob.readyT = S.t;
+    const pc = S.pc; pc.lastDoneT = S.runT;
+    if (pc.ts < 0.8 && !g.demo) { pc.snap = 0.45; TM.sfx.whoosh(); }   // bullet time ends: snap back to full speed with a whoosh
+    pc.ts = 1;
     const h = S.hero, early = (ob.launchX - h.x) > speedFor(g, S.li) * 0.9 && h.st === 'run';
     const a = chipPos(ob), bonus = early ? 1.5 : 1;
     g.wordDone(ob.typer, a.x, a.y, { bonus, color: C.jumper });
@@ -135,8 +169,14 @@
     const h = S.hero;
     if (h.st === 'fall' || h.st === 'bonk' || h.st === 'dead' || h.st === 'respawn') return;
     const t = targetOb(); if (!t) return;
+    const pos0 = t.typer.pos, pc = S.pc;
     const r = t.typer.feed(k);
     g.keyResult(r);
+    if (r !== 'miss') { // rolling estimate of this player's typing speed
+      if (pos0 === 0) pc.react += (clamp(S.runT - pc.lastDoneT, 0.12, 3) - pc.react) * 0.3;
+      else { const iv = S.runT - pc.lastKeyT; if (iv < 2) pc.cpc = clamp(pc.cpc + (iv - pc.cpc) * 0.25, 0.07, 1.2); }
+      pc.lastKeyT = S.runT;
+    }
     S.lvl.keys++; if (r === 'miss') S.lvl.bad++;
     if (r === 'done') completeWord(g, t);
   }
@@ -303,13 +343,55 @@
   }
 
   /* ============================================================ update */
+  /* ---------- adaptive pacing: run faster when the player has typed ahead, bullet-time near the word being typed ---------- */
+  function frontier() { // first word the player has not finished yet
+    const o = S.L.obs;
+    for (let i = S.oi; i < o.length; i++) if (o[i].item && o[i].status === 'todo') return o[i];
+    return null;
+  }
+  function remainingTime(o) { // estimated seconds the player still needs for this word
+    const t = o.typer, pc = S.pc;
+    if (!o.req) o.req = t.chars.filter((c) => !c.opt).length || 1;
+    const left = Math.max(0, o.req - t.typedReq);
+    return left * pc.cpc + (t.pos === 0 ? pc.react : 0);
+  }
+  const smooth = (x) => { x = clamp(x, 0, 1); return x * x * (3 - 2 * x); };
+  function pacing(g, rdt) {
+    const pc = S.pc, h = S.hero;
+    let spT = 1, tsT = 1;
+    const live = PACE_ON && !g.demo && g.state === 'play' && S.phase === 'play' && h.st !== 'fall' && h.st !== 'bonk' && h.st !== 'dead' && h.st !== 'celebrate';
+    if (live) {
+      const o = frontier(), v = speedFor(g, S.li);
+      if (o) {
+        const D = Math.max(0, o.launchX - h.x), tw = remainingTime(o);
+        pc.lead = D; pc.tw = tw;
+        // M = how fast the hero must move (in units of base speed) to reach the word exactly as the player finishes it
+        const M = D / (v * Math.max(tw, 0.3) * 1.05);
+        spT = clamp(M, MIN_PACE, MAX_PACE);                    // typed ahead -> run faster (up to 2x); slow typist -> ease off a little
+        if (!o.req) o.req = o.typer.chars.filter((c) => !c.opt).length || 1;
+        const Z = clamp(v * 1.2 + o.req * 18, 380, 900);   // longer words get a longer slow-mo run-up
+        if (D < Z && !o.optional)                              // last stretch before the word: bullet time, as strong as this player needs (>= 0.25x)
+          tsT = 1 - (1 - clamp(M / MIN_PACE, 0.25, 1)) * smooth(1.25 * (1 - D / Z));
+      } else pc.lead = 0;
+    }
+    pc.speed += (spT - pc.speed) * (1 - Math.exp(-rdt * (spT > pc.speed ? 2.2 : 4)));
+    if (tsT < pc.ts) pc.ts += (tsT - pc.ts) * (1 - Math.exp(-rdt * 7)); else pc.ts = Math.min(tsT, pc.ts + rdt * 4);
+    if (TM.settings.reduceMotion) pc.ts = Math.max(pc.ts, 0.5);
+    if (pc.snap > 0) pc.snap -= rdt;
+    if (pc.ts < 0.7 && !pc.bt) { pc.bt = true; WJ.sound('forceField_001', 0.25); } else if (pc.ts > 0.9) pc.bt = false;
+  }
+
   function update(g, dt) {
     if (!S) return;
     const L = S.L, h = S.hero, v = speedFor(g, S.li);
+    const rdt = dt;                      // real time (UI, timers that must stay forgiving)
     S.runT += dt;
     // banner & fade
     if (S.banner) { S.banner.t += dt; if (S.banner.t > 2.6) S.banner = null; }
+    if (S.toast) { S.toast.t += dt; if (S.toast.t > S.toast.life) S.toast = null; }
     if (S.fade > 0 && S.phase !== 'fadeout') S.fade = Math.max(0, S.fade - dt * 2.2);
+    pacing(g, rdt);
+    dt *= S.pc.ts;                       // world time (bullet time)
     // particles always
     updateParts(dt);
     if (g.state === 'countdown') { camFollow(g, dt, true); h.walkT += dt; return; }
@@ -352,7 +434,7 @@
     }
     for (const o of L.obs) { if (o.bump > 0) o.bump = Math.max(0, o.bump - dt * 4); if (o.sprT > 0) o.sprT = Math.max(0, o.sprT - dt); }
 
-    stepHero(g, dt, v);
+    stepHero(g, dt, v, rdt);
     // coins
     const hy = h.y - 62;
     for (const c of L.coins) {
@@ -365,17 +447,17 @@
     for (const f of L.flags) if (f.hit && f.t != null) f.t += dt;
     // trail at high combo
     if (!g.demo && g.score.mult >= 2 && h.st !== 'idle') { h.trail -= dt; if (h.trail <= 0) { h.trail = 0.05; emit('star', h.x - 30, h.y - 50 + (Math.random() - 0.5) * 50, -90, 10, 0.5, 8 + Math.random() * 6, g.score.mult >= 3 ? '#FF8FC8' : '#FFD93D', { g: 0 }); } }
-    camFollow(g, dt);
-    if (S.camSnap > 0) S.camSnap -= dt;
+    camFollow(g, rdt);
+    if (S.camSnap > 0) S.camSnap -= rdt;
   }
 
-  function stepHero(g, dt, v) {
-    const h = S.hero, L = S.L;
+  function stepHero(g, dt, v, rdt) {
+    const h = S.hero, L = S.L, sp = S.pc.speed;
     switch (h.st) {
       case 'idle': h.st = 'run'; break;
       case 'run': {
-        h.x += v * dt; h.walkT += dt * v / 260; h.y = h.surfY;
-        h.dust -= dt; if (h.dust <= 0) { h.dust = 0.16; dustPuff(h.x - 24, h.y, 1, 60); }
+        h.x += v * sp * dt; h.walkT += dt * v * sp / 260; h.y = h.surfY;
+        h.dust -= dt; if (h.dust <= 0) { h.dust = 0.16 / sp; dustPuff(h.x - 24, h.y, sp > 1.3 ? 2 : 1, 60 + sp * 40); }
         if (h.x >= L.goalX && !S.L.done) { S.L.done = true; levelDone(g); return; }
         const ob = nextOb();
         if (ob && h.x >= ob.launchX) {
@@ -383,21 +465,21 @@
           if (ob.status === 'ready') { execute(g, ob); break; }
           if (ob.optional) { ob.status = 'skipped'; break; }
           if (ob.type === 'mplatOut') break;
-          h.x = ob.launchX; h.st = 'teeter'; h.teeterT = 0; h.ob = ob; S.teeterOb = ob;
+          h.x = ob.launchX; h.st = 'teeter'; h.teeterT = 0; h.teeterR = 0; h.ob = ob; S.teeterOb = ob;
         }
         break;
       }
       case 'teeter': {
-        const ob = h.ob; h.teeterT += dt; h.walkT = 0;
+        const ob = h.ob; h.teeterT += dt; h.teeterR = (h.teeterR || 0) + rdt; h.walkT = 0;
         if (ob.status === 'ready') { h.st = 'run'; execute(g, ob); break; }
         const len = ob.item ? ob.item.len : 5;
         const grace = (g.diff === 'gentle' ? 7 : g.diff === 'turbo' ? 3 : 4.5) + len * (g.diff === 'gentle' ? 1.0 : g.diff === 'turbo' ? 0.4 : 0.7);
         if (g.demo) { if (h.teeterT > 9) failOb(g, ob); break; }
-        if (h.teeterT > grace) failOb(g, ob);
+        if (h.teeterR > grace) failOb(g, ob);   // grace is real time, not slowed by bullet time
         break;
       }
       case 'arc': {
-        const l = h.leg; l.t += dt;
+        const l = h.leg; l.t += dt * (l.mpLand || l.respawn || l.drop ? 1 : 1 + Math.max(0, sp - 1) * 0.7);   // jumps are a bit quicker while catching up (not onto moving platforms: those are timed)
         const t = Math.min(l.t, l.T), p = WJ.arcPos(l, t); h.x = p.x; h.y = p.y;
         const f = t / l.T;
         const vy = -l.vy + l.g * t; h.avy = vy;
@@ -622,7 +704,7 @@
     const h = S.hero, col = S.heroCol, t = S.t, P = col + '_';
     let key = P + 'stand', rot = h.rot, sx = 1 - h.sq * 0.28, sy = 1 + h.sq * 0.36, ox = 0, oy = 0;
     switch (h.st) {
-      case 'run': key = P + (Math.floor(h.walkT * 3) % 2 ? 'walk2' : 'walk1'); oy = -Math.abs(Math.sin(h.walkT * 6)) * 8; rot = 0.07; break;
+      case 'run': key = P + (Math.floor(h.walkT * 3) % 2 ? 'walk2' : 'walk1'); oy = -Math.abs(Math.sin(h.walkT * 6)) * 8; rot = 0.07 + (S.pc.speed - 1) * 0.12; break;
       case 'teeter': key = P + 'skid'; rot = -0.08 + Math.sin(h.teeterT * 9) * 0.07; ox = Math.sin(h.teeterT * 9) * 3; break;
       case 'arc': key = P + ((h.avy || 0) > 120 ? 'fall' : 'jump'); if (h.leg && h.leg.bounce) key = P + 'cheer1'; break;
       case 'dash': key = P + 'kick'; break;
@@ -641,7 +723,7 @@
     WJ.hspr(ctx, key, 0, 84, HS);
     ctx.restore(); ctx.globalAlpha = 1;
     if (h.st === 'teeter' && h.teeterT > 0.35) { // "!" bubble
-      const bx = h.x + 20, by = h.y - 150 + Math.sin(h.teeterT * 8) * 4;
+      const bx = h.x - 72, by = h.y - 120 + Math.sin(h.teeterT * 8) * 4;
       D.text(ctx, '!', bx, by, { size: 60, color: '#FF5A5F', outline: 10 });
     }
   }
@@ -687,9 +769,11 @@
     { const yy = gl - cam.y + 70, sh = ctx.createLinearGradient(0, yy, 0, view.h); sh.addColorStop(0, 'rgba(31,26,61,0)'); sh.addColorStop(1, 'rgba(31,26,61,0.2)'); ctx.fillStyle = sh; ctx.fillRect(0, yy, view.w, view.h - yy); }
     ctx.restore();
     // ---- screen-space overlays ----
+    drawPaceFx(ctx, g, v, gl, z);
     g.fx.draw(ctx);
     if (!g.demo && (g.state === 'play' || g.state === 'countdown' || g.state === 'over')) drawChips(g, ctx, v, tgt);
     if (!g.demo && g.state !== 'title') drawHudExtras(g, ctx, v);
+    if (!g.demo) drawToast(ctx, v);
     if (S.banner && !g.demo) drawBanner(ctx, v);
     if (S.phase === 'rating') drawRating(g, ctx, v);
     if (g.demo) { // attract-mode vignette-free dim for the title card
@@ -698,24 +782,63 @@
     if (S.fade > 0) { ctx.fillStyle = 'rgba(31,26,61,' + clamp(S.fade, 0, 1) + ')'; ctx.fillRect(v.x - 10, v.y - 10, v.w + 20, v.h + 20); }
   }
 
+  /* speed lines when the hero is catching up; blue bullet-time vignette while a word is being typed; whoosh burst on snap-back */
+  const hash = (n) => { const x = Math.sin(n * 127.1 + 311.7) * 43758.5453; return x - Math.floor(x); };
+  function drawPaceFx(ctx, g, v, gl, z) {
+    const pc = S.pc; if (g.demo) return;
+    const sp = pc.speed, cam = S.cam;
+    const gy = v.y + (gl - cam.y) * z;
+    if (sp > 1.06 && !TM.settings.reduceMotion) {
+      const a = clamp((sp - 1.06) / 0.9, 0, 1), span = v.w + 500;
+      ctx.save(); ctx.lineCap = 'round'; ctx.strokeStyle = '#fff';
+      for (let i = 0; i < 18; i++) {
+        const r1 = hash(i), r2 = hash(i + 50), r3 = hash(i + 99);
+        const len = (120 + r2 * 220) * (0.6 + sp * 0.4), x = v.x + v.w + 200 - ((g.t * (900 + r1 * 900) * sp + r3 * span) % span);
+        const y = gy - 120 - 300 * r2 + 440 * r1 * 0.55;
+        ctx.globalAlpha = a * (0.16 + 0.26 * r3); ctx.lineWidth = 3 + r1 * 4;
+        ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x + len, y); ctx.stroke();
+      }
+      ctx.restore();
+    }
+    const bt = clamp((1 - pc.ts) / 0.7, 0, 1);
+    if (bt > 0.02) {
+      const cx = v.x + v.w / 2, cy = v.y + v.h / 2, R = Math.hypot(v.w, v.h) / 2;
+      const gr = ctx.createRadialGradient(cx, cy, R * 0.30, cx, cy, R);
+      gr.addColorStop(0, 'rgba(40,110,255,0)'); gr.addColorStop(1, 'rgba(18,40,150,' + (0.8 * bt) + ')');
+      ctx.fillStyle = gr; ctx.fillRect(v.x, v.y, v.w, v.h);
+      ctx.fillStyle = 'rgba(90,160,255,' + (0.14 * bt) + ')'; ctx.fillRect(v.x, v.y, v.w, v.h);
+    }
+    if (pc.snap > 0) { // whoosh: rays burst outward from the hero
+      const k = 1 - pc.snap / 0.45, hv = w2v(S.hero.x, S.hero.y - 60);
+      ctx.save(); ctx.strokeStyle = '#fff'; ctx.lineCap = 'round'; ctx.lineWidth = 6 * (1 - k);
+      ctx.globalAlpha = 0.7 * (1 - k);
+      for (let i = 0; i < 14; i++) { const an = i / 14 * 6.283 + 0.2, r0 = 120 + k * 320, r1 = r0 + 90 + k * 140; ctx.beginPath(); ctx.moveTo(hv.x + Math.cos(an) * r0, hv.y + Math.sin(an) * r0 * 0.7); ctx.lineTo(hv.x + Math.cos(an) * r1, hv.y + Math.sin(an) * r1 * 0.7); ctx.stroke(); }
+      ctx.restore();
+    }
+  }
+
   function drawChips(g, ctx, v, tgt) {
     if (S.phase !== 'play') return;
     const list = targetsTwo(); if (!list.length) return;
     const showHint = (o) => g.hint || (o.fails > 0);
-    for (let i = list.length - 1; i >= 0; i--) {
-      const o = list[i], isT = o === tgt; if (!isT && i > 0 && false) continue;
+    S.chipRects.length = 0;
+    const L2 = [];
+    for (let i = 0; i < list.length; i++) { // pass 1: layout (target first so the preview chip yields to it)
+      const o = list[i], isT = o === tgt;
       const long = o.item.len > 15;
       const size = long ? 38 : (isT ? 56 : 46);
       const sz = D.chipSize(ctx, o.typer, size);
       const a = o.def ? { x: o.px, y: o.anchorY } : { x: o.x, y: o.anchorY == null ? -240 : o.anchorY };
       const p = w2v(a.x, a.y);
-      const sc = window.innerWidth / v.w, topMin = v.y + 215 / sc;
-      let cx = clamp(p.x, v.x + sz.w / 2 * (isT ? 1.08 : 0.8) + 30, v.x + v.w - sz.w / 2 * (isT ? 1.08 : 0.8) - 30);
-      let cy = Math.max(p.y, topMin) - (isT ? 0 : 20) - (isT ? 0 : 56);
-      if (!isT) { // keep the second chip from sitting on the first
-        const first = list[0], pa = w2v(first.def ? first.px : first.x, first.anchorY == null ? -240 : first.anchorY);
-        if (Math.abs(pa.x - p.x) < 520) cy -= 20;
-      }
+      const sc = window.innerWidth / v.w, topMin = v.y + 215 / sc, sk = isT ? 1.08 : 0.8;
+      const cx = clamp(p.x, v.x + sz.w / 2 * sk + 30, v.x + v.w - sz.w / 2 * sk - 30);
+      let cy = Math.max(p.y, topMin) - (isT ? 0 : 76);
+      const r = { cx, cy, w: sz.w * sk, h: sz.h * sk + (isT ? 30 : 0), isT, o, size, sz, p };
+      if (!isT) for (const q of L2) for (let n = 0; n < 4 && Math.abs(r.cx - q.cx) < (r.w + q.w) / 2 + 12 && Math.abs(r.cy - q.cy) < (r.h + q.h) / 2 + 6; n++) r.cy = q.cy - (r.h + q.h) / 2 - 8;
+      L2.push(r); S.chipRects.push({ x: r.cx - r.w / 2, y: r.cy - r.h / 2, w: r.w, h: r.h });
+    }
+    for (let i = L2.length - 1; i >= 0; i--) { // pass 2: draw, preview first, target on top
+      const { cx, cy, isT, o, size, sz, p } = L2[i];
       const off = p.x > v.x + v.w - 30 || p.x < v.x + 30;
       D.chip(ctx, cx, cy, o.typer, { size, accent: C.jumper, locked: isT && o.typer.pos > 0, alpha: isT ? 1 : 0.92, dim: !isT, scale: isT ? 1 : 0.8, hint: isT && showHint(o) });
       if (isT) { // pointer toward the obstacle
@@ -740,10 +863,13 @@
   }
 
   function drawBanner(ctx, v) {
-    const k = S.banner.t, a = k < 0.3 ? k / 0.3 : k > 2.2 ? 1 - (k - 2.2) / 0.4 : 1, s = k < 0.3 ? ease.outBack(k / 0.3) : 1;
-    ctx.save(); ctx.globalAlpha = Math.max(0, a); ctx.translate(W / 2, v.y + v.h * 0.3); ctx.scale(s, s);
-    D.text(ctx, S.banner.text, 0, 0, { size: 130, color: S.L.biome.accent, outline: 20 });
-    D.text(ctx, S.banner.sub, 0, 100, { size: 62, color: '#fff', outline: 14 });
+    const k = S.banner.t, a = k < 0.3 ? k / 0.3 : k > 2.2 ? 1 - (k - 2.2) / 0.4 : 1, sc = k < 0.3 ? ease.outBack(k / 0.3) : 1;
+    const hv = w2v(S.hero.x, S.hero.surfY), avail = hv.x - 110 - (v.x + 36), est = Math.max(S.banner.text.length * 74 * 0.56, S.banner.sub.length * 36 * 0.56);
+    const fit = Math.min(1, avail / est);
+    { const r = { x: v.x + 36, y: v.y + 240, w: est * fit, h: 130 }; if (S.chipRects.some((c) => r.x < c.x + c.w && r.x + r.w > c.x && r.y < c.y + c.h && r.y + r.h > c.y)) S.dbgOverlap++; }
+    ctx.save(); ctx.globalAlpha = Math.max(0, a); ctx.translate(v.x + 36, v.y + 300); ctx.scale(sc * fit, sc * fit);
+    D.text(ctx, S.banner.text, 0, 0, { size: 74, color: S.L.biome.accent, outline: 13, align: 'left' });
+    D.text(ctx, S.banner.sub, 0, 58, { size: 36, color: '#fff', outline: 9, align: 'left' });
     ctx.restore();
   }
 
@@ -799,6 +925,7 @@
     howto: [
       'Your hero runs through side-scrolling levels all by themself.',
       'Every <b>gap, enemy, crate and spring</b> has a <b>word</b> on it. Type the word and the hero jumps, stomps or smashes it!',
+      'Type ahead and the hero <b>speeds up</b> to catch up. Near a word, time <b>slows down</b> (bullet time) so you can finish typing it, then <b>whoosh</b> - back to full speed!',
       'Type early for <b>Speedy!</b> bonus points. If you wait too long at the edge, you fall and go back to the last <b>flag</b> and lose a heart.',
       'Collect <b>coins, gems and stars</b>. Hit the <b>? blocks</b> for bonus coins (they are optional!).',
       'Beat the big boss at the end of each of the 5 worlds. Earn up to 3 stars per level!',

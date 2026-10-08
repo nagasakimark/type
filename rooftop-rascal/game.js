@@ -27,7 +27,7 @@
   function runParam() { const q = parseInt(TM.U.qs('run'), 10); return q >= 1 && q <= 30 ? q : 0; }
 
   function reset(g) {
-    G = g;
+    G = g; TOAST.life = 0; TOAST.t = 9;
     const qp = runParam();
     const run = g.demo ? (qp || (demoRun++ % 5) + 1) : (qp || pendingRun);
     S = {
@@ -63,6 +63,7 @@
   const chaseRate = (g) => (g.diff === 'gentle' ? 0.5 : g.diff === 'turbo' ? 0.75 : 0.62);
   const dMaxEff = () => DMAX;
   let CS = 1;
+  const TOP_Y = 178; // top safe zone for toasts / banners (chips live below y=310)
   let ZB = 1.32; // base zoom so Rascal reads big; grows a little on tall/narrow windows
   function toScreen(wx, wy) { // world -> virtual screen (after zoom)
     const c = S.cam, px = ANCHOR, py = S.gsy, zz = c.z * ZB;
@@ -70,7 +71,29 @@
     return [px + (sx - px) * zz, py + (sy - py) * zz];
   }
   const feetS = () => toScreen(S.rx, S.ry);
-  function say(g, str, color, size) { if (g.demo) return; const p = toScreen(S.rx + 40, S.ry - 230); g.fx.pop(clamp(p[0], 200, 1700), clamp(p[1] - 60, 240, 800), str, { color: color || C.gold, size: size || 58, life: 0.9 }); }
+  /* One-slot toast: every pop-up message goes here. Top safe zone, small, short, new replaces old. */
+  const TOAST = { str: '', color: '#fff', t: 9, life: 0, size: 48 };
+  const PEND = { pts: '', combo: '', at: -9 };
+  const nowS = () => performance.now() / 1000;
+  function toast(str, color, size, life) {
+    const n = nowS();
+    if (n - PEND.at < 0.12) { if (PEND.pts && str.indexOf(PEND.pts) < 0) str += '  ' + PEND.pts; if (PEND.combo && str.indexOf(PEND.combo) < 0) str += '  ' + PEND.combo; }
+    Object.assign(TOAST, { str, color: color || C.gold, t: 0, life: Math.min(life || 0.9, 1.1), size: Math.min(size || 48, 52) });
+  }
+  TM.FX.prototype.pop = function (x, y, str, o = {}) {
+    if (!G || G.demo) return;
+    if (/^\+\d/.test(str)) { PEND.pts = str; PEND.combo = ''; PEND.at = nowS(); if (TOAST.t > 0.35 || TOAST.life === 0) toast(str, o.color, 38, 0.7); return; }
+    if (/^COMBO/.test(str)) { PEND.combo = str; PEND.at = nowS(); toast(str, o.color, 48, 1.0); return; }
+    toast(str, o.color, Math.min(o.size || 48, 52), Math.min(o.life || 0.9, 1.1));
+  };
+  function say(g, str, color) { if (g.demo) return; toast(str, color || C.gold, 50, 0.9); }
+  function drawToast(ctx) {
+    if (TOAST.t >= TOAST.life || S.banner.t < 2.4 && S.mode !== 'summary' && S.banner.t > 0) return;
+    const k = TOAST.t / TOAST.life, a = k > 0.75 ? 1 - (k - 0.75) / 0.25 : 1, pop = 1 + (1 - U.ease.outBack(clamp(TOAST.t / 0.18, 0, 1))) * 0.35;
+    ctx.save(); ctx.globalAlpha = clamp(a, 0, 1); ctx.translate(W / 2, TOP_Y); ctx.scale(pop, pop);
+    D.text(ctx, TOAST.str, 0, 0, { size: TOAST.size, color: TOAST.color, outline: Math.round(TOAST.size / 5) });
+    ctx.restore();
+  }
   const typeWord = { gap: 'Great jump!', slide: 'Smooth!', crow: 'Hop!', bounce: 'Boing!', wall: 'Nice climb!', kick: 'Wall kick!', zip: 'Zip zip!', sneak: 'So sneaky!', finale: 'YOU DID IT!' };
   const typeColor = { gap: '#FFC83D', slide: '#2BE6FF', crow: '#FF8A5C', bounce: '#FF3EA5', wall: '#8CFF6A', kick: '#FF8A3D', zip: '#7B5CFF', sneak: '#9BE59B', finale: '#FFC83D' };
   const typeIcon = { gap: '#FFC83D', slide: '#2BE6FF', crow: '#FF8A5C', bounce: '#FF3EA5', wall: '#8CFF6A', kick: '#FF8A3D', zip: '#9B7CFF', sneak: '#6FD28A', finale: '#FFC83D' };
@@ -217,7 +240,7 @@
     const inCount = g.state === 'countdown';
     if (inCount) S.pose = RR.pose.idle(S.t);
     RR.parts.update(dt);
-    S.banner.t += dt;
+    S.banner.t += dt; TOAST.t += dt;
     S.ts += (S.tsT - S.ts) * Math.min(1, dt * 5);
     const wdt = dt * S.ts;
     if (g.demo) S.bg && 0;
@@ -435,6 +458,7 @@
     T('chips', () => drawChips(g, ctx));
     T('hud', () => drawHUD(g, ctx, v));
     drawBanners(g, ctx, v);
+    drawToast(ctx);
     g.fx.draw(ctx);
   }
 
@@ -595,7 +619,7 @@
       let x = p[0], y = p[1];
       if (ob.typed) {
         // ready tag
-        if (!ob.done && S.mv !== ob) { readyPills.push([clamp(x + 200, 140, 1780), clamp(y - 130, 200, 560)]); }
+        if (!ob.done && S.mv !== ob) { readyPills.push(1); }
         shown++; continue;
       }
       const base = (act ? (ob.type === 'finale' ? 58 : 52) : 36) * CS;
@@ -605,7 +629,7 @@
       let off = false;
       if (x > rightLimit) { x = rightLimit; off = true; }
       x = Math.max(x, size.w / 2 + 40);
-      y = clamp(y, 270, 640);
+      y = clamp(y, 320, 640);
       if (!act) { y -= 0; }
       ctx.save();
       const pulse = S.mode === 'wait' && act ? 1 + Math.sin(S.t * 12) * 0.04 : 1;
@@ -621,7 +645,7 @@
       ctx.restore();
       shown++;
     }
-    for (const [x, y] of readyPills) { ctx.save(); const k = 1 + Math.sin(S.t * 8) * 0.04; ctx.translate(x, y); ctx.scale(k * 0.8, k * 0.8); D.pill(ctx, -112, -34, 224, 68, C.good, { stroke: C.ink, lw: 5 }); D.text(ctx, 'READY!', 0, 3, { size: 38, color: '#fff', outline: 7 }); ctx.restore(); }
+    if (readyPills.length) { ctx.save(); const k = 1 + Math.sin(S.t * 8) * 0.03; ctx.translate(W / 2, 236); ctx.scale(k * 0.62, k * 0.62); D.pill(ctx, -112, -34, 224, 68, C.good, { stroke: C.ink, lw: 5 }); D.text(ctx, 'READY!', 0, 3, { size: 38, color: '#fff', outline: 7 }); ctx.restore(); }
   }
 
   function drawHUD(g, ctx, v) {
@@ -631,9 +655,9 @@
     let x = 26;
     ctx.save();
     for (const [k, n, col] of items) {
-      D.pill(ctx, x, 104, 112, 46, 'rgba(31,26,61,0.82)');
-      if (k === 'gem') RR.drawGem(ctx, x + 26, 127, 0.5, 0, 0); else if (k === 'fish') RR.drawFish(ctx, x + 26, 127, 0.62, 0); else RR.drawCookie(ctx, x + 26, 127, 0.6, 0);
-      D.text(ctx, String(n), x + 78, 129, { size: 30, color: '#fff', font: D.FONT_DISPLAY(30, 800) });
+      D.pill(ctx, x, 128, 112, 46, 'rgba(31,26,61,0.82)');
+      if (k === 'gem') RR.drawGem(ctx, x + 26, 151, 0.5, 0, 0); else if (k === 'fish') RR.drawFish(ctx, x + 26, 151, 0.62, 0); else RR.drawCookie(ctx, x + 26, 151, 0.6, 0);
+      D.text(ctx, String(n), x + 78, 153, { size: 30, color: '#fff', font: D.FONT_DISPLAY(30, 800) });
       x += 124;
     }
     ctx.restore();
@@ -665,12 +689,11 @@
   }
 
   function drawBanners(g, ctx, v) {
-    if (S.banner.t < 3.2 && S.mode !== 'summary' && !g.demo) {
-      const k = S.banner.t, a = k < 0.4 ? sm(k / 0.4) : k > 2.6 ? 1 - (k - 2.6) / 0.6 : 1, dist = S.dist;
-      ctx.save(); ctx.globalAlpha = clamp(a, 0, 1); ctx.translate(W / 2, 250 + (1 - sm(clamp(k / 0.5, 0, 1))) * -60);
-      D.text(ctx, 'RUN ' + S.run + (S.run > 5 ? '  ∞' : ''), 0, 0, { size: 118, color: C.rascal, outline: 20 });
-      D.text(ctx, dist.name.toUpperCase(), 0, 96, { size: 56, color: '#fff', outline: 12 });
-      D.text(ctx, dist.time + ' · ' + dist.blurb, 0, 152, { size: 32, color: '#FFE9A8', outline: 8, font: D.FONT_WORD(30, 700) });
+    if (S.banner.t < 2.4 && S.mode !== 'summary' && !g.demo) {
+      const k = S.banner.t, a = k < 0.3 ? sm(k / 0.3) : k > 1.9 ? 1 - (k - 1.9) / 0.5 : 1, dist = S.dist;
+      ctx.save(); ctx.globalAlpha = clamp(a, 0, 1); ctx.translate(W / 2, 128 + (1 - sm(clamp(k / 0.4, 0, 1))) * -40);
+      D.text(ctx, 'RUN ' + S.run + (S.run > 5 ? ' \u221E' : '') + '  \u00B7  ' + dist.name.toUpperCase(), 0, 0, { size: 58, color: C.rascal, outline: 12 });
+      D.text(ctx, dist.time + ' \u00B7 ' + dist.blurb, 0, 52, { size: 28, color: '#FFE9A8', outline: 7, font: D.FONT_WORD(28, 700) });
       ctx.restore();
     }
     if (S.mode === 'summary' && S.summary) drawSummary(g, ctx);
@@ -680,7 +703,7 @@
     const s = S.summary, k = clamp(s.t / 0.5, 0, 1), dist = S.dist;
     ctx.save(); ctx.fillStyle = `rgba(20,10,50,${0.55 * k})`; ctx.fillRect(-400, -400, W + 800, H + 800);
     ctx.translate(W / 2, H / 2 + (1 - sm(k)) * 80); ctx.globalAlpha = k;
-    const pw = 860, ph = 620;
+    const pw = 860, ph = 730;
     D.sticker(ctx, P.rr(-pw / 2, -ph / 2, pw, ph, 44), '#FFF8EC', { x: -pw / 2, y: -ph / 2, w: pw, h: ph }, { lw: 7 });
     D.text(ctx, `RUN ${S.run} COMPLETE!`, 0, -ph / 2 + 72, { size: 76, color: C.rascal, outline: 12 });
     D.text(ctx, dist.name, 0, -ph / 2 + 138, { size: 40, color: C.ink });
@@ -704,7 +727,7 @@
     const el = TM.ui.el;
     const css = document.createElement('style');
     css.textContent = `
-      .rr-panel{position:fixed;left:50%;bottom:26px;transform:translateX(-50%);z-index:12;display:flex;gap:14px;align-items:center;flex-wrap:wrap;justify-content:center;max-width:96vw;font:700 20px var(--word);color:#fff}
+      .rr-panel{position:static;display:flex;gap:12px;align-items:center;flex-wrap:wrap;justify-content:center;max-width:96vw;font:700 20px var(--word);color:#fff}
       .rr-panel.hidden{display:none}
       .rr-runs{display:flex;gap:8px;align-items:center;background:rgba(31,26,61,.78);border:4px solid var(--ink);border-radius:999px;padding:8px 14px}
       .rr-runs b{font:800 18px var(--display);margin-right:4px;opacity:.85}
@@ -721,7 +744,12 @@
       .rr-hat.lock canvas{filter:grayscale(1) brightness(.75);opacity:.7}
       .rr-hat span{display:block;font:800 18px var(--display)}
       .rr-hat small{display:block;color:#6A6590}
-      @media (max-width:700px){.rr-hats{grid-template-columns:repeat(2,1fr)}}`;
+      @media (max-width:700px){.rr-hats{grid-template-columns:repeat(2,1fr)}}
+      .tm-title .tm-press{display:none}
+      .tm-title{gap:min(22px,2.2vh);padding:60px 0 12px;box-sizing:border-box;overflow:hidden}
+      .tm-title .tm-logo{font-size:min(13vw,17vh,150px);-webkit-text-stroke-width:min(14px,1.6vh)}
+      @media (max-height:820px){.rr-run{width:40px;height:40px;font-size:20px}.rr-runs{padding:5px 12px}.rr-gems{padding:5px 14px;font-size:20px}.tm-title .tm-tagline{font-size:18px;padding:6px 18px}.tm-title .tm-btn{font-size:24px}.tm-title .tm-press{display:none}}
+      @media (max-width:760px){.rr-panel{gap:8px}.rr-runs b{display:none}}`;
     document.head.append(css);
     const panel = el('div', { class: 'rr-panel hidden' });
     const runsBox = el('div', { class: 'rr-runs' }, el('b', {}, 'START AT RUN'));
@@ -740,7 +768,7 @@
       const cx = cv.getContext('2d'); if (RR.A.ready) RR.drawGem(cx, 20, 20, 0.55, 0, 0); else setTimeout(() => { RR.A.ready && RR.drawGem(cx, 20, 20, 0.55, 0, 0); }, 800);
     }
     panel.append(runsBox, gemsBox, wardBtn);
-    document.body.append(panel);
+    const tbox = document.querySelector('.tm-title'); (tbox || document.body).append(panel);
     function wardrobe() {
       const grid = el('div', { class: 'rr-hats' });
       const card = el('div', { class: 'tm-card tm-modal' },

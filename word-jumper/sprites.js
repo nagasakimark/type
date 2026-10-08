@@ -31,6 +31,9 @@
     ctx.drawImage(IMG, r[0], r[1], w, h, -w * ax, -h * ay, w, h);
     ctx.restore();
   };
+  // hero poses (heroes.png) - character art drawn with feet at y, centred on x, scaled s
+  const HM = window.WJ_HEROES || {}, HIMG = new Image(); HIMG.src = BASE + 'heroes.png';
+  WJ.hspr = function (ctx, key, x, y, s) { const r = HM[key]; if (!r || !HIMG.complete) return; ctx.drawImage(HIMG, r[0], r[1], r[2], r[3], x - r[2] * s / 2, y - r[3] * s, r[2] * s, r[3] * s); };
   WJ.tile = function (ctx, key, x, y) {
     const r = M[key]; if (!r) return;
     ctx.drawImage(IMG, r[0], r[1], r[2], r[3], x, y, r[2] + 1, r[3] + 1);
@@ -95,7 +98,7 @@
       sky: ['#79B91F', '#A6D94E'], far: '#6FA81B', mid: '#5E9A17', near: '#4C8A12', fog: '#8CC832', clouds: false, bg: 'bg_shroom', tint: 0.18,
       decor: ['m/tinyShroom_red', 'm/tinyShroom_tan', 'm/tinyShroom_brown', 'm/bush', 'i/plant', 'i/mushroomRed', 'i/mushroomBrown', 'm/tallShroom_tan'],
       enemies: ['ladyBug', 'frog', 'spider', 'worm', 'snake', 'snail'], fliers: ['bee', 'fly', 'ladyBugFly'],
-      boss: 'spider', coin: 'i/coinGold', music: 1, ambient: 'fireflies', accent: '#FF8A1F',
+      boss: 'frog', coin: 'i/coinGold', music: 1, ambient: 'fireflies', accent: '#FF8A1F',
     },
     {
       id: 'town', name: 'Cozy Town', ground: 't/sand', plat: 't/sandHalf', liquid: 'water',
@@ -116,7 +119,7 @@
       sky: ['#9CCBFF', '#F2FBFF'], far: '#D6EAFB', mid: '#BBD9F3', near: '#A3C8EC', fog: '#EAF6FF', clouds: true, tint: 0.3,
       decor: ['ice/pineSapling', 'ice/pineSaplingAlt', 'ice/rock', 'ice/plant', 'ice/plantAlt', 'ice/snowBallBigGround', 'ice/caneRedTop', 'ice/caneGreenTop', 'ice/deadTree'],
       enemies: ['slimeBlue', 'spinnerHalf', 'snail', 'mouse', 'frog', 'worm'], fliers: ['bat', 'spinner', 'fly'],
-      boss: 'ghost', coin: 'i/coinGold', music: 4, ambient: 'snow', accent: '#35A4F0',
+      boss: 'slimeBlue', coin: 'i/coinGold', music: 4, ambient: 'snow', accent: '#35A4F0',
     },
   ];
 

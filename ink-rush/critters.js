@@ -20,6 +20,7 @@
     big: { wh: 5.6, ah: 250, spd: 1, label: 'Big Gloop' },
     mama: { wh: 6.2, ah: 270, spd: 1, label: 'Mama Splitter' },
   };
+  for (const k of ['jelly','stilt','brolly','jumper','flyer','tiny','split','glob']) INK.TYPES[k].wh *= 1.45;
   const GREYS = {
     jelly: '#9EB0C3', stilt: '#A59DC4', brolly: '#B0A7A0', jumper: '#A1B39F', flyer: '#BBA9B8', tiny: '#A5A3B8', split: '#8F8BAA', glob: '#7F7498',
     king: '#8E88A6', squid: '#8F86B6', big: '#968FAE', mama: '#9A8FA8',

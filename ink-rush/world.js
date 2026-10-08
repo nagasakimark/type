@@ -30,25 +30,25 @@
       id: 'street', name: 'Squeaky Street', tag: 'The whole street has gone grey!', stops: [6, 24, 42, 60],
       pairs: [['#FF3EA5', '#B8F03A'], ['#FF8A1F', '#2F9BFF']],
       pal: { skyT: '#B4B9D0', skyB: '#E6E8F4', skyTV: '#3FA9FF', skyBV: '#CDEFFF', outer: '#9EA2B4', outerV: '#8EDB6A', road: '#80849A', roadV: '#5C5F78', side: '#B7BACB', sideV: '#E9E6F5', far: '#A9AEC6', farV: '#8FA2E6', near: '#9499B4', nearV: '#6F7FD6' },
-      dull: ['#B9BCCB', '#C6C0CF', '#AEB7C4', '#BFC4C0'],
+      dull: ['#CBC6DE', '#D9CEC6', '#C0D2DA', '#D0D8C4'],
     },
     {
       id: 'harbour', name: 'Sunny Harbour', tag: 'The docks are drowning in grey goo!', stops: [6, 24, 42, 60],
       pairs: [['#FFB11F', '#FF3EA5'], ['#8A5CFF', '#B8F03A']],
       pal: { skyT: '#B3BDCC', skyB: '#E4E9F0', skyTV: '#2FA8F5', skyBV: '#D5F5FF', outer: '#8896AC', outerV: '#1FB3E6', road: '#9C928C', roadV: '#B97C46', side: '#B2A9A3', sideV: '#E5B77C', far: '#A0AABD', farV: '#4DB6C9', near: '#8E98AC', nearV: '#2E8FA8' },
-      dull: ['#B5B9C4', '#C2BCC0', '#A9B3BE', '#BDC1B8'],
+      dull: ['#CBC6DE', '#D9CEC6', '#C0D2DA', '#D0D8C4'],
     },
     {
       id: 'skate', name: 'Skate Plaza', tag: 'Shred it back to colour!', stops: [6, 24, 42, 60],
       pairs: [['#B8F03A', '#7B5CFF'], ['#FF4F5A', '#18C1C9']],
       pal: { skyT: '#BCB9CC', skyB: '#ECE8F2', skyTV: '#FFAA3D', skyBV: '#FFF0C4', outer: '#9AA39A', outerV: '#62C46C', road: '#8F8EA0', roadV: '#B9B4D6', side: '#B5B4C4', sideV: '#E2DFF0', far: '#AFA9C6', farV: '#E58E4C', near: '#9A94B4', nearV: '#C9684A' },
-      dull: ['#B6B4C6', '#C4BFC8', '#ABB4B8', '#BEC2B8'],
+      dull: ['#CBC6DE', '#D9CEC6', '#C0D2DA', '#D0D8C4'],
     },
     {
       id: 'roof', name: 'Rooftop Garden', tag: 'Even the plants are grumpy up here!', stops: [6, 24, 42, 60, 78],
       pairs: [['#2FE0C8', '#FF3EA5'], ['#FFD21F', '#7B5CFF']],
       pal: { skyT: '#B9B4CB', skyB: '#E8E3EC', skyTV: '#FF7BA8', skyBV: '#FFE0A6', outer: '#807F96', outerV: '#4B3F8E', road: '#8C8AA0', roadV: '#7F6BC4', side: '#B0AEC0', sideV: '#E8DDF5', far: '#9C98B4', farV: '#C25A8E', near: '#847FA0', nearV: '#8C3F86' },
-      dull: ['#B8B4C8', '#C3BDCB', '#ADB6BE', '#BCC2BA'],
+      dull: ['#CBC6DE', '#D9CEC6', '#C0D2DA', '#D0D8C4'],
     },
   ];
 
@@ -136,6 +136,7 @@
         z += d[0] * R(0.8, 1.2) + R(2, 7);
       }
     }
+    for (const p of WS.props) if (!p.paintable || p.kind === 'lamp') { p.fill = mix(def.dull[p.ci], p.vivid, 0.6); p.fill2 = mix(p.fill, '#ffffff', 0.2); p.amt = 0.6; }
     // pre-compute which props count for coverage
     for (const p of WS.props) if (p.paintable && Math.abs(p.x) < 26 && p.kind !== 'lamp') { for (const s of def.stops) if (p.wz > s + 4 && p.wz < s + 38) { p.range = true; break; } }
     WS.propN = WS.props.filter((p) => p.range).length;
@@ -242,6 +243,7 @@
     WS.skyV = { x: v.x - 2, y: v.y };
   }
   INK.drawSky = function (ctx, v, WS, amt, t) {
+    amt = 0.7 + 0.3 * amt; // the sky/skyline never starts washed out
     const key = [Math.round(amt * 16), Math.round(v.w), Math.round(v.y), Math.round(v.x)].join('|');
     if (WS.skyKey !== key) bakeSky(v, WS, Math.round(amt * 16) / 16);
     ctx.drawImage(WS.skyCv, WS.skyV.x, WS.skyV.y + (V.hz - HZ0));
@@ -256,6 +258,7 @@
     ctx.beginPath(); ctx.moveTo(INK.sx(x0, z0), INK.gy(z0)); ctx.lineTo(INK.sx(x1, z0), INK.gy(z0)); ctx.lineTo(INK.sx(x1, z1), INK.gy(z1)); ctx.lineTo(INK.sx(x0, z1), INK.gy(z1)); ctx.closePath(); ctx.fill();
   }
   INK.drawGround = function (ctx, v, WS, amt, cz, t) {
+    amt = 0.55 + 0.45 * amt; // ground starts saturated; paint adds the team colours on top
     const pal = WS.def.pal, hz = V.hz, bot = v.y + v.h + 2, L = v.x - 2, Rr = v.x + v.w + 2, id = WS.def.id;
     // outer ground (grass / water / city below)
     ctx.fillStyle = mix(pal.outer, pal.outerV, amt); ctx.fillRect(L, hz - 1, Rr - L, bot - hz + 1);

@@ -9,19 +9,17 @@
 
   // size = displayed max dimension (virtual px); flesh = cut-face colour; juice = splat colour
   WN.FRUITS = {
-    apple:      { size: 150, flesh: '#FFF3C9', juice: '#E8412E', seeds: 1 },
-    banana:     { size: 250, flesh: '#FFF6C0', juice: '#FFD83A' },
-    orange:     { size: 150, flesh: '#FFC864', juice: '#FF9A1F', ring: '#FFF1C4' },
-    lemon:      { size: 140, flesh: '#FFF59A', juice: '#FFE14D', ring: '#FFFBD0' },
-    pear:       { size: 160, flesh: '#F4F6BE', juice: '#A9DC52', seeds: 1 },
-    strawberry: { size: 140, flesh: '#FFC2C8', juice: '#FF3D55' },
-    watermelon: { size: 190, flesh: '#FF6B7A', juice: '#FF4D6A', seeds: 2 },
-    pineapple:  { size: 200, flesh: '#FFEB7A', juice: '#FFD23F' },
-    coconut:    { size: 150, flesh: '#FFFFFF', juice: '#F2EBDD' },
-    cherries:   { size: 160, flesh: '#FF9AA8', juice: '#D81E3C' },
-    grapes:     { size: 160, flesh: '#D9C2FF', juice: '#8E4BD8' },
-    avocado:    { size: 160, flesh: '#D6EB7A', juice: '#8DBE3A', seeds: 3 },
-    tomato:     { size: 140, flesh: '#FF9A8A', juice: '#EE3B2B', seeds: 1 },
+    apple:      { size: 190, flesh: '#FFF3C9', juice: '#E8412E', seeds: 1 },
+    banana:     { size: 280, flesh: '#FFF6C0', juice: '#FFD83A' },
+    orange:     { size: 190, flesh: '#FFC864', juice: '#FF9A1F', ring: '#FFF1C4' },
+    lemon:      { size: 180, flesh: '#FFF59A', juice: '#FFE14D', ring: '#FFFBD0' },
+    pear:       { size: 200, flesh: '#F4F6BE', juice: '#A9DC52', seeds: 1 },
+    strawberry: { size: 180, flesh: '#FFC2C8', juice: '#FF3D55' },
+    watermelon: { size: 210, flesh: '#FF6B7A', juice: '#FF4D6A', seeds: 2 },
+    pineapple:  { size: 240, flesh: '#FFEB7A', juice: '#FFD23F' },
+    cherries:   { size: 200, flesh: '#FF9AA8', juice: '#D81E3C' },
+    grapes:     { size: 200, flesh: '#D9C2FF', juice: '#8E4BD8' },
+    tomato:     { size: 180, flesh: '#FF9A8A', juice: '#EE3B2B', seeds: 1 },
   };
   WN.NORMAL_KINDS = Object.keys(WN.FRUITS);
   WN.SUSHI = ['sushi-egg', 'sushi-salmon', 'maki-salmon', 'maki-roe', 'maki-vegetable'];
@@ -44,7 +42,51 @@
 
   /* ---------- kind -> {img, size, flesh, juice} ---------- */
   WN.kinds = {};
+  /* brighten / recolour the flat-lit Kenney renders and add a chunky sticker outline */
+  function enhance(im, o) {
+    const pad = 9, w = im.width + pad * 2, h = im.height + pad * 2;
+    const body = mk(w, h), bx = body.getContext('2d');
+    bx.drawImage(im, pad, pad);
+    const d = bx.getImageData(0, 0, w, h), p = d.data;
+    for (let i = 0; i < p.length; i += 4) {
+      if (!p[i + 3]) continue;
+      let r = p[i], g = p[i + 1], b = p[i + 2];
+      if (o.map) { const L = (r * 0.3 + g * 0.59 + b * 0.11) / 255; [r, g, b] = o.map(L, r, g, b); }
+      const m = (r + g + b) / 3;
+      const sat = o.sat || 1.3, br = o.bright || 1.25;
+      r = (m + (r - m) * sat) * br + 14; g = (m + (g - m) * sat) * br + 14; b = (m + (b - m) * sat) * br + 14;
+      p[i] = r > 255 ? 255 : r < 0 ? 0 : r; p[i + 1] = g > 255 ? 255 : g < 0 ? 0 : g; p[i + 2] = b > 255 ? 255 : b < 0 ? 0 : b;
+    }
+    bx.putImageData(d, 0, 0);
+    if (o.after) o.after(bx, w, h);
+    // outline: dark silhouette stamped around, then the body on top, then a soft top-left highlight
+    const sil = mk(w, h), sx = sil.getContext('2d');
+    sx.drawImage(body, 0, 0); sx.globalCompositeOperation = 'source-in'; sx.fillStyle = '#1F1A3D'; sx.fillRect(0, 0, w, h);
+    const out = mk(w, h), ox = out.getContext('2d');
+    for (let i = 0; i < 16; i++) { const a = i / 16 * 6.283; ox.drawImage(sil, Math.cos(a) * 5, Math.sin(a) * 5); }
+    ox.drawImage(body, 0, 0);
+    return out;
+  }
+  function enhanceAll() {
+    const gold = (L, c) => c;
+    const E = {
+      apple: {}, banana: { sat: 1.2, bright: 1.2 }, orange: {}, lemon: { bright: 1.18 }, strawberry: {}, tomato: {}, cherries: {}, grapes: { bright: 1.3 },
+      pineapple: { bright: 1.25 }, pear: { sat: 1.1, bright: 1.35, map: (L, r, g, b) => [r * 0.55 + 150 * L + 40, g * 0.6 + 170 * L + 40, b * 0.5 + 30] },
+      // dark-brown avocado skin -> glossy green with a pale-gold top
+      avocado: { sat: 1, bright: 1, map: (L) => [40 + L * 330, 90 + L * 560, 30 + L * 190],
+        after: (x, w, h) => { x.globalCompositeOperation = 'source-atop'; const g = x.createRadialGradient(w * 0.38, h * 0.3, 4, w * 0.5, h * 0.5, w * 0.7); g.addColorStop(0, 'rgba(255,255,220,0.55)'); g.addColorStop(0.5, 'rgba(255,255,255,0)'); x.fillStyle = g; x.fillRect(0, 0, w, h); x.globalCompositeOperation = 'source-over'; } },
+      // flat green ball -> striped watermelon with a gloss
+      watermelon: { sat: 1.25, bright: 1.15,
+        after: (x, w, h) => {
+          x.globalCompositeOperation = 'source-atop'; x.fillStyle = 'rgba(14,90,40,0.55)';
+          for (let i = -3; i <= 3; i++) { const cx = w / 2 + i * w * 0.14; x.beginPath(); x.moveTo(cx - 9, 0); x.quadraticCurveTo(cx + i * 16, h / 2, cx - 9, h); x.lineTo(cx + 3, h); x.quadraticCurveTo(cx + i * 16 + 14, h / 2, cx + 3, 0); x.closePath(); x.fill(); }
+          const g = x.createRadialGradient(w * 0.36, h * 0.3, 4, w * 0.5, h * 0.5, w * 0.62); g.addColorStop(0, 'rgba(255,255,255,0.45)'); g.addColorStop(0.5, 'rgba(255,255,255,0)'); x.fillStyle = g; x.fillRect(0, 0, w, h); x.globalCompositeOperation = 'source-over';
+        } },
+    };
+    for (const k of WN.NORMAL_KINDS) if (imgs[k]) imgs[k] = enhance(imgs[k], E[k] || {});
+  }
   function bakeSpecials() {
+    enhanceAll();
     for (const k of WN.NORMAL_KINDS) WN.kinds[k] = Object.assign({ name: k, img: imgs[k] }, WN.FRUITS[k]);
     WN.kinds.bossmelon = { name: 'bossmelon', img: imgs.watermelon, size: 450, flesh: '#FF5C6E', juice: '#FF4D6A', seeds: 2, fleshW: 84 };
     // golden banana: gold tint + sparkle ring baked

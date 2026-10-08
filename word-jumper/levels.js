@@ -109,8 +109,8 @@
       leadRun(it);
       const kinds = air ? B.fliers : B.enemies, kind = kinds[rr(R, 0, kinds.length - 1)], def = WJ.ENEMIES[kind];
       const lx = cx, ex = cx + 1.85 * TS, fh = air ? (1.5 + R() * 0.8) * TS : 0;
-      const h = WJ.size('e/' + def.f[0]).h * (o.index === 0 ? 1.15 : 1.1);
-      mkOb('enemy', it, { x: ex, launchX: lx, kind, def, air: !!air, fh, eh: h, sc: 1.1, phase: R() * 6, anchorY: cy - fh - h - 150, bounce: true });
+      const h = WJ.size('e/' + def.f[0]).h * 1.35;
+      mkOb('enemy', it, { x: ex, launchX: lx, kind, def, air: !!air, fh, eh: h, sc: 1.35, phase: R() * 6, anchorY: cy - fh - h - 150, bounce: true });
       run(4); // ground under the stomp + landing
       L.obs[L.obs.length - 1].landX = ex + 1.7 * TS;
     }
@@ -177,6 +177,10 @@
       { n: 'ride', w: [0, 0, 3, 3, 3], f: () => mplat(item(), item(), rr(R, 8, 9)) },
       { n: 'mixed', w: [1, 2, 3, 3, 3], f: () => { hop(item(), 1); gap(item(), 4); enemy(item(), R() < 0.5); } },
       { n: 'dblgap', w: [2, 2, 2, 2, 3], f: () => { gap(item(), 4); gap(item(), 4); } },
+      { n: 'hill', w: [2, 3, 3, 3, 3], f: () => { hop(item(), 2); hop(item(), 1); drop(3); } },
+      { n: 'plateau', w: [0, 2, 3, 3, 3], f: () => { hop(item(), 2); enemy(item()); gap(item(), 4); drop(2); } },
+      { n: 'valley', w: [1, 2, 2, 2, 2], f: () => { drop(2); enemy(item(), R() < 0.4); hop(item(), 2); } },
+      { n: 'ridge', w: [0, 2, 2, 3, 3], f: () => { hop(item(), 1); hop(item(), 2); gap(item(), 4); drop(3); } },
       { n: 'qspring', w: [0, 0, 2, 3, 3], f: () => { qblock(item(-0.6)); springTower(item(), 3); } },
     ];
     const pickSeg = (last) => {

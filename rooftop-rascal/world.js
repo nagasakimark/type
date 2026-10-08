@@ -235,9 +235,10 @@
       const edge = lx + 120, gapW = 1000 + runN * 40;
       roof.w = edge - roof.x;
       const tw = 1250, nr = mkRoof(edge + gapW, y0 + 40); nr.treasure = true; nr.w = tw;
+      const tail = mkRoof(nr.x + tw, nr.y); tail.w = 2800; // the pantry building runs on so ultrawide / tall windows never see the roof end
       const land = [nr.x + 330, nr.y];
       const tC = 0.55, tL = 2.15;
-      const ob2 = { type: 'finale', item, lx, ex: land[0], roof, roofTo: nr, done: false, typed: false, idx: n, camZ: 0.84, shake: 14, edge, gapW, finale: true };
+      const ob2 = { type: 'finale', item, lx, ex: land[0], roof, roofTo: nr, done: false, typed: false, idx: n, camZ: 0.92, shake: 14, edge, gapW, finale: true };
       ob2.mv = { dur: tC + tL + 0.3, segs: [
         seg({ t: tC, x0: lx, y0, x1: lx + 70, y1: y0, p: 'crouch', blend: 0.18, ease: (u) => u }),
         seg({ t: tL, x0: lx + 70, y0, x1: land[0], y1: land[1], h: 560, p: 'tuck', rot0: 0, rot1: TAU * 2, rotEase: sm, blend: 0.1 }),

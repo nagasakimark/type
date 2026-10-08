@@ -27,6 +27,7 @@
     wave: 'square', pad: 'sine',
   });
 
+  window.__wnS = () => S;
   /* ---------- state ---------- */
   let S;
   function maxLevelFor(g) { return g.diff === 'gentle' ? 4 : g.diff === 'turbo' ? 8 : 6; }
@@ -113,14 +114,17 @@
   /* ---------- spawning ---------- */
   function launch(g, f, o) {
     const v = g.vw(), from = o.from || 'bottom';
+    // authored in 1920-space; stretch the playable span (200px margins) across the whole visible width
+    const X = (a) => v.x + 200 + (a - 200) / 1520 * (v.w - 400);
     let x0, y0, xa;
     if (from === 'bottom') { y0 = Math.max(H, v.y + v.h) + 130; x0 = o.x0 != null ? o.x0 : U.rand(380, 1540); xa = o.xa != null ? o.xa : U.clamp(x0 + U.rand(-320, 320), 300, 1620); }
     else { y0 = U.rand(640, 860); x0 = from === 'left' ? v.x - 120 : v.x + v.w + 120; xa = o.xa != null ? o.xa : from === 'left' ? U.rand(430, 900) : U.rand(1020, 1490); }
+    if (from === 'bottom') { x0 = X(x0); xa = X(xa); } else xa = X(xa);
     const apex = o.apex != null ? o.apex : U.rand(350, 520), rise = y0 - apex, T = o.T;
     const ratio = Math.sqrt(Math.max(0.25, (FLOOR_HIT - apex) / rise)), ta = T / (1 + ratio);
     f.g = (2 * rise) / (ta * ta); f.vy = -f.g * ta; f.vx = (xa - x0) / ta;
     const xe = x0 + f.vx * T;
-    if (xe > W - 150) f.vx = (W - 150 - x0) / T; else if (xe < 150) f.vx = (150 - x0) / T;
+    if (xe > v.x + v.w - 200) f.vx = (v.x + v.w - 200 - x0) / T; else if (xe < v.x + 200) f.vx = (v.x + 200 - x0) / T;
     f.x = x0; f.y = y0;
   }
   function airtime(g, len, o = {}) {
@@ -346,12 +350,12 @@
   /* ---------- decals ---------- */
   function addDecal(x, y, color, size, drip) {
     const img = WN.splat(Math.floor(Math.random() * WN.nSplats), color); if (!img) return;
-    S.decals.push({ x, y, img, s: size, rot: U.rand(0, 6.28), t: 0, life: U.rand(9, 13), drip: drip ? { dx: U.rand(-0.3, 0.3) * size, len: U.rand(40, 110), w: U.rand(7, 12), color } : null, floor: false });
-    if (S.decals.length > 90) S.decals.shift();
+    S.decals.push({ x, y, img, s: size, rot: U.rand(0, 6.28), t: 0, life: U.rand(26, 34), drip: drip ? { dx: U.rand(-0.3, 0.3) * size, len: U.rand(40, 110), w: U.rand(7, 12), color } : null, floor: false });
+    if (S.decals.length > 70) S.decals.shift();
   }
   function floorSplat(x, color, size) {
     const img = WN.splat(Math.floor(Math.random() * WN.nSplats), color); if (!img) return;
-    S.decals.push({ x, y: FLOOR_HIT + 30, img, s: size, rot: U.rand(0, 6.28), t: 0, life: 8, drip: null, floor: true, sy: 0.45 });
+    S.decals.push({ x, y: FLOOR_HIT + 30, img, s: size, rot: U.rand(0, 6.28), t: 0, life: 20, drip: null, floor: true, sy: 0.45 });
   }
 
   /* ---------- update ---------- */
@@ -646,7 +650,7 @@
     WN.backdrop.drawBack(ctx, v, env);
     // juice splats on the dojo wall/floor
     for (const d of S.decals) {
-      const k = d.t / d.life, a = Math.min(1, d.t * 7) * (k > 0.6 ? 1 - (k - 0.6) / 0.4 : 1) * 0.78;
+      const k = d.t / d.life, a = Math.min(1, d.t * 7) * (k > 0.75 ? 1 - (k - 0.75) / 0.25 : 1) * 0.78;
       const grow = U.ease.outBack(Math.min(1, d.t * 5));
       ctx.save(); ctx.globalAlpha = a; ctx.translate(d.x, d.y); ctx.rotate(d.rot); if (d.floor) ctx.scale(1, d.sy);
       const s = d.s * grow; ctx.drawImage(d.img, -s / 2, -s / 2, s, s); ctx.restore();

@@ -109,7 +109,7 @@
       cars, player: p, phase: 'grid', raceT: 0, laps: ST.laps, total: ST.laps * L, finishOrder: 0, banners: [], nitro: 0, nitroT: 0, nitroFlash: 0, boostK: 0, shake: 0, camBump: 0, camBumpV: 0,
       queue: [], rate: 0, rateSm: 0, stageBase: tr.def.stage[0], stageSpan: tr.def.stage[1] - tr.def.stage[0], chunkCount: 0,
       cam: { init: false, y: 0, ly: 0, fov: 60, roll: 0, p0: new THREE.Vector3(), p1: new THREE.Vector3(), q0: new THREE.Quaternion(), q1: new THREE.Quaternion(), f0: 60, f1: 60, introT: 0, podT: 0 },
-      tickT: performance.now(), lastRank: 3, finishT: 0, podium: false, results: null, tags: [], streaks: [], lapFlash: 0, jumpsDone: 0, nitrosDone: 0, bigAir: 0, goT: 0, hintPulse: 0, ranks: [], liveWpm: 0,
+      tickT: performance.now(), lastRank: 3, finishT: 0, podium: false, results: null, tags: [], streaks: [], lapFlash: 0, jumpsDone: 0, nitrosDone: 0, bigAir: 0, goT: 0, hintPulse: 0, ranks: [], liveWpm: 0, avgRate: p.baseWpm / 12,
       lightsOn: 0, fastest: TM.store.get('turbo.best.' + tr.def.id, 0) || 0, welcome: 3,
     });
     S.demo = !!demo;
@@ -194,7 +194,7 @@
     for (let i = 0; i < 50; i++) emitFlame(P, 1.6);
     S.score && 0;
   }
-  function banner(text, color, life = 1.2, sub) { if (!S) return; S.banners.push({ text, color, life, t: 0, sub }); if (S.banners.length > 4) S.banners.shift(); }
+  function banner(text, color, life = 1.2, sub) { if (!S) return; S.banners.push({ text, color, life, t: 0, sub }); if (S.banners.length > 2) S.banners.shift(); }
 
   /* ====================================================================== particles */
   const rearPos = (c, back, side, up) => { _v.set(side, up, -back).applyQuaternion(c.mesh.q1); return _v.add(c.mesh.p1); };
@@ -241,9 +241,14 @@
       let m = c.mult;
       if (c.spec.name === 'Taro') m *= lerp(1.22, 0.9, smooth(0.0, 0.6, prog));
       else if (c.spec.name === 'Sora') m *= lerp(0.8, 1.22, smooth(0.1, 0.8, prog));
-      const rubber = clamp((P.dist - c.dist) / 260, -1, 1) * (S.demo ? 0 : 0.16);
+      /* Rivals match the player's real typing pace (long-run average) so a slow typist AND a fast typist both get a
+         close race; rubber-banding keeps the pack within sight: far behind the player -> push, far ahead -> ease off. */
+      const ref = S.demo ? c.baseWpm / c.mult / 12 : Math.max(c.baseWpm / c.mult / 12 * 0.85, S.avgRate * 1.0);
+      const gap = P.dist - c.dist;                       // + = rival is behind
+      const rubber = S.demo ? 0 : clamp(gap / 140, -1, 1) * (gap > 0 ? 0.32 : 0.22);
       const wob = 1 + Math.sin(T * 0.5 + c.wob) * 0.07 + Math.sin(T * 1.3 + c.wob * 2) * 0.04;
-      cps = (c.baseWpm / c.mult / 12) * m * wob * (1 + rubber) * (S.demo ? 1.5 : 1);
+      c.rubber = rubber * 0.55;
+      cps = ref * m * wob * (1 + rubber * 0.45) * (S.demo ? 1.5 : 1);
       c.rate = cps;
       // AI stumbles and nitros
       c.stumbleTimer -= dt; if (c.stumbleTimer <= 0 && !c.finished) { c.stumbleTimer = (6 + Math.random() * 10) / ((c.spec.stumble || 0.05) * 20); if (Math.random() < 0.55 && racing && T > 3) { c.v *= 0.8; c.stumble = 0.6; puffSmoke(c, 5); } }
@@ -254,6 +259,7 @@
     const nitroOn = c.nitroT > 0;
     if (nitroOn) vT *= 1.3; else if (c.padT > 0) vT *= 1.2;
     if (c.stumble > 0) vT *= 0.65;
+    if (!c.isPlayer && !S.demo && !c.finished) vT *= 1 + (c.rubber || 0);   // rubber-band on final speed (nitro/pads included)
     vT += c.kick * (c.isPlayer ? 1 : 0);
     if (c.isPlayer && !S.demo && !c.finished) vT *= 1 + clamp((S.leaderDist - c.dist) / 400, 0, 1) * 0.07; // small catch-up help
     if (!racing || (S.phase === 'grid' && !S.demo)) vT = 0;
@@ -432,6 +438,7 @@
       if (S.nitroT > 0) S.nitroT -= dt;
       S.nitro = Math.max(0, S.nitro - dt * 0.004);
       S.liveWpm += (S.player.rate * 12 - S.liveWpm) * Math.min(1, dt * 3);
+      S.avgRate += (S.player.rate - S.avgRate) * Math.min(1, dt / 12);
       const t = S.queue[0]; if (t && t.shake > 0) t.shake = Math.max(0, t.shake - dt * 3);
     }
     if (S.phase === 'finish') {
@@ -601,6 +608,9 @@
   function drawTitleHud(ctx, v) {
     if (ST.fileMode) D.text(ctx, 'Tip: open this page from a web server (http) for the full 3D look.', W / 2, v.y + v.h - 40, { size: 26, color: '#fff', outline: 8 });
   }
+  /* HUD side anchors: the visible rect, but never wider than ~21:9 so ultrawide windows keep the HUD near the action */
+  const sc0 = (v) => v.h / v.w > 0.95;
+  const hudL = (v) => Math.max(v.x, W / 2 - 1280), hudR = (v) => Math.min(v.x + v.w, W / 2 + 1280);
   const scaleHud = (v) => (v.h / v.w > 0.95 ? 1.25 : 1);
   function panelHeightPx(v) {
     const sc = Math.min(window.innerWidth / W, window.innerHeight / H);
@@ -672,7 +682,7 @@
   function drawSpeedo(ctx, v) {
     const sc = scaleHud(v), bottom = v.y + v.h - 26 - (TM.settings.keyboard ? 270 : 0);
     const P = S.player, panelH = S.panelTop ? (bottom - S.panelTop) : 200;
-    const cx = 150 * sc, cy = (S.panelTop || bottom - 200) - 130 * sc, r = 100 * sc;
+    const cx = hudL(v) + 150 * sc, cy = (S.panelTop || bottom - 200) - 130 * sc, r = 100 * sc;
     ctx.save();
     // dial
     ctx.fillStyle = 'rgba(31,26,61,0.84)'; ctx.beginPath(); ctx.arc(cx, cy, r + 14, 0, 7); ctx.fill();
@@ -690,14 +700,14 @@
     ctx.restore();
     // position numeral
     const rk = S.player.rank;
-    const px = W - 140 * sc, py = (S.panelTop || bottom - 200) - 100 * sc;
+    const px = hudR(v) - 140 * sc, py = (S.panelTop || bottom - 200) - 100 * sc;
     D.text(ctx, ORD[rk].toUpperCase(), px, py, { size: 130 * sc, color: rk === 0 ? '#FFC83D' : '#fff', outline: 18, font: D.FONT_DISPLAY(130 * sc, 800) });
     D.text(ctx, 'of ' + S.cars.length, px, py + 78 * sc, { size: 34 * sc, color: '#fff', outline: 8 });
   }
 
   /* ---- standings ---- */
   function drawStandings(ctx, v) {
-    const sc = scaleHud(v), x = 28, y = v.y + 122, rowH = 62 * sc, w = 360 * sc;
+    const sc = scaleHud(v), x = hudL(v) + 28, y = v.y + 122 + (sc > 1 ? 40 : 0), rowH = 62 * sc, w = 360 * sc;
     const r = S.cars.slice().sort((a, b) => a.rank - b.rank);
     ctx.save();
     D.pill(ctx, x, y - 8, w, 40 * sc, 'rgba(31,26,61,0.84)'); D.text(ctx, 'RACE', x + 64 * sc, y + 12 * sc, { size: 24 * sc, color: '#fff' }); D.text(ctx, 'WPM', x + w - 56 * sc, y + 12 * sc, { size: 22 * sc, color: 'rgba(255,255,255,0.7)' });
@@ -720,7 +730,7 @@
   /* ---- mini-map ---- */
   function drawMinimap(ctx, v) {
     const tr = ST.track, m = tr.mini; if (!m) return;
-    const sc = scaleHud(v), box = 230 * sc, x = W - 28 - box, y = v.y + 96;
+    const sc = scaleHud(v), box = 230 * sc, x = hudR(v) - 28 - box, y = v.y + 96 + (sc > 1 ? 40 : 0);
     const k = Math.min((box - 30) / m.w, (box - 30) / m.h), ox = x + (box - m.w * k) / 2, oy = y + (box - m.h * k) / 2;
     ctx.save();
     ctx.fillStyle = 'rgba(31,26,61,0.78)'; ctx.fill(D.P.rr(x, y, box, box, 26));
@@ -742,7 +752,7 @@
 
   /* ---- lap box ---- */
   function drawLapBox(ctx, v) {
-    const sc = scaleHud(v), y = v.y + 110, lap = clamp(S.player.lap + 1, 1, S.laps);
+    const sc = scaleHud(v), y = v.y + 110 + (sc0(v) ? 44 : 0), lap = clamp(S.player.lap + 1, 1, S.laps);
     ctx.save();
     const w = 290 * sc, h = 76 * sc, x = W / 2 - w / 2;
     ctx.fillStyle = 'rgba(31,26,61,0.84)'; ctx.fill(D.P.rr(x, y, w, h, 24));
@@ -754,12 +764,12 @@
 
   /* ---- banners ---- */
   function drawBanners(ctx, v) {
-    const y0 = v.y + v.h * 0.3;
+    const y0 = v.y + v.h * 0.37;
     S.banners.forEach((b, i) => {
       const k = b.t / b.life, s = k < 0.14 ? U.ease.outBack(k / 0.14) : 1, a = k > 0.75 ? 1 - (k - 0.75) / 0.25 : 1;
-      ctx.save(); ctx.globalAlpha = a; ctx.translate(W / 2, y0 + (S.banners.length - 1 - i) * -0 + i * 96 - k * 24); ctx.scale(s, s);
-      D.text(ctx, b.text, 0, 0, { size: 92, color: b.color, outline: 18, font: D.FONT_DISPLAY(92, 800) });
-      if (b.sub) D.text(ctx, b.sub, 0, 66, { size: 38, color: '#fff', outline: 10 });
+      ctx.save(); ctx.globalAlpha = a; ctx.translate(W / 2, y0 + i * 128 - k * 24); ctx.scale(s * 0.9, s * 0.9);
+      D.text(ctx, b.text, 0, 0, { size: 88, color: b.color, outline: 18, font: D.FONT_DISPLAY(88, 800) });
+      if (b.sub) D.text(ctx, b.sub, 0, 62, { size: 36, color: '#fff', outline: 10 });
       ctx.restore();
     });
     if (S.phase === 'race' && S.raceT < 6 && S.player.rate < 0.5 && S.chunkCount === 0 && !S.banners.length) {

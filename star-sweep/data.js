@@ -65,7 +65,7 @@
     const L = sector * 4 + Math.min(wave, 3);
     const boss = wave === perSector - 1, elite = wave === perSector - 2 && perSector >= 3;
     const dens = diff === 'gentle' ? 0.72 : diff === 'turbo' ? 1.25 : 1;
-    const out = { kind: boss ? 'boss' : elite ? 'elite' : 'normal', L, tokens: [], interval: Math.max(0.95, 2.6 - L * 0.09) * (diff === 'gentle' ? 1.35 : diff === 'turbo' ? 0.8 : 1), cap: Math.max(3, Math.min(9, 4 + Math.floor(L / 3) - (diff === 'gentle' ? 1 : 0) + (diff === 'turbo' ? 1 : 0))) };
+    const out = { kind: boss ? 'boss' : elite ? 'elite' : 'normal', L, tokens: [], interval: Math.max(0.8, 2.2 - L * 0.08) * (diff === 'gentle' ? 1.35 : diff === 'turbo' ? 0.8 : 1), cap: Math.max(4, Math.min(10, 4 + Math.floor(L / 3) - (diff === 'gentle' ? 1 : 0) + (diff === 'turbo' ? 1 : 0))) };
     if (boss) { out.tokens = ['boss']; out.interval = 99; return out; }
     const n = Math.round((7 + L * 0.9 + (elite ? 2 : 0)) * dens);
     const w = WEIGHTS(L, sector);

@@ -7,7 +7,7 @@
   const INK = window.INK;
   const W = 1920, H = 1080, VX = 960;
   const F = INK.F, CAMH = INK.CAMH, V = INK.view;
-  const Z_FAR = 36, Z_ATK = 2.7;
+  const Z_FAR = 27, Z_ATK = 2.7;
   const GOO = '#7D6FA6', GOO2 = '#9A8CC4';
   const NSTAGE = INK.STAGES.length;
 
@@ -118,6 +118,7 @@
     };
     if (o.fromBoss) e.kick = 0;
     e.canopy = U.pick(['#B9A488', '#A8B3A0', '#B5A3B8']); e.canopy2 = '#E9DDCA';
+    e.pop = 0; e.popFx = true;
     S.enemies.push(e);
     return e;
   }
@@ -595,6 +596,7 @@
     e.blink = Math.max(0, e.blink - dt); if (Math.random() < dt * 0.4) e.blink = 0.12;
     if (e.typer.shake > 0) e.typer.shake = Math.max(0, e.typer.shake - dt * 3);
     e.near = e.z < 8 && !e.boss;
+    if (e.pop < 1) { e.pop = Math.min(1, e.pop + dt * 2.4); if (e.popFx && e.pop > 0.05 && !e.boss) { e.popFx = false; const p = eScreen(e); for (let i = 0; i < 5; i++) parts.sprite('smoke_04', p.x + U.rand(-30, 30) * p.sc / 40, p.y - 6, Math.max(40, p.sc * 1.1), { color: '#ffffff', life: 0.5, add: false, a: 0.7, vx: U.rand(-60, 60), vy: U.rand(-80, -20) }); } }
     if (e.boss) return updateBoss(g, e, dt);
     e.danger = 100 - e.z;
     if (e.state === 'doomed') { e.doomT += dt; if (e.doomT > 0.9 && e.alive) splatEnemy(g, e, S.pair[0], true); return; }
@@ -679,7 +681,8 @@
     // shadow on the ground
     ctx.save(); ctx.fillStyle = 'rgba(31,26,61,0.2)'; ctx.beginPath(); const sw = T.wh * 0.42 * sc * (e.boss ? 1.3 : 1) * (1 - Math.min(0.5, e.y * 0.12)); ctx.ellipse(x, gy + 2, sw, sw * 0.2, 0, 0, 7); ctx.fill(); ctx.restore();
     const s = (sc * T.wh) / T.ah;
-    ctx.save(); ctx.translate(x, y); ctx.scale(s, s);
+    const pk = e.boss || e.pop === undefined ? 1 : U.ease.outBack(Math.min(1, e.pop));
+    ctx.save(); ctx.translate(x, y + (1 - pk) * T.ah * s * 0.5); ctx.scale(s * pk, s * Math.max(0.2, pk)); 
     if (e.boss) INK.drawBoss(ctx, e, e.t); else INK.drawEnemy(ctx, e, e.t);
     if (e.hurt > 0.5) { ctx.globalCompositeOperation = 'lighter'; ctx.globalAlpha = (e.hurt - 0.5) * 0.6; ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.ellipse(0, -T.ah * 0.5, T.ah * 0.5, T.ah * 0.55, 0, 0, 7); ctx.fill(); }
     ctx.restore();
@@ -963,5 +966,5 @@
   });
   // show the team picker only on the title screen
   setInterval(() => { if (G && G.__teamBox) G.__teamBox.classList.toggle('hidden', G.state !== 'title' || (window.TM.ui.isModalOpen && window.TM.ui.isModalOpen())); }, 120);
-  window.INK_DEBUG = { S: () => S, WS: () => WS, parts, spawn: (t, x, z) => mkEnemy(G, t, { x, z }), boss: () => startBoss(G), stage: (i) => { newStage(G, i); }, setCz: (c) => { S.cz = c; } };
+  window.INK_DEBUG = { G: () => G, S: () => S, WS: () => WS, parts, spawn: (t, x, z) => mkEnemy(G, t, { x, z }), boss: () => startBoss(G), stage: (i) => { newStage(G, i); }, setCz: (c) => { S.cz = c; } };
 })();

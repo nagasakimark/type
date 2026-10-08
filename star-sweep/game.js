@@ -19,9 +19,9 @@
     const pxv = v.w / window.innerWidth;
     const kb = TM.settings.keyboard && window.innerWidth > 900 && window.innerHeight > 640;
     const shipY = bottom - 160 - (kb ? 215 * pxv : 0);
-    const impactY = shipY - 70, spawnY = top - 120;
-    const half = Math.min(v.w / 2 - 170, 1050);
-    return { v, top, bottom, pxv, shipY, impactY, spawnY, fs: clamp((impactY - spawnY) / 940, 1, 2.1), xmin: SX - half, xmax: SX + half, hudTop: v.y + 92 * pxv };
+    const impactY = shipY - 70, spawnY = top - 170;
+    const half = Math.min(v.w / 2 - 150, 2600);
+    return { v, top, bottom, pxv, shipY, impactY, spawnY, fs: clamp((impactY - spawnY) / 940, 1, 2.1), xmin: SX - half, xmax: SX + half, wf: Math.max(1, half / 950), hudTop: v.y + 92 * pxv };
   }
 
   /* ---------- state ---------- */
@@ -62,15 +62,16 @@
   function aliveCount(types) { let n = 0; for (const e of S.enemies) if (e.alive && !e.doomed && e.type !== 'powerup' && e.type !== 'boss' && e.type !== 'ace' && (!types || types.includes(e.type))) n++; return n; }
   function waveDone() { if (S.queue.length) return false; for (const e of S.enemies) if (e.alive && e.type !== 'powerup') return false; return true; }
 
+  const F0 = () => S.F || { wf: 1 };
   function updateWaves(g, dt) {
     if (S.mode === 'fight') {
       if (S.queue.length) {
         S.spawnT -= dt * (S.pace > 1 ? 1 + (S.pace - 1) * 0.5 : S.pace);
         const tok = S.queue[0];
-        const cap = S.plan.cap + (S.pace < 0.85 ? -1 : 0);
+        const cap = S.plan.cap + 1 + Math.round((F0().wf - 1) * 2.4) + (S.pace < 0.85 ? -1 : 0);
         if (S.spawnT <= 0 && (aliveCount() < cap || tok === 'powerup' || tok === 'boss' || tok === 'ace')) {
           S.queue.shift(); spawnToken(g, tok);
-          S.spawnT = S.plan.interval * rnd(0.75, 1.3) * (tok === 'swarm' ? 1.6 : 1) / (S.pace > 1 ? S.pace * 0.5 + 0.5 : 1);
+          S.spawnT = S.plan.interval / (1 + (F0().wf - 1) * 0.55) * rnd(0.7, 1.2) * (tok === 'swarm' ? 1.6 : 1) / (S.pace > 1 ? S.pace * 0.5 + 0.5 : 1);
         }
       } else if (waveDone() && !g.demo) {
         S.mode = 'clear'; S.clearT = 2.8;
@@ -159,7 +160,7 @@
     const col = sec.col === 'any' || Math.random() < 0.28 ? U.pick(['Black', 'Blue', 'Green', 'Red']) : sec.col;
     const e = { id: ++S.uid, type, T, alive: true, doomed: false, x: o.x ?? pickX(F, 250), y: o.y ?? F.spawnY, t: 0, flash: 0, locked: false, col, spdMul: 1, sc: T.scale, rot: 0, baseRot: 0, targetable: true, stun: 0, push: 0,
       ph: rnd(0, 6.28), amp: rnd(110, 170), spin: 0, hitsPending: 0, delay: o.delay || 0, chx: 0, chy: 0, dying: 0, phases: null, pi: 0, name: type };
-    e.x0 = e.x; e.x1 = clamp(lerp(e.x, SX, rnd(0.1, 0.55)), F.xmin, F.xmax);
+    e.x0 = e.x; e.x1 = clamp(lerp(e.x, SX, rnd(0.03, 0.3)), F.xmin, F.xmax);
     e.spr = T.spr(col);
     let item;
     if (type === 'ufo') { e.spr = 'ufo' + U.pick(['Blue', 'Green', 'Red', 'Yellow']); e.R = rnd(70, 105); e.cy = F.spawnY - e.R; e.spinDir = Math.random() < 0.5 ? 1 : -1; e.x0 = clamp(e.x0, F.xmin + 100, F.xmax - 100); e.x1 = clamp(lerp(e.x0, SX, 0.25), F.xmin + 100, F.xmax - 100); }
@@ -915,7 +916,7 @@
       ctx.translate(SX, cy); ctx.scale(k, k);
       if (b.top) D.text(ctx, b.top, 0, -92, { font: KV(34), size: 34, color: '#fff', outline: 10 });
       D.text(ctx, b.title, 0, b.boss ? -26 : 0, { font: KV(b.boss ? 96 : 110), size: 100, color: '#fff', outline: 20 });
-      if (b.sub) D.text(ctx, b.sub, 0, b.boss ? 58 : 84, { size: b.boss ? 56 : 52, color: b.boss ? '#ffe9a8' : (b.color || '#fff'), outline: 12 });
+      if (b.sub) D.text(ctx, b.sub, 0, b.boss ? 78 : 104, { size: b.boss ? 56 : 52, color: b.boss ? '#ffe9a8' : (b.color || '#fff'), outline: 12 });
       ctx.restore();
     }
     const c = S.banner2; if (c && !g.demo) { const t = c.t; ctx.save(); ctx.globalAlpha = t > 1 ? 1 - (t - 1) / 0.4 : 1; ctx.translate(SX, F.top + 400); const s = U.ease.outBack(Math.min(1, t / 0.3)); ctx.scale(s, s); D.text(ctx, c.text, 0, 0, { font: KV(80), size: 80, color: '#ff6a6a', outline: 16 }); ctx.restore(); }

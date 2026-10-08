@@ -769,8 +769,8 @@
       // trophy
       const prof = [[0, 0], [1.1, 0], [1.1, 0.25], [0.35, 0.5], [0.3, 1.4], [0.9, 1.8], [1.6, 2.9], [1.5, 3.4], [0.8, 3.1], [0, 3.0]].map((p) => new THREE.Vector2(p[0], p[1]));
       const cup = new THREE.Mesh(new THREE.LatheGeometry(prof, 24), new THREE.MeshStandardMaterial({ color: 0xffc83d, metalness: 0.85, roughness: 0.25, emissive: 0x553300, emissiveIntensity: 0.4 }));
-      cup.position.set(0, 0, 7); cup.scale.setScalar(1.15); cup.castShadow = true; g.add(cup); this.trophy = cup;
-      const base = mk(2.6, 0.6, 2.6, 0x7a4b1f); base.position.set(0, 0.3, 7); g.add(base); cup.position.y = 0.6;
+      cup.position.set(-13.5, 0, 1); cup.scale.setScalar(1.0); cup.castShadow = true; g.add(cup); this.trophy = cup;
+      const base = mk(2.6, 0.6, 2.6, 0x7a4b1f); base.position.set(-13.5, 0.3, 1); g.add(base); cup.position.y = 0.6;
       g.userData.slots = this.podiumSlots; this.podium = g; this.root.add(g);
       this.podiumPos = new Vector3(o.x, o.y + 0.0, o.z).addScaledVector(fwd, 3); this.podiumFwd = fwd; this.podiumRight = rv;
     }

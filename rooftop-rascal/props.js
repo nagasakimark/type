@@ -193,7 +193,7 @@
     D.sticker(ctx, P.rr(x + 8, y - 44, 44, 44, 6), '#A9A4C4', { x: x + 8, y: y - 44, w: 44, h: 44 }, { shadow: false });
     D.sticker(ctx, P.rr(x, y - 60, 60, 20, 8), '#8F8AB0', null, { shadow: false });
     const t = (o.t || 0) + x * 0.01;
-    for (let i = 0; i < 3; i++) { const k = ((t * 0.5 + i / 3) % 1); ctx.fillStyle = `rgba(255,255,255,${0.5 * (1 - k)})`; ctx.beginPath(); ctx.arc(x + 30 + Math.sin(k * 6 + i) * 10, y - 70 - k * 90, 12 + k * 22, 0, TAU); ctx.fill(); }
+    for (let i = 0; i < 3; i++) { const k = ((((t * 0.5 + i / 3) % 1) + 1) % 1); ctx.fillStyle = `rgba(255,255,255,${0.5 * (1 - k)})`; ctx.beginPath(); ctx.arc(x + 30 + Math.sin(k * 6 + i) * 10, y - 70 - k * 90, 12 + k * 22, 0, TAU); ctx.fill(); }
   };
   DEC.solar = function (ctx, x, y) {
     for (let i = 0; i < 2; i++) {
@@ -210,7 +210,7 @@
   DEC.chimney = function (ctx, x, y, o) {
     RR.spr(ctx, 'chimneyThin', x, y - 62, 62, 62); RR.spr(ctx, 'chimney', x + 14, y - 108, 62, 62);
     const t = (o.t || 0) + x * 0.013;
-    for (let i = 0; i < 3; i++) { const k = ((t * 0.35 + i / 3) % 1); ctx.fillStyle = `rgba(235,230,250,${0.45 * (1 - k)})`; ctx.beginPath(); ctx.arc(x + 44 + Math.sin(k * 5 + i * 2) * 14, y - 118 - k * 110, 12 + k * 20, 0, TAU); ctx.fill(); }
+    for (let i = 0; i < 3; i++) { const k = ((((t * 0.35 + i / 3) % 1) + 1) % 1); ctx.fillStyle = `rgba(235,230,250,${0.45 * (1 - k)})`; ctx.beginPath(); ctx.arc(x + 44 + Math.sin(k * 5 + i * 2) * 14, y - 118 - k * 110, 12 + k * 20, 0, TAU); ctx.fill(); }
   };
   DEC.plant = function (ctx, x, y) {
     RR.spr(ctx, 'plant', x, y - 52, 56, 56); RR.spr(ctx, 'mushroomRed', x + 44, y - 42, 42, 42); RR.spr(ctx, 'bush', x + 82, y - 50, 70, 36);
@@ -384,7 +384,7 @@
       D.sticker(ctx, P.rr(cx - 76, cy - 62, 152, 62, 28), '#FF5A5F', { x: cx - 76, y: cy - 62, w: 152, h: 62 }, { shadow: false });
       D.sticker(ctx, P.ellipse(cx, cy - 62, 76, 16), '#FFE9A8', null, { shadow: false });
       ctx.fillStyle = '#FFB36B'; ctx.beginPath(); ctx.ellipse(cx - 24, cy - 64, 22, 8, 0, 0, TAU); ctx.fill(); ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(cx + 28, cy - 66, 11, 0, TAU); ctx.fill(); ctx.fillStyle = '#FFC83D'; ctx.beginPath(); ctx.arc(cx + 28, cy - 66, 5, 0, TAU); ctx.fill(); ctx.fillStyle = '#6FD26F'; ctx.fillRect(cx - 4, cy - 72, 22, 6);
-      for (let i = 0; i < 3; i++) { const k = ((t * 0.5 + i / 3) % 1); ctx.fillStyle = `rgba(255,255,255,${0.7 * (1 - k)})`; ctx.beginPath(); ctx.arc(cx - 30 + i * 30 + Math.sin(k * 6 + i) * 8, cy - 86 - k * 70, 10 + k * 12, 0, TAU); ctx.fill(); }
+      for (let i = 0; i < 3; i++) { const k = ((((t * 0.5 + i / 3) % 1) + 1) % 1); ctx.fillStyle = `rgba(255,255,255,${0.7 * (1 - k)})`; ctx.beginPath(); ctx.arc(cx - 30 + i * 30 + Math.sin(k * 6 + i) * 8, cy - 86 - k * 70, 10 + k * 12, 0, TAU); ctx.fill(); }
     } else if (kind === 'fish') {
       D.sticker(ctx, P.ellipse(cx, cy - 24, 120, 22), '#E9E6F4', null, { shadow: false });
       RR.drawFish(ctx, cx - 20, cy - 50, 2.4, 0); RR.drawFish(ctx, cx + 56, cy - 40, 1.4, 1);

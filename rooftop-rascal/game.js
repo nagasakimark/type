@@ -9,7 +9,7 @@
   const clamp = U.clamp, lerp = U.lerp;
   const sm = (t) => t * t * (3 - 2 * t);
   const ANCHOR = 600;                 // screen x of Rascal
-  const GROUND_SY = 735;              // screen y of the roof Rascal runs on (title demo lowers it)
+  const GROUND_SY = 800;              // screen y of the roof Rascal runs on (title demo lowers it)
   const DMAX = 1500, DSTART = 1050, DCATCH = 170;
 
   /* ---------------- persistent progress ---------------- */
@@ -62,13 +62,15 @@
   function typerOf(ob) { if (!ob.typer) ob.typer = new TM.Typer(ob.item); return ob.typer; }
   const chaseRate = (g) => (g.diff === 'gentle' ? 0.5 : g.diff === 'turbo' ? 0.75 : 0.62);
   const dMaxEff = () => DMAX;
+  let CS = 1;
+  let ZB = 1.32; // base zoom so Rascal reads big; grows a little on tall/narrow windows
   function toScreen(wx, wy) { // world -> virtual screen (after zoom)
-    const c = S.cam, px = ANCHOR, py = S.gsy;
+    const c = S.cam, px = ANCHOR, py = S.gsy, zz = c.z * ZB;
     const sx = wx - c.x, sy = wy - c.y;
-    return [px + (sx - px) * c.z, py + (sy - py) * c.z];
+    return [px + (sx - px) * zz, py + (sy - py) * zz];
   }
   const feetS = () => toScreen(S.rx, S.ry);
-  function say(g, str, color, size) { if (g.demo) return; const p = toScreen(S.rx + 40, S.ry - 230); g.fx.pop(clamp(p[0], 200, 1700), clamp(p[1] - 60, 240, 800), str, { color: color || C.gold, size: size || 44, life: 0.85 }); }
+  function say(g, str, color, size) { if (g.demo) return; const p = toScreen(S.rx + 40, S.ry - 230); g.fx.pop(clamp(p[0], 200, 1700), clamp(p[1] - 60, 240, 800), str, { color: color || C.gold, size: size || 58, life: 0.9 }); }
   const typeWord = { gap: 'Great jump!', slide: 'Smooth!', crow: 'Hop!', bounce: 'Boing!', wall: 'Nice climb!', kick: 'Wall kick!', zip: 'Zip zip!', sneak: 'So sneaky!', finale: 'YOU DID IT!' };
   const typeColor = { gap: '#FFC83D', slide: '#2BE6FF', crow: '#FF8A5C', bounce: '#FF3EA5', wall: '#8CFF6A', kick: '#FF8A3D', zip: '#7B5CFF', sneak: '#9BE59B', finale: '#FFC83D' };
   const typeIcon = { gap: '#FFC83D', slide: '#2BE6FF', crow: '#FF8A5C', bounce: '#FF3EA5', wall: '#8CFF6A', kick: '#FF8A3D', zip: '#9B7CFF', sneak: '#6FD28A', finale: '#FFC83D' };
@@ -416,7 +418,9 @@
     if (!S) return;
     const v = g.vw(), c = S.cam, t = S.t, L = S.L, dist = S.dist;
     // zoom about the raccoon's ground spot
-    const px = ANCHOR, py = S.gsy, z = c.z;
+    ZB = 1.32 * (1 + clamp((1.78 - v.w / v.h) * 0.5, 0, 0.3));
+    CS = 1 + clamp((1.78 - v.w / v.h) * 0.7, 0, 0.45);
+    const px = ANCHOR, py = S.gsy, z = c.z * ZB;
     ctx.save();
     ctx.translate(px, py); ctx.scale(z, z); ctx.translate(-px, -py);
     const cv = { x: px - (px - v.x) / z - 2, y: py - (py - v.y) / z - 2, w: v.w / z + 4, h: v.h / z + 4 };
@@ -554,7 +558,7 @@
     // vignette (+ danger)
     if (!window.__novig) edgeBands(ctx, v, '10,5,35', 0.4);
     if (S.danger > 0.02) edgeBands(ctx, v, '255,60,60', S.danger * (0.5 + Math.sin(S.t * 9) * 0.18));
-    if (S.ghost > 0) { ctx.save(); ctx.fillStyle = 'rgba(120,90,220,0.14)'; ctx.fillRect(v.x, v.y, v.w, v.h); ctx.restore(); }
+    if (S.ghost > 0) { ctx.save(); ctx.fillStyle = 'rgba(120,90,220,0.14)'; ctx.fillRect(v.x - 12, v.y - 12, v.w + 24, v.h + 24); ctx.restore(); }
   }
 
   /* soft edge vignette: four small gradient bands (much cheaper than a full-screen radial) */
@@ -563,10 +567,10 @@
     const bw = v.w * 0.17, bh = v.h * 0.2;
     const stops = [[0, a], [0.25, a * 0.56], [0.5, a * 0.25], [0.75, a * 0.06], [1, 0]].map((p) => [p[0], `rgba(${rgb},${p[1].toFixed(3)})`]);
     const mk = (gr) => { for (const p of stops) gr.addColorStop(p[0], p[1]); return gr; };
-    let gr = ctx.createLinearGradient(v.x, 0, v.x + bw, 0); ctx.fillStyle = mk(gr); ctx.fillRect(v.x, v.y, bw, v.h);
-    gr = ctx.createLinearGradient(v.x + v.w, 0, v.x + v.w - bw, 0); ctx.fillStyle = mk(gr); ctx.fillRect(v.x + v.w - bw, v.y, bw, v.h);
-    gr = ctx.createLinearGradient(0, v.y, 0, v.y + bh); ctx.fillStyle = mk(gr); ctx.fillRect(v.x, v.y, v.w, bh);
-    gr = ctx.createLinearGradient(0, v.y + v.h, 0, v.y + v.h - bh); ctx.fillStyle = mk(gr); ctx.fillRect(v.x, v.y + v.h - bh, v.w, bh);
+    let gr = ctx.createLinearGradient(v.x, 0, v.x + bw, 0); ctx.fillStyle = mk(gr); ctx.fillRect(v.x - 12, v.y - 12, bw + 12, v.h + 24);
+    gr = ctx.createLinearGradient(v.x + v.w, 0, v.x + v.w - bw, 0); ctx.fillStyle = mk(gr); ctx.fillRect(v.x + v.w - bw, v.y - 12, bw + 12, v.h + 24);
+    gr = ctx.createLinearGradient(0, v.y, 0, v.y + bh); ctx.fillStyle = mk(gr); ctx.fillRect(v.x - 12, v.y - 12, v.w + 24, bh + 12);
+    gr = ctx.createLinearGradient(0, v.y + v.h, 0, v.y + v.h - bh); ctx.fillStyle = mk(gr); ctx.fillRect(v.x - 12, v.y + v.h - bh, v.w + 24, bh + 12);
     ctx.restore();
   }
   function chipFor(g, ctx, ob, size, o) {
@@ -591,10 +595,10 @@
       let x = p[0], y = p[1];
       if (ob.typed) {
         // ready tag
-        if (!ob.done && S.mv !== ob) { readyPills.push([clamp(x, 140, 1780), clamp(y - 120, 200, 600)]); }
+        if (!ob.done && S.mv !== ob) { readyPills.push([clamp(x + 200, 140, 1780), clamp(y - 130, 200, 560)]); }
         shown++; continue;
       }
-      const base = act ? (ob.type === 'finale' ? 58 : 52) : 36;
+      const base = (act ? (ob.type === 'finale' ? 58 : 52) : 36) * CS;
       const sz = chipFor(g, ctx, ob, base);
       const size = D.chipSize(ctx, ty, sz);
       const rightLimit = 1560 - size.w / 2;

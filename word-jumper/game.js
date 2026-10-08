@@ -4,8 +4,8 @@
   'use strict';
   const TM = window.TM, WJ = window.WJ, C = TM.C, U = TM.U, D = TM.draw, P = D.P;
   const W = 1920, H = 1080, TS = WJ.TS;
-  const HERO_COLORS = ['Pink', 'Blue', 'Yellow'];
-  const ALL_COLORS = ['Pink', 'Blue', 'Green', 'Yellow', 'Beige'];
+  const HERO_COLORS = ['player', 'female', 'adventurer'];
+  const ALL_COLORS = HERO_COLORS;
   const LEVELS = 5;
   const GRAV = 2600;
   const clamp = U.clamp;
@@ -400,7 +400,7 @@
         const l = h.leg; l.t += dt;
         const t = Math.min(l.t, l.T), p = WJ.arcPos(l, t); h.x = p.x; h.y = p.y;
         const f = t / l.T;
-        const vy = -l.vy + l.g * t;
+        const vy = -l.vy + l.g * t; h.avy = vy;
         if (l.flip) h.rot = Math.PI * 2 * ease.inOut(f);
         else h.rot = clamp(vy * 0.00055, -0.25, 0.4);
         if (l.apex && !l.apexDone && t >= l.vy / l.g) { l.apexDone = true; l.apex(); }
@@ -470,6 +470,14 @@
     return { x: clamp(p.x, vw.x + cw + 24, vw.x + vw.w - cw - 24), y: Math.max(p.y, vw.y + 230 / Math.max(0.3, vw.w ? window.innerWidth / vw.w : 1)) };
   }
 
+  const patCache = {};
+  function centerPattern(ctx, key) {
+    if (patCache[key]) return patCache[key];
+    if (!WJ.ready || !WJ.has(key)) return null;
+    const c = document.createElement('canvas'); c.width = c.height = TS; const x = c.getContext('2d');
+    WJ.tileFull(x, key, 0, 0, TS + 1, TS + 1);
+    return (patCache[key] = ctx.createPattern(c, 'repeat'));
+  }
   function drawTerrain(ctx, g, view, camX, bot) {
     const L = S.L, B = L.biome, x0 = camX - 120, x1 = camX + view.w + 120;
     const gk = B.ground;
@@ -480,8 +488,9 @@
         const x = s.x0 + i * TS; if (x + TS < x0 || x > x1) continue;
         const top = n === 1 ? 'Mid' : i === 0 && s.capL ? 'Left' : i === n - 1 && s.capR ? 'Right' : 'Mid';
         WJ.tile(ctx, gk + top, x, s.y);
-        for (let y = s.y + TS; y < bot; y += TS) WJ.tile(ctx, gk + 'Center', x, y);
       }
+      const px0 = Math.max(s.x0, Math.floor(x0 / TS) * TS), px1 = Math.min(s.x1, x1), pat = centerPattern(ctx, gk + 'Center');
+      if (pat && px1 > px0 && bot > s.y + TS) { ctx.fillStyle = pat; ctx.fillRect(px0, s.y + TS, px1 - px0, bot - s.y - TS + TS); }
     }
     // static floating platforms
     for (const p of L.plats) {
@@ -610,27 +619,26 @@
   }
 
   function drawHero(ctx, g) {
-    const h = S.hero, col = S.heroCol, t = S.t;
-    let key = 'a/alien' + col + '_stand', rot = h.rot, sx = 1 - h.sq * 0.28, sy = 1 + h.sq * 0.36, ox = 0, oy = 0;
+    const h = S.hero, col = S.heroCol, t = S.t, P = col + '_';
+    let key = P + 'stand', rot = h.rot, sx = 1 - h.sq * 0.28, sy = 1 + h.sq * 0.36, ox = 0, oy = 0;
     switch (h.st) {
-      case 'run': key = 'a/alien' + col + (Math.floor(h.walkT * 3) % 2 ? '_walk2' : '_walk1'); oy = -Math.abs(Math.sin(h.walkT * 6)) * 6; rot = 0.1; break;
-      case 'teeter': key = 'a/alien' + col + '_stand'; rot = Math.sin(h.teeterT * 9) * 0.1; ox = Math.sin(h.teeterT * 9) * 3; break;
-      case 'arc': key = 'a/alien' + col + '_jump'; if (h.leg && h.leg.drop) key = 'a/alien' + col + '_jump'; break;
-      case 'dash': key = 'a/alien' + col + '_duck'; break;
-      case 'ride': key = 'a/alien' + col + '_stand'; rot = Math.sin(t * 2) * 0.04; break;
-      case 'fall': case 'bonk': case 'dead': key = 'a/alien' + col + '_hurt'; break;
-      case 'celebrate': case 'celeb': key = 'a/alien' + col + (Math.floor(h.celT * 6) % 2 ? '_climb1' : '_climb2'); break;
-      default: if (S.phase === 'celeb' || S.phase === 'rating') key = 'a/alien' + col + (Math.floor(h.celT * 6) % 2 ? '_climb1' : '_climb2');
+      case 'run': key = P + (Math.floor(h.walkT * 3) % 2 ? 'walk2' : 'walk1'); oy = -Math.abs(Math.sin(h.walkT * 6)) * 8; rot = 0.07; break;
+      case 'teeter': key = P + 'skid'; rot = -0.08 + Math.sin(h.teeterT * 9) * 0.07; ox = Math.sin(h.teeterT * 9) * 3; break;
+      case 'arc': key = P + ((h.avy || 0) > 120 ? 'fall' : 'jump'); if (h.leg && h.leg.bounce) key = P + 'cheer1'; break;
+      case 'dash': key = P + 'kick'; break;
+      case 'ride': key = P + (Math.floor(t * 2) % 2 ? 'stand' : 'talk'); rot = Math.sin(t * 2) * 0.04; break;
+      case 'fall': case 'bonk': case 'dead': key = P + 'hurt'; break;
     }
-    if (S.phase === 'celeb' || S.phase === 'rating') key = 'a/alien' + col + (Math.floor(h.celT * 6) % 2 ? '_climb1' : '_climb2');
-    if (g.state === 'over' && h.st !== 'dead') key = 'a/alien' + col + '_jump';
+    if (h.st === 'celebrate' || h.st === 'celeb' || S.phase === 'celeb' || S.phase === 'rating') { key = P + (Math.floor(h.celT * 5) % 2 ? 'cheer1' : 'cheer2'); oy = -Math.abs(Math.sin(h.celT * 7)) * 26; rot = 0; }
+    if (g.state === 'over' && h.st !== 'dead') key = P + 'cheer2';
+    const HS = 0.78;
     // shadow
     const sh = h.st === 'ride' ? h.y : h.surfY;
     const air = clamp((sh - h.y) / 300, 0, 1);
-    if (h.st !== 'fall') { ctx.fillStyle = 'rgba(31,26,61,' + (0.2 - air * 0.12) + ')'; ctx.beginPath(); ctx.ellipse(h.x, sh + 3, 40 * (1 - air * 0.4), 9 * (1 - air * 0.4), 0, 0, 7); ctx.fill(); }
+    if (h.st !== 'fall') { ctx.fillStyle = 'rgba(31,26,61,' + (0.2 - air * 0.12) + ')'; ctx.beginPath(); ctx.ellipse(h.x, sh + 3, 52 * (1 - air * 0.4), 11 * (1 - air * 0.4), 0, 0, 7); ctx.fill(); }
     if (h.inv > 0 && Math.floor(h.inv * 14) % 2 === 0 && h.st !== 'fall') ctx.globalAlpha = 0.45;
-    ctx.save(); ctx.translate(h.x + ox, h.y + oy); ctx.scale(sx, sy); ctx.translate(0, -62); ctx.rotate(rot);
-    WJ.spr(ctx, key, 0, 62);
+    ctx.save(); ctx.translate(h.x + ox, h.y + oy); ctx.scale(sx, sy); ctx.translate(0, -84); ctx.rotate(rot);
+    WJ.hspr(ctx, key, 0, 84, HS);
     ctx.restore(); ctx.globalAlpha = 1;
     if (h.st === 'teeter' && h.teeterT > 0.35) { // "!" bubble
       const bx = h.x + 20, by = h.y - 150 + Math.sin(h.teeterT * 8) * 4;

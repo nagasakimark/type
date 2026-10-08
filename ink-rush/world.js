@@ -7,12 +7,39 @@
   const INKC = INK.INKC;
   const VX = 960, F = 620, CAMH = 2.6, HZ0 = 395;
   INK.VX = VX; INK.F = F; INK.CAMH = CAMH; INK.HZ0 = HZ0;
-  const V = (INK.view = { hz: HZ0, camX: 0, cz: 0, t: 0 });
+  const V = (INK.view = { hz: HZ0, camX: 0, cz: 0, t: 0, R: null, o0: 0, h0: 0 });
   INK.quality = 0; // 0 high, 1 medium, 2 low: raised automatically when frames are slow
   INK.sc = (z) => F / z;
-  INK.gy = (z) => V.hz + (CAMH * F) / z;
-  INK.sx = (x, z) => VX + ((x - V.camX) * F) / z;
-  INK.sy = (y, z) => V.hz + ((CAMH - y) * F) / z; // y = height above ground (world units)
+  /* the route: the road bends (lateral offset) and rises/falls (height) as a function of world distance. Everything in the scene is
+     placed relative to the road, so projecting through these three functions is all it takes to drive round a bend or over a hill. */
+  INK.setCam = (cz, R) => { V.cz = cz; V.R = R || null; V.o0 = R ? R.off(cz) : 0; V.h0 = R ? R.h(cz) : 0; };
+  const dxz = (z) => (V.R ? V.R.off(V.cz + z) - V.o0 : 0);
+  const dhz = (z) => (V.R ? V.R.h(V.cz + z) - V.h0 : 0);
+  INK.dhz = dhz;
+  INK.gy = (z) => V.hz + ((CAMH - dhz(z)) * F) / z;
+  INK.sx = (x, z) => VX + ((x + dxz(z) - V.camX) * F) / z;
+  INK.sy = (y, z) => V.hz + ((CAMH - dhz(z) - y) * F) / z; // y = height above ground (world units)
+
+  /* route builder: Catmull-Rom through [world distance, value] keys, baked to a 0.5 unit table */
+  function makeCurve(keys, len) {
+    const K = keys.slice(); const step = 0.5, n = Math.ceil(len / step) + 2, tab = new Float32Array(n + 1);
+    const at = (i) => K[U.clamp(i, 0, K.length - 1)];
+    let seg = 0;
+    for (let i = 0; i <= n; i++) {
+      const w = i * step; while (seg < K.length - 2 && w > K[seg + 1][0]) seg++;
+      const p0 = at(seg - 1), p1 = at(seg), p2 = at(seg + 1), p3 = at(seg + 2);
+      const t = U.clamp((w - p1[0]) / Math.max(0.001, p2[0] - p1[0]), 0, 1), t2 = t * t, t3 = t2 * t;
+      tab[i] = 0.5 * ((2 * p1[1]) + (-p0[1] + p2[1]) * t + (2 * p0[1] - 5 * p1[1] + 4 * p2[1] - p3[1]) * t2 + (-p0[1] + 3 * p1[1] - 3 * p2[1] + p3[1]) * t3);
+    }
+    return (w) => { const f = U.clamp(w, 0, len) / step, i = Math.floor(f); return tab[i] + (tab[Math.min(n, i + 1)] - tab[i]) * (f - i); };
+  }
+  INK.ROUTES = {
+    //            lateral bends  [distance, offset]                                         hills  [distance, height]
+    street: { off: [[-30, 0], [0, 0], [22, 0], [46, 9], [78, -6], [104, 8], [140, 0], [400, 0]], h: [[-30, 0], [0, 0], [30, 0], [52, 1.1], [82, -0.4], [108, 0.9], [140, 0], [400, 0]] },
+    harbour: { off: [[-30, 0], [0, 0], [24, 0], [50, -10], [82, 9], [112, -7], [150, 0], [400, 0]], h: [[-30, 0], [0, 0], [38, 0], [58, 1.2], [84, 1.2], [104, 0], [150, 0], [400, 0]] },
+    skate: { off: [[-30, 0], [0, 0], [26, 0], [52, 8], [84, -9], [116, 6], [150, 0], [400, 0]], h: [[-30, 0], [0, 0], [28, 0], [48, 1.3], [74, -0.2], [96, 1.2], [124, 0], [400, 0]] },
+    roof: { off: [[-30, 0], [0, 0], [30, 0], [56, 6], [88, -5], [120, 5], [160, 0], [400, 0]], h: [[-30, 0], [0, 0], [40, 0], [56, 1.0], [76, 1.0], [92, 0], [112, 1.0], [160, 0], [400, 0]] },
+  };
 
   /* ---------------- helpers ---------------- */
   const hex2 = (h) => { const n = parseInt(h.slice(1), 16); return [(n >> 16) & 255, (n >> 8) & 255, n & 255]; };
@@ -61,6 +88,7 @@
     const R = (a, b) => a + rng() * (b - a);
     const len = def.stops[def.stops.length - 1] + 58;
     const WS = { si, def, pair, team, len, props: [], t: 0, amtQ: -1 };
+    { const rd = INK.ROUTES[def.id]; WS.route = { off: makeCurve(rd.off.map((k) => [k[0], k[1]]), len + 400), h: makeCurve(rd.h.map((k) => [k[0], k[1]]), len + 400) }; WS.route.slope = (w) => (WS.route.h(w + 1.5) - WS.route.h(w - 1.5)) / 3; }
     // paint texture (transparent, painted into as splats land)
     WS.texH = Math.ceil(len * TPU);
     WS.tex = document.createElement('canvas'); WS.tex.width = TEXW; WS.tex.height = WS.texH; WS.tctx = WS.tex.getContext('2d');
@@ -79,7 +107,7 @@
     };
     const kindsFor = {
       street: { A: ['shop', 'shop', 'shop', 'tower'], furn: ['lamp', 'tree', 'bin', 'bench', 'tree'], B: ['tower', 'shop', 'tower'], C: ['tower', 'tower', 'tower', 'shop'] },
-      harbour: { A: ['crate', 'warehouse', 'crate', 'crate'], furn: ['lamp', 'bollard', 'barrel', 'bollard', 'barrel'], B: ['boat', 'boat', 'crane', 'boat'], C: ['boat', 'boat', 'warehouse', 'crane'] },
+      harbour: { A: ['crate', 'warehouse', 'crate', 'crate'], furn: ['lamp', 'bollard', 'barrel', 'bollard', 'barrel'], B: ['crane', 'warehouse', 'crate', 'crate', 'crane'], C: ['boat', 'boat', 'buoy', 'boat'] },
       skate: { A: ['gwall', 'ramp', 'ramp', 'gwall'], furn: ['funbox', 'rail', 'lamp', 'flag', 'tree'], B: ['tree', 'tower', 'ramp', 'tree'], C: ['tower', 'tower', 'tree', 'tower'] },
       roof: { A: ['parapet'], furn: ['planter', 'tree', 'utable', 'lights', 'planter'], B: ['greenhouse', 'tank', 'planter', 'tree', 'chimney', 'greenhouse'], C: ['tower', 'tower', 'tower', 'tank'] },
     }[def.id];
@@ -90,7 +118,7 @@
         case 'lamp': return [0.7, 4.8]; case 'tree': return [R(3.4, 5), R(4.6, 6.8)]; case 'bin': return [0.95, 1.1]; case 'bench': return [2.3, 1.1];
         case 'crate': { const n = 1 + Math.floor(rng() * 3); return [5.8, 2.4 * n, n]; }
         case 'warehouse': return [R(9, 12), R(5, 7)]; case 'crane': return [R(7, 9), R(15, 21)]; case 'boat': return [R(6, 9), R(4, 6)];
-        case 'barrel': return [1.1, 1.3]; case 'bollard': return [0.7, 1];
+        case 'buoy': return [1.3, 1.9]; case 'barrel': return [1.1, 1.3]; case 'bollard': return [0.7, 1];
         case 'ramp': return [R(6, 9), R(3, 4.6)]; case 'funbox': return [R(4.5, 6), 1.7]; case 'rail': return [4, 1.2];
         case 'gwall': return [R(8, 12), R(4, 5.6)]; case 'flag': return [2.2, 6.4];
         case 'planter': return [R(3, 5), 1.9]; case 'greenhouse': return [R(6, 8), 4.6]; case 'tank': return [3.2, 7]; case 'chimney': return [1.7, 5.4];
@@ -99,6 +127,10 @@
     };
     const pickK = (arr) => arr[Math.floor(rng() * arr.length)];
     const hasWater = def.id === 'harbour';
+    /* harbour: containers, warehouses and cranes stand on the QUAY (|x| < Q); boats are moored in water slips cut into it or out in the bay */
+    WS.Q = hasWater ? 27 : 0; WS.slips = { '-1': [], '1': [] };
+    if (hasWater) for (const s of [-1, 1]) { let z = R(12, 24) + (s > 0 ? 0 : 22); while (z < len + 60) { const l = R(14, 17); WS.slips[s].push([z, z + l]); z += l + R(26, 38); } }
+    const inSlip = (s, z0, z1) => hasWater && WS.slips[s].some((q) => z1 > q[0] - 1 && z0 < q[1] + 1);
     const side = (s) => s; // -1 / +1
     for (const s of [-1, 1]) {
       // row A: just behind the sidewalk
@@ -106,6 +138,7 @@
       while (z < len) {
         const k = pickK(kindsFor.A), d = dimOf(k);
         const inner = def.id === 'roof' ? 7.4 : 7.8;
+        if (inSlip(s, z, z + d[0])) { z += 2; continue; }
         const p = add(k, s * (inner + d[0] / 2), z + d[0] / 2, d[0], d[1], d[2] ? { n2: d[2] } : {});
         if (k === 'parapet') p.paintable = true;
         z += d[0] * (def.id === 'roof' ? 0.98 : R(0.95, 1.25)) + (def.id === 'roof' ? 0 : R(0.2, 1.3));
@@ -122,9 +155,10 @@
       z = R(0, 6);
       while (z < len) {
         const k = pickK(kindsFor.B), d = dimOf(k);
-        const water = hasWater && (k === 'boat');
-        const x = water ? s * R(11.5, 22) : s * (R(def.id === 'roof' ? 15 : 14, def.id === 'roof' ? 24 : 24) + d[0] / 2);
-        add(k, x, z, d[0], d[1], { bob: water ? R(0, 6) : 0 });
+        let x = s * (R(def.id === 'roof' ? 15 : 14, 24) + d[0] / 2);
+        if (hasWater) x = s * Math.min(R(15, 22) + d[0] / 2, WS.Q - 1.2 - d[0] / 2);
+        if (inSlip(s, z, z + d[0])) { z += 2; continue; }
+        add(k, x, z, d[0], d[1], { bob: 0 });
         z += d[0] * R(0.9, 1.3) + R(1, 4);
       }
       // row C: far / ultrawide fill
@@ -132,8 +166,27 @@
       while (z < len + 40) {
         const k = pickK(kindsFor.C), d = dimOf(k);
         const x = s * (R(30, 56) + d[0] / 2);
-        add(k, x, z, d[0] * R(1, 1.3), d[1] * R(1, 1.25), { paintable: false, bob: k === 'boat' ? R(0, 6) : 0 });
+        add(k, x, z, d[0] * R(1, 1.3), d[1] * R(1, 1.25), { paintable: false, bob: k === 'boat' || k === 'buoy' ? R(0, 6) : 0 });
         z += d[0] * R(0.8, 1.2) + R(2, 7);
+      }
+    }
+    /* set pieces: a bunting arch over the road ahead of every fighting stop, and a themed landmark either side of the road */
+    {
+      const lm = { street: ['clock', 17, 22], harbour: ['lighthouse', 19, 20], skate: ['wheel', 16, 17], roof: ['mast', 14, 21] }[def.id];
+      def.stops.forEach((st, i) => {
+        add('arch', 0, st + 31, 15.6, 7.2, { paintable: true });
+        const sd = i % 2 ? 1 : -1;
+        add(lm[0], sd * (lm[1] + R(0, 3)), st + 22 + R(0, 6), lm[0] === 'wheel' ? 18 : 6, lm[2], { paintable: def.id !== 'harbour' || lm[0] !== 'lighthouse' ? true : true, bob: 0 });
+      });
+    }
+    if (hasWater) {
+      for (const s of [-1, 1]) {
+        for (const q of WS.slips[s]) { // a boat (sometimes two small ones) moored in each slip
+          const d = dimOf('boat'); add('boat', s * R(13, 19), (q[0] + q[1]) / 2 + R(-0.8, 0.8), Math.min(d[0], q[1] - q[0] - 3), d[1], { bob: R(0, 6) });
+          if (rng() < 0.5) add('buoy', s * R(9.2, 11), q[0] + R(1.5, q[1] - q[0] - 1.5), 1.3, 1.9, { bob: R(0, 6) });
+        }
+        for (let z = R(2, 8); z < len + 50; z += R(8, 15)) add('buoy', s * R(WS.Q + 1.5, 40), z, 1.3, 1.9, { bob: R(0, 6) });
+        for (let z = R(4, 14); z < len + 50; z += R(22, 34)) add('boat', s * R(WS.Q + 5, 46), z, R(6, 9), R(4, 6), { bob: R(0, 6) });
       }
     }
     for (const p of WS.props) if (!p.paintable || p.kind === 'lamp') { p.fill = mix(def.dull[p.ci], p.vivid, 0.6); p.fill2 = mix(p.fill, '#ffffff', 0.2); p.amt = 0.6; }
@@ -254,8 +307,12 @@
   };
 
   /* ---------------- ground ---------------- */
-  function strip(ctx, c, x0, z0, x1, z1) { // quad on the ground between lateral x0..x1 and depth z0(near)..z1(far)
-    ctx.beginPath(); ctx.moveTo(INK.sx(x0, z0), INK.gy(z0)); ctx.lineTo(INK.sx(x1, z0), INK.gy(z0)); ctx.lineTo(INK.sx(x1, z1), INK.gy(z1)); ctx.lineTo(INK.sx(x0, z1), INK.gy(z1)); ctx.closePath(); ctx.fill();
+  function strip(ctx, c, x0, z0, x1, z1) { // ground ribbon between lateral x0..x1 and depth z0(near)..z1(far); follows the route's bends and hills
+    const zs = [z0]; for (let z = z0 + Math.max(1.2, z0 * 0.1); z < z1 - 0.01; z += Math.max(1.2, z * 0.1)) zs.push(z); zs.push(z1);
+    ctx.beginPath();
+    for (let i = 0; i < zs.length; i++) { const z = zs[i]; if (i) ctx.lineTo(INK.sx(x0, z), INK.gy(z)); else ctx.moveTo(INK.sx(x0, z), INK.gy(z)); }
+    for (let i = zs.length - 1; i >= 0; i--) { const z = zs[i]; ctx.lineTo(INK.sx(x1, z), INK.gy(z)); }
+    ctx.closePath(); ctx.fill();
   }
   INK.drawGround = function (ctx, v, WS, amt, cz, t) {
     amt = 0.55 + 0.45 * amt; // ground starts saturated; paint adds the team colours on top
@@ -274,6 +331,16 @@
     } else if (id === 'street' || id === 'skate') { // grassy tufts / patches: simple checker bands on the outer ground
       ctx.fillStyle = 'rgba(31,26,61,0.045)';
       for (let wz = Math.floor(cz / 4) * 4; wz < cz + 90; wz += 8) { const z0 = wz - cz, z1 = z0 + 4; if (z0 < zb) continue; strip(ctx, null, -300, z0, 300, z1); }
+    }
+    if (id === 'harbour') { // the quay: stone/plank apron either side of the boardwalk, interrupted by water slips
+      const qc = U.shade(mix(pal.side, pal.sideV, amt), -0.1), qe = U.shade(qc, 0.2);
+      for (const s of [-1, 1]) {
+        const sl = WS.slips[s]; let a = cz - 4;
+        const seg = (z0, z1) => { z0 = Math.max(z0 - cz, zb); z1 = Math.min(z1 - cz, zf); if (z1 <= z0) return; ctx.fillStyle = qc; strip(ctx, null, s * 7.1, z0, s * WS.Q, z1); ctx.fillStyle = qe; strip(ctx, null, s * (WS.Q - 0.5), z0, s * WS.Q, z1); };
+        for (const q of sl) { if (q[1] < cz) continue; if (q[0] > cz + zf) break; seg(a, q[0]); a = q[1]; }
+        seg(a, cz + zf);
+        for (const q of sl) { for (const e of [q[0], q[1]]) { const z0 = e - cz; if (z0 > zb && z0 < zf - 1) { ctx.fillStyle = 'rgba(31,26,61,0.3)'; strip(ctx, null, s * 7.1, z0 - 0.14, s * WS.Q, z0 + 0.14); } } }
+      }
     }
     // sidewalk and road
     ctx.fillStyle = mix(pal.side, pal.sideV, amt); strip(ctx, null, -7.2, zb, 7.2, zf);
@@ -300,20 +367,20 @@
       ctx.strokeStyle = 'rgba(31,26,61,0.16)';
       for (let wz = Math.floor(cz / 2) * 2; wz < cz + 60; wz += 2) { const z = wz - cz; if (z < zb) continue; const sc = F / z; ctx.lineWidth = Math.max(0.6, 0.04 * sc); const y = INK.gy(z); ctx.beginPath(); ctx.moveTo(INK.sx(-7.2, z), y); ctx.lineTo(INK.sx(-4.7, z), y); ctx.moveTo(INK.sx(4.7, z), y); ctx.lineTo(INK.sx(7.2, z), y); ctx.stroke(); }
     }
-    // the paint layer, perspective-mapped strip by strip
+    // the paint layer, perspective-mapped slice by slice (slices follow the bends and hills of the route)
     const tex = WS.tex, th = WS.texH, zMax = 52, zMin = Math.max(zb, 1.3);
-    const yTop = Math.ceil(hz + (CAMH * F) / zMax), yBot = Math.min(bot, hz + (CAMH * F) / zMin);
     ctx.imageSmoothingEnabled = true;
-    for (let y = yTop; y < yBot; ) {
-      const step = (y > hz + 160 ? 2 : 3) + INK.quality;
-      const z0 = (CAMH * F) / (y - hz), z1 = (CAMH * F) / (y + step - hz);
+    for (let z0 = zMax; z0 > zMin + 0.01; ) {
+      const hh = Math.max(0.6, CAMH - INK.dhz(z0)), stp = (INK.sy(0, z0) > hz + 160 ? 2 : 3) + INK.quality;
+      const z1 = Math.max(zMin, z0 - Math.max(0.012, (stp * z0 * z0) / (hh * F)));
+      const yA = INK.gy(z0), yB = INK.gy(z1);
       let sy = (cz + z1) * TPU, sh = (z0 - z1) * TPU;
       if (sy < 0) { sh += sy; sy = 0; } if (sy + sh > th) sh = th - sy;
-      if (sh > 0.3) {
+      if (sh > 0.3 && yB > yA && yA < bot) {
         const zm = (z0 + z1) / 2, sc = F / zm;
-        ctx.drawImage(tex, 0, sy, TEXW, sh, VX + (-7 - V.camX) * sc, y, 14 * sc, step + 0.6);
+        ctx.drawImage(tex, 0, sy, TEXW, sh, INK.sx(-7, zm), yA, 14 * sc, Math.min(yB - yA, 40) + 0.6);
       }
-      y += step;
+      z0 = z1;
     }
     // haze at the horizon
     if (INK.quality >= 2) return;
@@ -414,6 +481,54 @@
     const sail = new Path2D(); sail.moveTo(w * 0.28, -h); sail.lineTo(w * 0.28, -h * 0.4); sail.lineTo(w * 0.02, -h * 0.4); sail.closePath(); plain(ctx, c, sail, c.fill2);
     ctx.fillStyle = 'rgba(255,255,255,0.7)'; ctx.beginPath(); ctx.ellipse(0, 0.2, w * 0.55, 0.28, 0, 0, 7); ctx.fill();
   };
+  K.buoy = (ctx, p, c) => {
+    const b = c.baking ? 0 : Math.sin(V.t * 1.7 + p.bob) * 0.12; ctx.translate(0, b);
+    const path = new Path2D(); path.moveTo(-0.62, 0); path.quadraticCurveTo(-0.72, -1.2, -0.3, -1.5); path.lineTo(0.3, -1.5); path.quadraticCurveTo(0.72, -1.2, 0.62, 0); path.closePath();
+    body(ctx, p, c, path, -0.7, -1.5, 1.4, 1.5, c.fill);
+    ctx.fillStyle = 'rgba(255,255,255,0.88)'; ctx.fillRect(-0.66, -0.95, 1.32, 0.28);
+    ctx.strokeStyle = INKC; ctx.lineWidth = c.lw * 1.4; ctx.beginPath(); ctx.moveTo(0, -1.5); ctx.lineTo(0, -2.4); ctx.stroke();
+    ctx.fillStyle = '#FFD84A'; ctx.beginPath(); ctx.arc(0, -2.5, 0.22, 0, 7); ctx.fill(); ctx.lineWidth = c.lw; ctx.stroke();
+    ctx.fillStyle = 'rgba(255,255,255,0.7)'; ctx.beginPath(); ctx.ellipse(0, 0.05, 0.95, 0.18, 0, 0, 7); ctx.fill();
+  };
+  K.arch = (ctx, p, c) => {
+    const w = p.w, h = p.h, pw = 1.1;
+    box(ctx, p, c, -w / 2, -h, pw, h, 0.3); box(ctx, p, c, w / 2 - pw, -h, pw, h, 0.3);
+    box(ctx, p, c, -w / 2 - 0.4, -h - 1.5, w + 0.8, 1.7, 0.5, p.fill2);
+    if (!c.far) { // bunting
+      const n = 9; for (let i = 0; i < n; i++) { const x = -w / 2 + 0.9 + (i + 0.5) * ((w - 1.8) / n), t = new Path2D(); t.moveTo(x - 0.6, -h + 0.2); t.lineTo(x + 0.6, -h + 0.2); t.lineTo(x, -h + 1.7); t.closePath(); plain(ctx, c, t, i % 2 ? p.vivid : p.vivid2); }
+    }
+  };
+  K.lighthouse = (ctx, p, c) => {
+    const w = p.w, h = p.h; const t = new Path2D(); t.moveTo(-w * 0.5, 0); t.lineTo(-w * 0.3, -h * 0.82); t.lineTo(w * 0.3, -h * 0.82); t.lineTo(w * 0.5, 0); t.closePath();
+    body(ctx, p, c, t, -w / 2, -h * 0.82, w, h * 0.82, c.fill);
+    ctx.fillStyle = p.amt > 0.3 ? p.vivid2 : '#d9aeb0'; for (const k of [0.25, 0.55]) { ctx.beginPath(); ctx.moveTo(-w * (0.5 - k * 0.2), -h * k); ctx.lineTo(w * (0.5 - k * 0.2), -h * k); ctx.lineTo(w * (0.5 - (k + 0.14) * 0.2), -h * (k + 0.14)); ctx.lineTo(-w * (0.5 - (k + 0.14) * 0.2), -h * (k + 0.14)); ctx.closePath(); ctx.fill(); }
+    box(ctx, p, c, -w * 0.42, -h * 0.9, w * 0.84, h * 0.08, 0.15, c.fill2);
+    plain(ctx, c, P.rr(-w * 0.22, -h * 0.98, w * 0.44, h * 0.09, 0.3), '#FFE680');
+    const roof = new Path2D(); roof.moveTo(-w * 0.3, -h * 0.98); roof.lineTo(0, -h * 1.12); roof.lineTo(w * 0.3, -h * 0.98); roof.closePath(); plain(ctx, c, roof, p.amt > 0.3 ? p.vivid : c.fill2);
+  };
+  K.clock = (ctx, p, c) => {
+    const w = p.w, h = p.h; box(ctx, p, c, -w / 2, -h, w, h, 0.4);
+    const roof = new Path2D(); roof.moveTo(-w * 0.6, -h); roof.lineTo(0, -h - w * 0.9); roof.lineTo(w * 0.6, -h); roof.closePath(); plain(ctx, c, roof, p.amt > 0.3 ? p.vivid : c.fill2);
+    const cy = -h * 0.8, r = w * 0.34; plain(ctx, c, P.circle(0, cy, r), '#fff');
+    if (!c.far) { ctx.strokeStyle = INKC; ctx.lineWidth = c.lw * 1.6; ctx.lineCap = 'round'; const a = V.t * 0.2; ctx.beginPath(); ctx.moveTo(0, cy); ctx.lineTo(0, cy - r * 0.7); ctx.moveTo(0, cy); ctx.lineTo(Math.cos(a) * r * 0.5, cy + Math.sin(a) * r * 0.5); ctx.stroke(); }
+    ctx.fillStyle = '#5A5780'; ctx.fillRect(-w * 0.18, -h * 0.4, w * 0.36, h * 0.4);
+  };
+  K.wheel = (ctx, p, c) => {
+    const R0 = p.h * 0.5, cy = -R0 - 1.2; ctx.lineCap = 'round';
+    const col = p.amt > 0.4 ? p.vivid : '#B6B8CA', lw = Math.max(c.lw * 3, 0.3);
+    const ln = (x0, y0, x1, y1, w2, col2) => { ctx.strokeStyle = INKC; ctx.lineWidth = w2 + c.lw * 2; ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x1, y1); ctx.stroke(); ctx.strokeStyle = col2; ctx.lineWidth = w2; ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x1, y1); ctx.stroke(); };
+    ln(-R0 * 0.45, 0, 0, cy, lw, col); ln(R0 * 0.45, 0, 0, cy, lw, col);
+    ctx.strokeStyle = INKC; ctx.lineWidth = lw + c.lw * 2; ctx.beginPath(); ctx.arc(0, cy, R0, 0, 7); ctx.stroke(); ctx.strokeStyle = col; ctx.lineWidth = lw; ctx.stroke();
+    const rot = c.baking ? 0 : V.t * 0.15;
+    for (let i = 0; i < 8; i++) { const a = rot + i * Math.PI / 4, x = Math.cos(a) * R0, y = cy + Math.sin(a) * R0; ln(0, cy, x, y, lw * 0.5, col); if (!c.far) { plain(ctx, c, P.rr(x - 0.55, y, 1.1, 0.9, 0.25), i % 2 ? p.vivid2 : '#FFD84A'); } }
+  };
+  K.mast = (ctx, p, c) => {
+    const h = p.h; ctx.lineCap = 'round'; const col = p.amt > 0.4 ? p.vivid : '#B6B8CA';
+    const ln = (x0, y0, x1, y1, w2, col2) => { ctx.strokeStyle = INKC; ctx.lineWidth = w2 + c.lw * 2; ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x1, y1); ctx.stroke(); ctx.strokeStyle = col2; ctx.lineWidth = w2; ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x1, y1); ctx.stroke(); };
+    ln(-1.1, 0, -0.2, -h, 0.3, col); ln(1.1, 0, 0.2, -h, 0.3, col); for (let i = 1; i < 5; i++) { const y = -h * i / 5, k = 1 - i / 5.6; ln(-1.0 * k, y, 1.0 * k, y, 0.18, col); }
+    ln(-0.9, -h * 0.7, 0.9, -h * 0.7, 0.2, col); const on = c.baking ? 1 : (Math.sin(V.t * 3) > 0 ? 1 : 0.3);
+    ctx.globalAlpha = on; ctx.fillStyle = '#FF5A5F'; ctx.beginPath(); ctx.arc(0, -h - 0.3, 0.34, 0, 7); ctx.fill(); ctx.globalAlpha = 1;
+  };
   K.barrel = (ctx, p, c) => { box(ctx, p, c, -0.55, -1.3, 1.1, 1.3, 0.35); ctx.strokeStyle = INKC; ctx.lineWidth = c.lw; for (const y of [-0.9, -0.4]) { ctx.beginPath(); ctx.moveTo(-0.55, y); ctx.lineTo(0.55, y); ctx.stroke(); } };
   K.bollard = (ctx, p, c) => { box(ctx, p, c, -0.3, -1, 0.6, 1, 0.25); ctx.fillStyle = '#fff'; ctx.fillRect(-0.3, -0.75, 0.6, 0.18); };
   K.ramp = (ctx, p, c) => {
@@ -471,7 +586,7 @@
   const tmpC = { fill: '', fill2: '', lw: 0.05, far: false, baking: false };
   function bboxOf(p) {
     const hw = Math.max(p.w / 2 + 1.4, p.kind === 'lights' ? 5.4 : 0, p.kind === 'crane' ? p.w * 0.62 + 1 : 0, p.kind === 'tree' ? p.w * 0.6 + 0.5 : 0);
-    return { hw, top: p.h + 2.8 + (p.kind === 'tower' ? 0.5 : 0) + (p.kind === 'greenhouse' ? 0 : 0), bot: 1.0 };
+    return { hw, top: p.h + 2.8 + (p.kind === 'tower' ? 0.5 : 0) + (p.kind === 'clock' ? p.w * 0.9 : 0) + (p.kind === 'lighthouse' ? p.h * 0.1 : 0) + (p.kind === 'greenhouse' ? 0 : 0), bot: 1.0 };
   }
   function bake(p, d) {
     const bb = bboxOf(p), w = Math.ceil(bb.hw * 2 * d), h = Math.ceil((bb.top + bb.bot) * d);
@@ -485,7 +600,7 @@
     const z = p.wz - cz;
     if (z < 3.2) { if (p.cache) p.cache = null; return; }
     if (INK.quality >= 1 && (z > 52 || (INK.quality >= 2 && !p.paintable && z > 24))) return;
-    const sc = F / z, x = VX + (p.x - V.camX) * sc, y = V.hz + CAMH * sc;
+    const sc = F / z, x = INK.sx(p.x, z), y = INK.gy(z);
     const hw = (p.w + 4) * sc * 0.55; if (x + hw < v.x || x - hw > v.x + v.w) return;
     if (z > 62) ctx.globalAlpha = U.clamp((95 - z) / 33, 0, 1);
     if (sc > 64 || p.kind === 'flag') {
@@ -498,7 +613,7 @@
       const want = Math.min(40, Math.max(10, sc * 1.3));
       if (!p.cache || (p.cache.d < want * 0.72 && p.cache.d < 40)) bake(p, want);
       const k = p.cache; let dy = 0;
-      if (p.kind === 'boat') dy = Math.sin(V.t * 1.3 + p.bob) * 0.18 * sc;
+      if (p.kind === 'boat' || p.kind === 'buoy') dy = Math.sin(V.t * 1.3 + p.bob) * 0.18 * sc;
       ctx.drawImage(k.cv, x - k.hw * sc, y - k.top * sc + dy, k.bw * sc, k.bh * sc);
     }
     if (z > 62) ctx.globalAlpha = 1;

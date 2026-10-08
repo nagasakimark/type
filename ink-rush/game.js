@@ -549,8 +549,9 @@
     S.t += dt; V.t = S.t;
     const calm = TM.settings.reduceMotion;
     V.sway = Math.sin(S.t * 0.35) * 1.0;
+    INK.setCam(S.cz, WS && WS.route);
     V.camX = calm ? 0 : Math.sin(S.t * 0.4) * 0.18;
-    V.hz = INK.HZ0 + (calm ? 0 : Math.sin(S.t * (S.moveSpd > 0.5 ? 9 : 1.3)) * (S.moveSpd > 0.5 ? 5 : 1.2) * Math.min(1, 0.3 + S.moveSpd / 6));
+    V.hz = INK.HZ0 - (WS && WS.route ? WS.route.slope(S.cz) * 110 : 0) + (calm ? 0 : Math.sin(S.t * (S.moveSpd > 0.5 ? 9 : 1.3)) * (S.moveSpd > 0.5 ? 5 : 1.2) * Math.min(1, 0.3 + S.moveSpd / 6));
     parts.update(dt);
     S.recoil = Math.max(0, S.recoil - dt * 7); S.hitFlash = Math.max(0, S.hitFlash - dt * 2.4);
     S.amt = U.lerp(S.amt, S.cov, Math.min(1, dt * 2.5));
@@ -946,6 +947,7 @@
     if (lastDraw && g.state === 'play') { const dtm = Math.min(200, nowT - lastDraw); ema += (dtm - ema) * 0.05; if (ema > 26) slowN++; else slowN = Math.max(0, slowN - 2); if (slowN > 120 && INK.quality < 2) { INK.quality++; slowN = 0; ema = 16; } }
     lastDraw = nowT;
     // keep the sky/ground edges beyond the visible rect
+    INK.setCam(S.cz, WS.route);
     INK.drawSky(ctx, v, WS, S.amt, S.t);
     INK.drawGround(ctx, v, WS, S.amt, S.cz, S.t);
     drawables.length = 0;

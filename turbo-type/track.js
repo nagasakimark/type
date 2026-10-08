@@ -13,7 +13,7 @@
      jumps: u = fraction of the lap, len = ramp length, h = ramp height.   pads: u = fraction of the lap. */
   TT.TRACKS = [
     {
-      id: 'sunny', name: 'Sunny Circuit', ja: 'サニー・サーキット', level: 'Easy', blurb: 'Wide, friendly corners and two little jumps.',
+      id: 'sunny', name: 'サニーサーキット', level: 'かんたん', blurb: 'ひろい コーナーと ちいさな ジャンプが 2つ',
       width: 18, bankGain: 5, maxBank: 0.12, stage: [0.0, 0.5],
       bridge: { u: 0.58 }, jumps: [{ u: 0.34, len: 9, h: 2.4 }, { u: 0.80, len: 9, h: 2.4 }],
       pads: [{ u: 0.12 }, { u: 0.56 }, { u: 0.93 }],
@@ -25,7 +25,7 @@
       ],
     },
     {
-      id: 'rally', name: 'Hill Rally', ja: 'ヒル・ラリー', level: 'Medium', blurb: 'Rolling hills, big jumps and a hairpin!',
+      id: 'rally', name: 'ヒルラリー', level: 'ふつう', blurb: 'おかと 大きな ジャンプと ヘアピンカーブ！',
       width: 18, bankGain: 6, maxBank: 0.14, stage: [0.25, 0.75],
       tunnel: { u: 0.62, len: 90 }, bridge: { u: 0.05 }, jumps: [{ u: 0.20, len: 10, h: 3.0 }, { u: 0.50, len: 10, h: 3.2 }, { u: 0.82, len: 10, h: 3.0 }],
       pads: [{ u: 0.08 }, { u: 0.38 }, { u: 0.66 }, { u: 0.92 }],
@@ -38,7 +38,7 @@
       ],
     },
     {
-      id: 'night', name: 'Night Sprint', ja: 'ナイト・スプリント', level: 'Hard', blurb: 'Neon night run with tunnels, tight turns and boost pads.',
+      id: 'night', name: 'ナイトスプリント', level: 'むずかしい', blurb: 'ネオンの 夜。トンネルと きついカーブと ブースト',
       width: 18, bankGain: 6, maxBank: 0.14, stage: [0.45, 1.0],
       tunnel: { u: 0.50, len: 100 }, bridge: { u: 0.43 }, jumps: [{ u: 0.30, len: 9, h: 2.8 }, { u: 0.74, len: 9, h: 2.8 }],
       pads: [{ u: 0.10 }, { u: 0.22 }, { u: 0.50 }, { u: 0.64 }, { u: 0.90 }],

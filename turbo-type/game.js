@@ -6,14 +6,14 @@
   const W = 1920, H = 1080;
   const clamp = U.clamp, lerp = U.lerp;
   const smooth = (a, b, x) => { const t = clamp((x - a) / (b - a), 0, 1); return t * t * (3 - 2 * t); };
-  const ORD = ['1st', '2nd', '3rd', '4th', '5th'];
+  const ORD = ['1位', '2位', '3位', '4位', '5位'];
   const GRAV = 27;
 
-  const PLAYER = { name: 'YOU', model: 'raceCarOrange', tint: { mat: 'pylon', color: 0xff7a1a }, css: '#FF7A1A' };
+  const PLAYER = { name: 'あなた', model: 'raceCarOrange', tint: { mat: 'pylon', color: 0xff7a1a }, css: '#FF7A1A' };
   const RIVALS = [
-    { name: 'Mochi', model: 'raceCarRed', tint: { mat: 'red', color: 0xe5383b }, css: '#FF5A7A', mult: 0.92, trait: 'Steady Eddie', stumble: 0.02, lane: 4 },
-    { name: 'Taro', model: 'raceCarGreen', tint: { mat: 'grass', color: 0x2bb673 }, css: '#2BB673', mult: 1.0, trait: 'Fast starter', stumble: 0.06, lane: -4 },
-    { name: 'Sora', model: 'raceCarWhite', tint: { mat: 'grey', color: 0x4aa3ff }, css: '#4AA3FF', mult: 0.95, trait: 'Late charge', stumble: 0.04, lane: 0 },
+    { name: 'Mochi', model: 'raceCarRed', tint: { mat: 'red', color: 0xe5383b }, css: '#FF5A7A', mult: 0.92, trait: 'ミスが すくない', stumble: 0.02, lane: 4 },
+    { name: 'Taro', model: 'raceCarGreen', tint: { mat: 'grass', color: 0x2bb673 }, css: '#2BB673', mult: 1.0, trait: 'スタートが はやい', stumble: 0.06, lane: -4 },
+    { name: 'Sora', model: 'raceCarWhite', tint: { mat: 'grey', color: 0x4aa3ff }, css: '#4AA3FF', mult: 0.95, trait: 'ラストが つよい', stumble: 0.04, lane: 0 },
   ];
   const SONGS = {
     sunny: TM.audio.song({ bpm: 132, roots: [48, 43, 45, 41], chords: [[60, 64, 67], [59, 62, 67], [57, 60, 64], [57, 60, 65]], bassPattern: [0, null, 12, null, 0, null, 12, 7, 0, null, 12, null, 7, null, 12, 10], lead: [79, null, 76, null, 79, null, 83, 81, null, 79, null, 76, 74, null, null, null, 72, null, 76, null, 79, 77, null, 76, null, 74, null, 72, 71, null, null, null], wave: 'square' }),
@@ -129,6 +129,7 @@
   }
 
   function reset(gm) {
+    if (!gm.fx._ja) { const op = gm.fx.pop.bind(gm.fx); gm.fx.pop = (x, y, str, o) => op(x, y, String(str).replace(/^COMBO x(\d+)!/, 'コンボ x$1！'), o); gm.fx._ja = 1; }
     g = gm;
     if (!ST.ready) { ST.wantReset = true; return; }
     const demo = g.demo;
@@ -169,7 +170,7 @@
     c.v *= first ? 0.74 : 0.94; c.rate *= first ? 0.45 : 0.8; c.stumble = 0.75; c.kick = 0; c.sparks = 0;
     if (c.isPlayer) {
       S.nitro = Math.max(0, S.nitro - 0.12); S.shake = Math.max(S.shake, first ? 0.5 : 0.2);
-      if (first) { Aud.play('stumble', 0.7); banner('OOPS!', '#FF5A5F', 0.7, 'keep going'); }
+      if (first) { Aud.play('stumble', 0.7); banner('あっ！', '#FF5A5F', 0.7, 'つづけよう'); }
     }
     puffSmoke(c, 9);
   }
@@ -181,13 +182,13 @@
     P.kick = Math.min(9, P.kick + 3.5); P.sqV += 3;
     S.nitro = Math.min(1.2, S.nitro + (sentence ? (clean ? 0.8 : 0.45) : (clean ? 0.34 : 0.14)));
     if (S.nitro >= 1 && S.nitroT <= 0) fireNitro(P);
-    else if (clean && sentence) { banner('PERFECT!', '#FFC83D', 1.0); }
+    else if (clean && sentence) { banner('パーフェクト！', '#FFC83D', 1.0); }
     for (let i = 0; i < 10; i++) emitFlame(P, 0.6);
   }
   function fireNitro(P) {
     S.nitro = Math.max(0, S.nitro - 1); S.nitroT = 3.4; P.nitroT = 3.4; P.v += 7; S.nitrosDone++;
     S.shake = Math.max(S.shake, 0.7); S.camBumpV -= 3;
-    banner('NITRO!', '#FF7A1A', 1.4, 'full throttle!'); Aud.play('nitro', 1); TM.sfx.boost && TM.sfx.boost();
+    banner('ニトロ！', '#FF7A1A', 1.4, 'ぜんそくりょく！'); Aud.play('nitro', 1); TM.sfx.boost && TM.sfx.boost();
     if (!g.demo) g.fx.doFlash('#FFB347', 0.28);
     for (let i = 0; i < 50; i++) emitFlame(P, 1.6);
     S.score && 0;
@@ -295,7 +296,7 @@
         // launch!
         const slope = vyG;
         c.air = true; c.vy = TT.launchVy(slope, c.v); c.airT = 0; c.airTotal = (2 * c.vy) / GRAV; c.trickOn = c.airTotal > 1.05; c.rollTrick = 0; c.jumps++;
-        if (c.isPlayer && !S.demo) { Aud.play('jump', 0.8); S.shake = Math.max(S.shake, 0.25); S.camBumpV += 4; banner('JUMP!', '#2F9BFF', 0.9); }
+        if (c.isPlayer && !S.demo) { Aud.play('jump', 0.8); S.shake = Math.max(S.shake, 0.25); S.camBumpV += 4; banner('ジャンプ！', '#2F9BFF', 0.9); }
       } else c.y += (gy - c.y) * Math.min(1, dt * 40) * 0 + (gy - c.y); // follow ground exactly
     }
     if (c.air) {
@@ -316,7 +317,7 @@
         c.pos.set(o1.x + o1.rx * c.lat, gy, o1.z + o1.rz * c.lat); landingDust(c, str);
         if (c.isPlayer && !S.demo) {
           S.shake = Math.max(S.shake, 0.6 + str * 0.5); S.camBumpV -= 6 * str; Aud.play('land', 0.45); Aud.thump(str);
-          if (c.airT > 0.85) { S.bigAir++; const bonus = Math.round(50 + c.airT * 60); g.score.add(bonus); banner('BIG AIR!', '#FFC83D', 1.4, '+' + bonus); }
+          if (c.airT > 0.85) { S.bigAir++; const bonus = Math.round(50 + c.airT * 60); g.score.add(bonus); banner('ビッグジャンプ！', '#FFC83D', 1.4, '+' + bonus); }
           S.jumpsDone++;
         }
         if (c.airT > 0.5) c.v *= 0.97;
@@ -328,7 +329,7 @@
       let d1 = (c.dist - p.s0) % tr.L; if (d1 < 0) d1 += tr.L;
       if (d1 < p.len) {
         c.padT = 1.7; c.v += 9; c.kick += 2;
-        if (c.isPlayer && !S.demo) { Aud.play('pad', 0.9); banner('BOOST!', '#2BD9FF', 0.9); S.shake = Math.max(S.shake, 0.2); g.score.add(25); for (let i = 0; i < 24; i++) emitFlame(c, 1.2); }
+        if (c.isPlayer && !S.demo) { Aud.play('pad', 0.9); banner('ブースト！', '#2BD9FF', 0.9); S.shake = Math.max(S.shake, 0.2); g.score.add(25); for (let i = 0; i < 24; i++) emitFlame(c, 1.2); }
         break;
       }
     }
@@ -391,7 +392,7 @@
     if (fast) { S.fastest = time; TM.store.set('turbo.best.' + ST.track.def.id, time); }
     Aud.play('lap', 0.7);
     if (lapNo < S.laps) {
-      banner(lapNo === S.laps - 1 && S.laps > 1 ? 'FINAL LAP!' : 'LAP ' + (lapNo + 1) + '/' + S.laps, lapNo === S.laps - 1 ? '#FFC83D' : '#fff', 1.8, 'lap time ' + fmt(time) + (fast && lapNo > 0 ? '  - fastest!' : ''));
+      banner(lapNo === S.laps - 1 && S.laps > 1 ? 'ファイナルラップ！' : 'ラップ ' + (lapNo + 1) + '/' + S.laps, lapNo === S.laps - 1 ? '#FFC83D' : '#fff', 1.8, 'ラップタイム ' + fmt(time) + (fast && lapNo > 0 ? '  ベスト！' : ''));
       g.score.add(150);
     }
     S.lapFlash = 1.5;
@@ -404,7 +405,7 @@
     S.cars.forEach((x) => { x.finalPlace = x.finished ? x.place : x.est; });
     const place = c.finalPlace; S.place = place;
     const bonus = [1000, 600, 300, 100][place - 1] || 0; g.score.add(bonus);
-    banner(place === 1 ? 'YOU WIN!' : ORD[place - 1].toUpperCase() + ' PLACE', place === 1 ? '#FFC83D' : '#fff', 4, 'FINISH!');
+    banner(place === 1 ? 'ゆうしょう！' : ORD[place - 1] + ' ゴール！', place === 1 ? '#FFC83D' : '#fff', 4, 'ゴール！');
     TM.sfx.win && 0;
     g.fx.confetti(W / 2, 400, place === 1 ? 140 : 50);
     // typing stats for the next race
@@ -413,8 +414,8 @@
     const rows = S.cars.slice().sort((a, b) => a.finalPlace - b.finalPlace);
     S.results = rows;
     g.end({
-      win: place <= 3, title: place === 1 ? 'You won the race!' : names + ' place!', sub: place === 1 ? 'Fastest typist on the track!' : place <= 3 ? 'On the podium - race again to get gold!' : 'Nice try - every race you get faster!',
-      targetMet: place <= 2, stats: [['Place', names], ['Race time', fmt(S.raceT)], ['Best lap', c.bestLap < 1e8 ? fmt(c.bestLap) : '-'], ['Big jumps', S.bigAir]], delay: 7600,
+      win: place <= 3, title: place === 1 ? 'ゆうしょう！' : names + 'だったよ！', sub: place === 1 ? 'タイピング ナンバーワン！' : place <= 3 ? 'ひょうしょうだい！ もういちどで 金メダル' : 'おしい！ レースごとに はやくなるよ',
+      targetMet: place <= 2, stats: [['じゅんい', names], ['タイム', fmt(S.raceT)], ['ベストラップ', c.bestLap < 1e8 ? fmt(c.bestLap) : '-'], ['ビッグジャンプ', S.bigAir]], delay: 7600,
     });
   }
   const fmt = (t) => { const m = Math.floor(t / 60), s = t - m * 60; return m + ':' + (s < 10 ? '0' : '') + s.toFixed(1); };
@@ -436,7 +437,7 @@
     S.tickT = performance.now();
     // phase transitions
     if (g.state === 'countdown' && S.phase !== 'grid') setupRace(false);
-    if (S.phase === 'grid' && g.state === 'play') { S.phase = 'race'; S.raceT = 0; S.player.v = 8; S.player.kick = 6; S.cars.forEach((c) => { c.lapStart = 0; }); S.goT = 0; Aud.play('whoosh', 0.5); banner('GO!', '#2BD96B', 1.0); }
+    if (S.phase === 'grid' && g.state === 'play') { S.phase = 'race'; S.raceT = 0; S.player.v = 8; S.player.kick = 6; S.cars.forEach((c) => { c.lapStart = 0; }); S.goT = 0; Aud.play('whoosh', 0.5); banner('スタート！', '#2BD96B', 1.0); }
     if (g.state === 'title' && !S.demo) setupRace(true);
     if (g.state === 'countdown' && S.phase === 'grid' && S.demo) setupRace(false);
     const racing = S.phase === 'race' || S.phase === 'finish' || S.demo;
@@ -446,7 +447,7 @@
     const rk = ranking();
     if (!S.demo && S.phase === 'race') {
       const myRank = S.player.rank;
-      if (myRank < S.lastRank && S.raceT > 4) { banner('OVERTAKE!', '#2BB673', 1.1, ORD[myRank]); g.score.add(60); TM.sfx.combo && TM.sfx.combo(0); }
+      if (myRank < S.lastRank && S.raceT > 4) { banner('ぬいた！', '#2BB673', 1.1, ORD[myRank]); g.score.add(60); TM.sfx.combo && TM.sfx.combo(0); }
       S.lastRank = myRank;
       if (S.nitroT > 0) S.nitroT -= dt;
       S.nitro = Math.max(0, S.nitro - dt * 0.004);
@@ -562,7 +563,7 @@
     const rows = S.results; world.showPodium(ST.track, rows.slice(0, 4).map((c) => c.mesh));
     S.podCars = rows;
     for (let i = 0; i < 70; i++) world.glow.emit(world.podiumPos.x + U.rand(-12, 12), world.podiumPos.y + U.rand(6, 16), world.podiumPos.z + U.rand(-12, 12), U.rand(-1, 1), U.rand(-4, -1.5), U.rand(-1, 1), U.rand(2, 4), 0.8, 0.8, Math.random(), Math.random(), Math.random(), 0.9, -2, 0.1);
-    banner('PODIUM!', '#FFC83D', 2.5);
+    banner('ひょうしょうだい！', '#FFC83D', 2.5);
   }
   function podiumCamera(dt) {
     S.podT += dt; const p = world.podiumPos, f = world.podiumFwd;
@@ -612,15 +613,15 @@
     g.fx.draw(ctx);
   }
   function drawLoading(ctx, v) {
-    D.text(ctx, ST.loading ? 'Warming up the engines...' : 'Loading...', W / 2, v.y + v.h * 0.62, { size: 54, color: '#fff', outline: 12 });
+    D.text(ctx, ST.loading ? 'エンジンを あたためているよ...' : 'よみこみちゅう...', W / 2, v.y + v.h * 0.62, { size: 54, color: '#fff', outline: 12 });
   }
   function drawNoGL(ctx, v) {
     ctx.fillStyle = '#1F1A3D'; ctx.fillRect(v.x, v.y, v.w, v.h);
-    D.text(ctx, 'Sorry! Your browser cannot show 3D graphics (WebGL).', W / 2, v.y + v.h / 2 - 30, { size: 46, color: '#fff' });
-    D.text(ctx, 'Try Chrome or Edge, or turn on hardware acceleration.', W / 2, v.y + v.h / 2 + 40, { size: 32, color: '#FFC83D' });
+    D.text(ctx, 'ごめんね！ このブラウザでは 3Dが 見られないよ', W / 2, v.y + v.h / 2 - 30, { size: 46, color: '#fff' });
+    D.text(ctx, 'Chromeか Edgeで ひらいてね', W / 2, v.y + v.h / 2 + 40, { size: 32, color: '#FFC83D' });
   }
   function drawTitleHud(ctx, v) {
-    if (ST.fileMode) D.text(ctx, 'Tip: open this page from a web server (http) for the full 3D look.', W / 2, v.y + v.h - 40, { size: 26, color: '#fff', outline: 8 });
+    if (ST.fileMode) D.text(ctx, 'ほんとうの 3Dで あそぶには ウェブサーバー（http）で ひらいてね', W / 2, v.y + v.h - 40, { size: 26, color: '#fff', outline: 8 });
   }
   /* HUD side anchors: the visible rect, but never wider than ~21:9 so ultrawide windows keep the HUD near the action */
   const sc0 = (v) => v.h / v.w > 0.95;
@@ -661,7 +662,7 @@
     ctx.fillStyle = 'rgba(31,26,61,0.86)'; ctx.fill(path);
     ctx.lineWidth = 7; ctx.strokeStyle = t.shake > 0 ? C.miss : C.turbo; ctx.stroke(path);
     // tab: TYPE! + hint
-    D.pill(ctx, cx - pw / 2 + 36, top - 22, 150, 44, C.turbo); D.text(ctx, S.phase === 'grid' ? 'READY' : 'TYPE!', cx - pw / 2 + 111, top + 2, { size: 30, color: '#fff' });
+    D.pill(ctx, cx - pw / 2 + 36, top - 22, 150, 44, C.turbo); D.text(ctx, S.phase === 'grid' ? 'よーい' : 'うて！', cx - pw / 2 + 111, top + 2, { size: 30, color: '#fff' });
     if (hasHint) {
       const hs = 36; ctx.font = D.FONT_JA(hs); const hw = ctx.measureText(t.item.hint).width + 56;
       const hx = cx + pw / 2 - 36 - hw; D.pill(ctx, hx, top - 28, hw, 56, '#fff', { stroke: C.ink, lw: 5 });
@@ -687,7 +688,7 @@
     });
     // next chunk preview
     const n = S.queue[1];
-    if (n) { ctx.font = D.FONT_WORD(30, 500); ctx.fillStyle = 'rgba(255,255,255,0.55)'; ctx.textAlign = 'right'; ctx.textBaseline = 'middle'; ctx.fillText('next: ' + (n.item.t.length > 38 ? n.item.t.slice(0, 36) + '...' : n.item.t), cx + pw / 2 - 40, top + ph + 22); }
+    if (n) { ctx.font = D.FONT_WORD(30, 500); ctx.fillStyle = 'rgba(255,255,255,0.55)'; ctx.textAlign = 'right'; ctx.textBaseline = 'middle'; ctx.fillText('つぎ: ' + (n.item.t.length > 38 ? n.item.t.slice(0, 36) + '...' : n.item.t), cx + pw / 2 - 40, top + ph + 22); }
     ctx.restore();
     S.panelTop = top;
   }
@@ -710,7 +711,7 @@
     D.pill(ctx, bx, by, bw, bh, 'rgba(31,26,61,0.88)');
     const nf = S.nitroT > 0 ? clamp(S.nitroT / 3.4, 0, 1) : clamp(S.nitro, 0, 1);
     if (nf > 0.01) D.pill(ctx, bx + 5, by + 5, Math.max(bh - 10, (bw - 10) * nf), bh - 10, S.nitroT > 0 || S.nitro > 0.85 ? '#FFC83D' : C.turbo);
-    D.text(ctx, S.nitroT > 0 ? 'NITRO!!' : S.nitro > 0.85 ? 'NITRO READY' : 'NITRO', bx + bw / 2, by + bh / 2 + 2, { size: 26 * sc, color: '#fff', outline: 7 });
+    D.text(ctx, S.nitroT > 0 ? 'ニトロ！！' : S.nitro > 0.85 ? 'ニトロ OK' : 'ニトロ', bx + bw / 2, by + bh / 2 + 2, { size: 26 * sc, color: '#fff', outline: 7 });
     ctx.restore();
   }
 
@@ -719,7 +720,7 @@
     const sc = scaleHud(v), x = hudL(v) + 28, y = Math.max(v.y + 122 + (sc > 1 ? 40 : 0), v.y + 92 / Math.min(window.innerWidth / W, window.innerHeight / H)), rowH = 62 * sc, w = 360 * sc;
     const r = S.cars.slice().sort((a, b) => a.rank - b.rank);
     ctx.save();
-    D.pill(ctx, x, y - 8, w, 40 * sc, 'rgba(31,26,61,0.84)'); D.text(ctx, 'RACE', x + 64 * sc, y + 12 * sc, { size: 24 * sc, color: '#fff' }); D.text(ctx, 'WPM', x + w - 56 * sc, y + 12 * sc, { size: 22 * sc, color: 'rgba(255,255,255,0.7)' });
+    D.pill(ctx, x, y - 8, w, 40 * sc, 'rgba(31,26,61,0.84)'); D.text(ctx, 'じゅんい', x + 64 * sc, y + 12 * sc, { size: 24 * sc, color: '#fff' }); D.text(ctx, 'WPM', x + w - 56 * sc, y + 12 * sc, { size: 22 * sc, color: 'rgba(255,255,255,0.7)' });
     r.forEach((c, i) => {
       const yy = y + 44 * sc + i * rowH, me = c.isPlayer;
       const path = D.P.rr(x, yy, w, rowH - 8, 18);
@@ -765,9 +766,9 @@
     ctx.save();
     const w = 290 * sc, h = 76 * sc, x = W / 2 - w / 2;
     ctx.fillStyle = 'rgba(31,26,61,0.84)'; ctx.fill(D.P.rr(x, y, w, h, 24));
-    D.text(ctx, 'LAP ' + lap + '/' + S.laps, x + w * 0.31, y + h * 0.5 + 2, { size: 40 * sc, color: S.lapFlash > 0 ? '#FFC83D' : '#fff' });
+    D.text(ctx, 'ラップ ' + lap + '/' + S.laps, x + w * 0.31, y + h * 0.5 + 2, { size: 40 * sc, color: S.lapFlash > 0 ? '#FFC83D' : '#fff' });
     D.text(ctx, fmt(Math.max(0, S.raceT)), x + w * 0.76, y + h * 0.5 + 2, { size: 30 * sc, color: 'rgba(255,255,255,0.85)', font: D.FONT_WORD(30 * sc, 700) });
-    if (S.fastest > 0 && S.fastest < 1e8) D.text(ctx, 'best lap ' + fmt(S.fastest), W / 2, y + h + 22 * sc, { size: 22 * sc, color: '#fff', outline: 6, font: D.FONT_WORD(22 * sc, 500) });
+    if (S.fastest > 0 && S.fastest < 1e8) D.text(ctx, 'ベスト ' + fmt(S.fastest), W / 2, y + h + 22 * sc, { size: 22 * sc, color: '#fff', outline: 6, font: D.FONT_WORD(22 * sc, 500) });
     ctx.restore();
   }
 
@@ -791,7 +792,7 @@
       const k = 1 + Math.sin(S.hintPulse * 6) * 0.04;
       ctx.save(); ctx.translate(tall ? bx : bx - 150 * sc, cy); ctx.scale(k, k);
       const w = 300 * sc, h = 62 * sc; ctx.fillStyle = 'rgba(31,26,61,0.88)'; ctx.fill(D.P.rr(-w / 2, -h / 2, w, h, 26 * sc)); ctx.lineWidth = 4; ctx.strokeStyle = '#fff'; ctx.stroke(D.P.rr(-w / 2, -h / 2, w, h, 26 * sc));
-      D.text(ctx, 'TYPE TO GO!', 0, 2 * sc, { size: 36 * sc, color: '#fff' }); ctx.restore();
+      D.text(ctx, 'タイプして スタート！', 0, 2 * sc, { size: 36 * sc, color: '#fff' }); ctx.restore();
     }
   }
 
@@ -856,7 +857,7 @@
     if (S.podium) {
       const rows = S.results; ctx.save();
       ctx.fillStyle = 'rgba(31,26,61,0.8)'; ctx.fill(D.P.rr(W / 2 - 330, v.y + v.h - 330, 660, 280, 30));
-      D.text(ctx, 'FINAL RESULTS', W / 2, v.y + v.h - 296, { size: 34, color: '#FFC83D' });
+      D.text(ctx, 'けっか', W / 2, v.y + v.h - 296, { size: 34, color: '#FFC83D' });
       rows.forEach((c, i) => {
         const yy = v.y + v.h - 250 + i * 48;
         D.text(ctx, ORD[i], W / 2 - 280, yy, { size: 34, color: i === 0 ? '#FFC83D' : '#fff', align: 'left' });
@@ -896,19 +897,19 @@
     const cards = el('div', { class: 'tt-cards' });
     TT.TRACKS.forEach((d, i) => {
       const cv = el('canvas', { width: 300, height: 132 });
-      const card = el('button', { class: 'tt-card', onclick: () => pickTrack(i) }, cv, el('div', {}, d.name), el('span', { class: 'lv' }, d.level.toUpperCase() + ' ' + '★'.repeat(i + 1)), el('small', {}, TM.store.get('turbo.best.' + d.id, 0) ? 'best lap ' + fmt(TM.store.get('turbo.best.' + d.id, 0)) : d.ja));
+      const card = el('button', { class: 'tt-card', onclick: () => pickTrack(i) }, cv, el('div', {}, d.name), el('span', { class: 'lv' }, d.level + ' ' + '★'.repeat(i + 1)), el('small', {}, TM.store.get('turbo.best.' + d.id, 0) ? 'ベスト ' + fmt(TM.store.get('turbo.best.' + d.id, 0)) : ''));
       cards.append(card); ST.cards.push({ card, cv, d });
       const b = d.built || (d.built = TT.buildTrack(d)); drawMiniCard(cv, b);
     });
     const lapBtns = {};
-    const laps = el('div', { class: 'tt-row' }, 'Laps', el('div', { class: 'tm-seg' }, [1, 2, 3, 5].map((n) => { const b = el('button', { onclick: () => { setLaps(n); TM.sfx.click(); } }, String(n)); lapBtns[n] = b; return b; })));
+    const laps = el('div', { class: 'tt-row', style: { display: 'none' } }, 'ラップ', el('div', { class: 'tm-seg' }, [1, 2, 3, 5].map((n) => { const b = el('button', { onclick: () => { setLaps(n); TM.sfx.click(); } }, String(n)); lapBtns[n] = b; return b; })));
     ST.lapBtns = lapBtns;
     ST.blurb = el('div', { class: 'tt-blurb' }, '');
     ST.pick = el('div', { class: 'tt-pick' }, cards, laps, ST.blurb);
     const row2 = box.querySelectorAll('.tm-row'); const ref = row2[1] || null;
     box.insertBefore(ST.pick, ref);
     setLaps(ST.laps, true); refreshCards();
-    if (ST.fileMode) { const n = el('div', { class: 'tt-note' }, 'Open this game from a web server (http) to see the full 3D art - simple blocks are shown instead.'); document.body.append(n); }
+    if (ST.fileMode) { const n = el('div', { class: 'tt-note' }, 'ウェブサーバー（http）で ひらくと きれいな 3Dで あそべるよ'); document.body.append(n); }
     const logo = box.querySelector('.tm-logo'); if (logo) logo.innerHTML = 'Turbo Type';
   }
   function drawMiniCard(cv, tr) {
@@ -940,7 +941,7 @@
     window.addEventListener('resize', () => world.resize());
     ST.fileMode = location.protocol === 'file:'; ST.skipRender = U.qs('norender') === '1';
     ST.trackIdx = clamp(TM.store.get('turbo.track', 0) | 0, 0, TT.TRACKS.length - 1);
-    ST.laps = [1, 2, 3, 5].includes(TM.store.get('turbo.laps', 3)) ? TM.store.get('turbo.laps', 3) : 3;
+    ST.laps = [1, 2, 3, 5].includes(+U.qs('laps')) ? +U.qs('laps') : 2;
     injectTitleUI();
     TT.Models.load().then(() => { buildTrackIdx(ST.trackIdx); });
     window.TTdebug = { get S() { return S; }, get g() { return g; }, world, ST };
@@ -950,13 +951,13 @@
   const music = SONGS.sunny;
   def = {
     id: 'turbo-type', name: 'Turbo Type', accent: C.turbo, bg: '#2A2350', fullBleed: true,
-    logoHTML: 'Turbo Type', tagline: 'Your race car goes as fast as you type!',
+    logoHTML: 'Turbo Type', tagline: 'タイプした ぶんだけ、レーシングカーが はやくなる！',
     howto: [
-      'Type the words at the bottom of the screen. <b>Every correct letter</b> makes your car go faster - you steer nothing, <b>typing is the engine</b>!',
-      'A wrong key makes you <b>stumble</b> and slow down for a moment. Keep calm and carry on.',
-      'Finish words with <b>no mistakes</b> to fill the <b>NITRO</b> meter. Full meter = turbo boost! Sentences give the biggest boost.',
-      'Hit the <b>blue boost pads</b> and fly off the <b>yellow ramps</b> for bonus points.',
-      'Race three rivals - Mochi, Taro and Sora - for 1, 2, 3 or 5 laps. Pick your track on the title screen!',
+      '画面の 下の ことばを タイプしよう。<b>ただしい もじ</b>を うつたびに くるまが はやくなるよ。ハンドルは いらない。<b>タイプが エンジン</b>！',
+      'まちがえると ちょっと <b>ゆっくり</b>に なるだけ。あわてず つづけよう。',
+      'ミスなしで うつと <b>ニトロ</b>メーターが たまるよ。まんたんで ターボ！ ぶんを うつと いちばん ふえるよ。',
+      '<b>あおい ブーストパッド</b>と <b>きいろい ジャンプだい</b>で ボーナス。',
+      'ライバルは モチ・タロ・ソラ。コースを えらんで レースしよう！',
     ],
     music, init, reset, update, draw, onKey,
     nextKey: () => (S && S.queue && S.queue[0] ? S.queue[0].nextReq() : null),

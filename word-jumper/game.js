@@ -65,7 +65,7 @@
     S.cam.x = L.startX - 520; S.cam.y = 0; S.cam.ty = 0;
     S.lvl = { keys: 0, bad: 0, lost: 0, coins: 0 };
     S.phase = 'play'; S.phaseT = 0; S.fade = first ? 0 : 1;
-    S.banner = { t: 0, text: 'Level ' + (li + 1), sub: L.biome.name };
+    S.banner = { t: 0, text: 'ステージ ' + (li + 1), sub: L.biome.name };
     S.anyKey = false; S.toast = null; if (S.pc) { S.pc.speed = 1; S.pc.ts = 1; S.pc.lastDoneT = S.runT; S.pc.lastKeyT = -9; }
     if (!first && GG && GG.state === 'play' && !g.demo) TM.audio.startMusic(songs[L.biome.music % songs.length]);
     WJ.preloadSounds();
@@ -97,7 +97,7 @@
   function coinGot(g, c) {
     c.got = true; const val = c.kind === 'star' ? 5 : c.kind === 'gem' ? 3 : 1;
     if (c.kind === 'heart') {
-      if (S.hearts < S.maxHearts) { S.hearts++; const v = w2v(c.x, c.y - 40); g.fx.pop(v.x, v.y, '+1 heart!', { color: '#FF5A8F', size: 54 }); WJ.sound('powerUp7', 0.5); sparkBurst(c.x, c.y, 12, ['#FF8FC8', '#fff']); return; }
+      if (S.hearts < S.maxHearts) { S.hearts++; const v = w2v(c.x, c.y - 40); g.fx.pop(v.x, v.y, 'ハート +1！', { color: '#FF5A8F', size: 54 }); WJ.sound('powerUp7', 0.5); sparkBurst(c.x, c.y, 12, ['#FF8FC8', '#fff']); return; }
       c.kind = 'gem';
     }
     S.lvl.coins += val; S.coinsAll += val;
@@ -108,16 +108,18 @@
   }
 
   /* ---- popups: ONE small toast, parked in the safe zone left of the hero (words only ever live ahead/right of him) ---- */
+  function tw(str, size) { let w = 0; for (const ch of str) w += (ch.charCodeAt(0) > 0x2e80 || ch.charCodeAt(0) === 0x2605 ? 1.02 : 0.56) * size; return w; }
   function toast(str, o) {
-    const prio = o.prio != null ? o.prio : /COMBO|Bonk|Splash|Checkpoint|heart/.test(str) ? 3 : /Speedy/.test(str) ? 2 : /^\+\d/.test(str) && o.size < 50 ? 0 : 1;
+    str = str.replace(/^COMBO x(\d+)!/, 'コンボ x$1！');
+    const prio = o.prio != null ? o.prio : /コンボ|ゴツン|ドボン|チェックポイント|ハート/.test(str) ? 3 : /はやい/.test(str) ? 2 : /^\+\d/.test(str) && o.size < 50 ? 0 : 1;
     const cur = S.toast;
     if (cur && prio < cur.prio && cur.t < cur.life * 0.7) return;   // never stack: a more important message wins, small ones are dropped
-    S.toast = { str, color: o.color || '#FFD93D', size: Math.min(o.size || 40, /COMBO/.test(str) ? 54 : 44), t: 0, life: Math.min(o.life || 0.9, 1.1), prio };
+    S.toast = { str, color: o.color || '#FFD93D', size: Math.min(o.size || 40, /コンボ/.test(str) ? 54 : 44), t: 0, life: Math.min(o.life || 0.9, 1.1), prio };
   }
   function drawToast(ctx, v) {
     const T = S.toast; if (!T || S.phase !== 'play') return;
     const h = S.hero, hv = w2v(h.x, h.surfY), k = T.t / T.life;
-    const w = T.str.length * T.size * 0.56 + 30, hh = T.size + 20;
+    const w = tw(T.str, T.size) + 30, hh = T.size + 20;
     let cx = Math.max(v.x + w / 2 + 20, hv.x - 120 - w / 2), cy = hv.y - 230;
     for (let tries = 0; tries < 5; tries++) { // belt and braces: slide away from any word chip
       const r = { x: cx - w / 2, y: cy - hh / 2, w, h: hh };
@@ -157,7 +159,7 @@
     const h = S.hero, early = (ob.launchX - h.x) > speedFor(g, S.li) * 0.9 && h.st === 'run';
     const a = chipPos(ob), bonus = early ? 1.5 : 1;
     g.wordDone(ob.typer, a.x, a.y, { bonus, color: C.jumper });
-    if (early && !g.demo) g.fx.pop(a.x, a.y - 70, 'Speedy!', { color: '#FF8A1F', size: 40, life: 0.8 });
+    if (early && !g.demo) g.fx.pop(a.x, a.y - 70, 'はやい！', { color: '#FF8A1F', size: 40, life: 0.8 });
     const w = { x: ob.x, y: ob.anchorY == null ? -200 : ob.anchorY };
     sparkBurst(ob.x, w.y + 60, 10, ['#6CCB3C', '#FFD93D', '#fff']);
   }
@@ -295,14 +297,14 @@
     else { h.st = 'bonk'; h.vx = -260; h.vy = -620; h.wait = 0; S.hurtSq = 0; }
     h.fail = ob; h.inv = 0;
     g.fx.shake(14, 0.22);
-    const v = w2v(h.x, h.y - 150); g.fx.pop(v.x, v.y, pit ? 'Splash!' : 'Bonk!', { color: '#FF5A5F', size: 60 });
+    const v = w2v(h.x, h.y - 150); g.fx.pop(v.x, v.y, pit ? 'ドボン！' : 'ゴツン！', { color: '#FF5A5F', size: 60 });
     if (lose && S.hearts <= 0) { h.dead = true; }
   }
   function respawn(g) {
     const h = S.hero, cp = S.cp;
     if (h.dead) {
       h.st = 'dead';
-      g.end({ win: false, title: 'Nice try!', sub: `You reached level ${S.li + 1}: ${S.L.biome.name}.`, targetMet: S.li >= 2, stats: [['Level', S.li + 1], ['Coins', S.coinsAll]] });
+      g.end({ win: false, title: 'おしい！', sub: `ステージ${S.li + 1}（${S.L.biome.name}）まで すすんだよ`, targetMet: S.li >= 2, stats: [['ステージ', S.li + 1], ['コイン', S.coinsAll]] });
       return;
     }
     const obs = S.L.obs;
@@ -325,7 +327,7 @@
     // rating
     const lv = S.lvl, acc = lv.keys ? 1 - lv.bad / lv.keys : 1, frac = S.L.total ? lv.coins / S.L.total : 1;
     const gentle = g.diff === 'gentle';
-    const crit = [{ t: 'Level cleared!', ok: true }, { t: `Accuracy ${gentle ? 80 : 90}%+`, ok: acc >= (gentle ? 0.8 : 0.9), v: Math.round(acc * 100) + '%' }, { t: `Coins ${gentle ? 55 : 70}%+`, ok: frac >= (gentle ? 0.55 : 0.7), v: Math.round(frac * 100) + '%' }];
+    const crit = [{ t: 'ステージクリア！', ok: true }, { t: `正しさ ${gentle ? 80 : 90}%いじょう`, ok: acc >= (gentle ? 0.8 : 0.9), v: Math.round(acc * 100) + '%' }, { t: `コイン ${gentle ? 55 : 70}%いじょう`, ok: frac >= (gentle ? 0.55 : 0.7), v: Math.round(frac * 100) + '%' }];
     const stars = crit.filter((c) => c.ok).length;
     S.rating = { crit, stars, acc, frac, coins: lv.coins, total: S.L.total, lost: lv.lost, shown: 0 };
     S.levelStars.push(stars); S.starsAll += stars;
@@ -336,7 +338,7 @@
     if (S.phase !== 'rating') return;
     if (S.li + 1 >= LEVELS) {
       const avg = S.starsAll / LEVELS;
-      g.end({ win: true, title: 'You did it!', sub: `All ${LEVELS} worlds cleared with ${S.starsAll} stars!`, targetMet: avg >= 2, stats: [['Stars', S.starsAll + '/' + LEVELS * 3], ['Coins', S.coinsAll]] });
+      g.end({ win: true, title: 'やったね！', sub: `${LEVELS}つの せかいを ぜんぶ クリア！`, targetMet: avg >= 2, stats: [['星', S.starsAll + '/' + LEVELS * 3], ['コイン', S.coinsAll]] });
       S.phase = 'end'; return;
     }
     S.phase = 'fadeout'; S.phaseT = 0;
@@ -443,7 +445,7 @@
       if (Math.abs(c.x - h.x) < 58 && Math.abs(c.y - hy) < 76) coinGot(g, c);
     }
     // checkpoints
-    for (const f of L.flags) if (!f.hit && h.x >= f.x) { f.hit = true; f.t = 0; S.cp = f; WJ.sound('threeTone1', 0.4); sparkBurst(f.x, f.y - 100, 14, ['#6CCB3C', '#fff', '#FFD93D']); const vv = w2v(f.x, f.y - 190); g.fx.pop(vv.x, vv.y, 'Checkpoint!', { color: '#6CCB3C', size: 46 }); }
+    for (const f of L.flags) if (!f.hit && h.x >= f.x) { f.hit = true; f.t = 0; S.cp = f; WJ.sound('threeTone1', 0.4); sparkBurst(f.x, f.y - 100, 14, ['#6CCB3C', '#fff', '#FFD93D']); const vv = w2v(f.x, f.y - 190); g.fx.pop(vv.x, vv.y, 'チェックポイント！', { color: '#6CCB3C', size: 46 }); }
     for (const f of L.flags) if (f.hit && f.t != null) f.t += dt;
     // trail at high combo
     if (!g.demo && g.score.mult >= 2 && h.st !== 'idle') { h.trail -= dt; if (h.trail <= 0) { h.trail = 0.05; emit('star', h.x - 30, h.y - 50 + (Math.random() - 0.5) * 50, -90, 10, 0.5, 8 + Math.random() * 6, g.score.mult >= 3 ? '#FF8FC8' : '#FFD93D', { g: 0 }); } }
@@ -864,7 +866,7 @@
 
   function drawBanner(ctx, v) {
     const k = S.banner.t, a = k < 0.3 ? k / 0.3 : k > 2.2 ? 1 - (k - 2.2) / 0.4 : 1, sc = k < 0.3 ? ease.outBack(k / 0.3) : 1;
-    const hv = w2v(S.hero.x, S.hero.surfY), avail = hv.x - 110 - (v.x + 36), est = Math.max(S.banner.text.length * 74 * 0.56, S.banner.sub.length * 36 * 0.56);
+    const hv = w2v(S.hero.x, S.hero.surfY), avail = hv.x - 110 - (v.x + 36), est = Math.max(tw(S.banner.text, 74), tw(S.banner.sub, 36));
     const fit = Math.min(1, avail / est);
     { const r = { x: v.x + 36, y: v.y + 240, w: est * fit, h: 130 }; if (S.chipRects.some((c) => r.x < c.x + c.w && r.x + r.w > c.x && r.y < c.y + c.h && r.y + r.h > c.y)) S.dbgOverlap++; }
     ctx.save(); ctx.globalAlpha = Math.max(0, a); ctx.translate(v.x + 36, v.y + 300); ctx.scale(sc * fit, sc * fit);
@@ -880,7 +882,7 @@
     ctx.translate(cx, cy); const s = ease.outBack(k); ctx.scale(s, s);
     const pw = 860, ph = 740, pp = P.rr(-pw / 2, -ph / 2, pw, ph, 56);
     D.sticker(ctx, pp, '#FFF8E7', { x: -pw / 2, y: -ph / 2, w: pw, h: ph }, { shade: false });
-    D.text(ctx, 'Level ' + (S.li + 1) + ' complete!', 0, -ph / 2 + 70, { size: 76, color: S.L.biome.accent, outline: 14 });
+    D.text(ctx, 'ステージ' + (S.li + 1) + ' クリア！', 0, -ph / 2 + 70, { size: 76, color: S.L.biome.accent, outline: 14 });
     D.text(ctx, S.L.biome.name, 0, -ph / 2 + 135, { size: 40, color: C.ink });
     // stars
     for (let i = 0; i < 3; i++) {
@@ -904,15 +906,15 @@
       if (c.v) D.text(ctx, c.v, 340, y + 2, { size: 38, color: c.ok ? '#2E8B1F' : '#8C86A6', align: 'right' });
       ctx.restore();
     }
-    D.text(ctx, `Coins ${r.coins}/${r.total}`, -340, 258, { size: 34, color: C.ink, align: 'left' });
+    D.text(ctx, `コイン ${r.coins}/${r.total}`, -340, 258, { size: 34, color: C.ink, align: 'left' });
     if (!g.demo && g.diff !== 'gentle') {
-      D.text(ctx, `Hearts: ${S.hearts}/${S.maxHearts}`, 340, 258, { size: 34, color: '#E0457B', align: 'right' });
+      D.text(ctx, `ハート ${S.hearts}/${S.maxHearts}`, 340, 258, { size: 34, color: '#E0457B', align: 'right' });
     }
     const pulse2 = 1 + Math.sin(g.t * 5) * 0.04;
     ctx.save(); ctx.translate(0, ph / 2 - 46); ctx.scale(pulse2, pulse2);
-    const nxt = S.li + 1 < LEVELS ? 'Next: ' + WJ.BIOMES[(S.li + 1) % WJ.BIOMES.length].name : 'Finish!';
+    const nxt = S.li + 1 < LEVELS ? 'つぎは ' + WJ.BIOMES[(S.li + 1) % WJ.BIOMES.length].name : 'おしまい！';
     D.sticker(ctx, P.rr(-300, -34, 600, 68, 34), C.jumper, { x: -300, y: -34, w: 600, h: 68 }, { shadow: false });
-    D.text(ctx, 'Press Space or Enter  -  ' + nxt, 0, 3, { size: 28, color: '#fff', outline: 7 });
+    D.text(ctx, 'スペースかEnterで ' + nxt, 0, 3, { size: 28, color: '#fff', outline: 7 });
     ctx.restore();
     ctx.restore();
   }
@@ -920,15 +922,15 @@
   /* ============================================================ framework */
   TM.game({
     id: 'word-jumper', name: 'Word Jumper', accent: C.jumper, bg: '#63C3FF',
-    logoHTML: 'Word<br>Jumper', tagline: 'Type the word to jump, stomp and smash!',
+    logoHTML: 'Word<br>Jumper', tagline: 'タイプして ジャンプ！ふんで、こわして すすめ！',
     lifeIcon: TM.ui.heartSVG('#6CCB3C'),
     howto: [
-      'Your hero runs through side-scrolling levels all by themself.',
-      'Every <b>gap, enemy, crate and spring</b> has a <b>word</b> on it. Type the word and the hero jumps, stomps or smashes it!',
-      'Type ahead and the hero <b>speeds up</b> to catch up. Near a word, time <b>slows down</b> (bullet time) so you can finish typing it, then <b>whoosh</b> - back to full speed!',
-      'Type early for <b>Speedy!</b> bonus points. If you wait too long at the edge, you fall and go back to the last <b>flag</b> and lose a heart.',
-      'Collect <b>coins, gems and stars</b>. Hit the <b>? blocks</b> for bonus coins (they are optional!).',
-      'Beat the big boss at the end of each of the 5 worlds. Earn up to 3 stars per level!',
+      'ヒーローは じどうで はしるよ。',
+      '<b>あな・てき・はこ・バネ</b>に <b>ことば</b>が ついているよ。そのことばを タイプすると、ジャンプ・ふむ・こわす ができるよ！',
+      'はやく タイプすると ヒーローが <b>はやく</b> なるよ。ことばの ちかくでは じかんが <b>ゆっくり</b> になるから、おちついて タイプしよう。',
+      'はやく うてば <b>ボーナス</b>！ まよっていて おちると、<b>はた</b>まで もどって ハートが 1つ へるよ。',
+      '<b>コイン・ほうせき・星</b>を あつめよう。<b>？ブロック</b>は とらなくても いいよ。',
+      '5つの せかいの さいごには ボスが いるよ。1ステージで 星は 3つまで！',
     ],
     music: songs[0],
     init: () => { WJ.preloadSounds(); },
@@ -937,7 +939,7 @@
     nextKey: () => { if (!S || S.phase !== 'play') return null; const t = targetOb(); return t ? t.typer.nextReq() : null; },
     hud: (g) => ({
       lives: S ? S.hearts : 3, maxLives: g.diff === 'gentle' ? 0 : 3,
-      right: S ? `Level ${S.li + 1}/${LEVELS}` : '',
+      right: S ? `ステージ ${S.li + 1}/${LEVELS}` : '',
       progress: S && S.L ? clamp((S.hero.x - S.L.startX) / Math.max(1, S.L.goalX - S.L.startX), 0, 1) : 0,
     }),
   });

@@ -608,7 +608,7 @@
         g.userData.overhead = true; root.add(g); return g;
       };
       // start/finish gantry with countdown lights
-      const sg = mkBeam(5, 11.5, 'TURBO TYPE  •  START / FINISH', '#1b1840', '#ffd23f');
+      const sg = mkBeam(5, 11.5, 'TURBO TYPE  •  スタート / ゴール', '#1b1840', '#ffd23f');
       this.startLights = [];
       const lampGeo = new THREE.SphereGeometry(0.85, 16, 12);
       for (let i = 0; i < 4; i++) {
@@ -638,7 +638,7 @@
         const rail = new THREE.Mesh(new THREE.BoxGeometry(span, 1.3, 0.7), red); rail.position.set(0, 11.4, sx * 6.8); g.add(rail);
         for (const px of [-1, 1]) { const pil = new THREE.Mesh(new THREE.BoxGeometry(2.4, 12, 3), conc); pil.position.set(px * (hw + 6.5), 4, sx * 4); pil.castShadow = true; g.add(pil); }
       }
-      const tex = bannerTex('TYPE FAST!', '#ffc83d', '#1f1a3d', 512, 128); const ban = new THREE.Mesh(new THREE.PlaneGeometry(14, 3.4), new THREE.MeshBasicMaterial({ map: tex, toneMapped: false })); ban.position.set(0, 7.6, -7.05); ban.rotation.y = Math.PI; g.add(ban);
+      const tex = bannerTex('はやく うとう！', '#ffc83d', '#1f1a3d', 512, 128); const ban = new THREE.Mesh(new THREE.PlaneGeometry(14, 3.4), new THREE.MeshBasicMaterial({ map: tex, toneMapped: false })); ban.position.set(0, 7.6, -7.05); ban.rotation.y = Math.PI; g.add(ban);
       g.userData.overhead = true; root.add(g);
     }
     buildTunnel(track, s0, len, theme) {

@@ -1,0 +1,7 @@
+/* Japanese glyphs (M PLUS Rounded 1c, OFL) merged into the Latin families via unicode-range, so the shared font stacks render kana/kanji. */
+@font-face { font-family: 'Baloo 2'; font-weight: 700; font-display: swap; src: url('mplus-rounded-ja-700.woff2') format('woff2'); unicode-range: U+3000-30FF,U+31F0-31FF,U+FF00-FFEF,U+4E00-9FFF,U+2018-201F,U+2026,U+2190-2193,U+25A0-25EF,U+2605-2606,U+2665-266B; }
+@font-face { font-family: 'Baloo 2'; font-weight: 800; font-display: swap; src: url('mplus-rounded-ja-800.woff2') format('woff2'); unicode-range: U+3000-30FF,U+31F0-31FF,U+FF00-FFEF,U+4E00-9FFF,U+2018-201F,U+2026,U+2190-2193,U+25A0-25EF,U+2605-2606,U+2665-266B; }
+@font-face { font-family: 'Lexend'; font-weight: 500; font-display: swap; src: url('mplus-rounded-ja-700.woff2') format('woff2'); unicode-range: U+3000-30FF,U+31F0-31FF,U+FF00-FFEF,U+4E00-9FFF,U+2018-201F,U+2026,U+2190-2193,U+25A0-25EF,U+2605-2606,U+2665-266B; }
+@font-face { font-family: 'Lexend'; font-weight: 700; font-display: swap; src: url('mplus-rounded-ja-700.woff2') format('woff2'); unicode-range: U+3000-30FF,U+31F0-31FF,U+FF00-FFEF,U+4E00-9FFF,U+2018-201F,U+2026,U+2190-2193,U+25A0-25EF,U+2605-2606,U+2665-266B; }
+@font-face { font-family: 'TM JP'; font-weight: 700; font-display: swap; src: url('mplus-rounded-ja-700.woff2') format('woff2'); }
+@font-face { font-family: 'TM JP'; font-weight: 800; font-display: swap; src: url('mplus-rounded-ja-800.woff2') format('woff2'); }

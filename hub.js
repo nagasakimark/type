@@ -12,8 +12,6 @@
       desc: 'Sweep grumpy space junk with sparkle shots before it reaches the station.' },
     { id: 'turbo-type', name: 'Turbo Type', c: C.turbo, tag: 'Race!', like: 'Nitro Type',
       desc: 'Your kart goes as fast as you type. Beat three rivals and your own ghost.' },
-    { id: 'rooftop-rascal', name: 'Rooftop Rascal', c: C.rascal, tag: 'Sneaky!', like: 'Rebellious Robot',
-      desc: 'Leap Rascal the raccoon across night rooftops and grab snacks before sunrise.' },
     { id: 'ink-rush', name: 'Ink Rush', c: C.ink2, tag: 'Splat!', like: 'The Typing of the Dead + Splatoon',
       desc: 'Splat the sleepy grey Gloops with colour ink and paint the whole town.' },
   ];

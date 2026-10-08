@@ -35,6 +35,7 @@
   function livesFor(g) { return g.diff === 'gentle' ? 5 : 3; }
 
   function reset(g) {
+    if (!g.fx._ja) { const op = g.fx.pop.bind(g.fx); g.fx.pop = (x, y, str, o) => op(x, y, String(str).replace(/^COMBO x(\d+)!/, 'コンボ x$1！'), o); g.fx._ja = 1; }
     const ml = maxLevelFor(g), lv = livesFor(g);
     S = {
       t: 0, fruits: [], halves: [], parts: [], decals: [], trails: [], banners: [], queue: [],
@@ -227,7 +228,7 @@
     if (!g.demo && target.type !== 'bomb') { const dk = g.t - S.lastKeyT; if (dk < 1.3 && dk > 0.05) S.pace = U.clamp(U.lerp(S.pace, dk, 0.1), 0.25, 1.0); S.lastKeyT = g.t; }
     target.hit = 1;
     if (target.type === 'bomb') {
-      if (result !== 'done' && S.lockWarn <= 0) { S.lockWarn = 2.2; g.fx.pop(target.x, target.y - 150, 'Stinky! Press Backspace!', { color: BOMB_ACCENT, size: 44, life: 1.4 }); }
+      if (result !== 'done' && S.lockWarn <= 0) { S.lockWarn = 2.2; g.fx.pop(target.x, target.y - 150, 'くさい！ BackSpaceで はなれよう', { color: BOMB_ACCENT, size: 44, life: 1.4 }); }
     } else if (result !== 'done') sparks(target, 2);
     if (result === 'done') { if (target.type === 'bomb') bombTyped(g, target); else slice(g, target); }
   }
@@ -287,11 +288,11 @@
     else if (boss) bossDown(g, f);
   }
   function chainReward(g, f) {
-    const c = S.chain, names = ['', '', 'Egg Nigiri!', 'Salmon Nigiri!', 'Maki Roll!', 'Roe Maki!', 'SUSHI PLATTER!'];
+    const c = S.chain, names = ['', '', 'たまごにぎり！', 'サーモンにぎり！', 'まきずし！', 'いくらまき！', 'おすしセット！'];
     const icons = ['', '', ['sushi-egg'], ['sushi-salmon'], ['maki-salmon'], ['maki-roe'], ['sushi-egg', 'sushi-salmon', 'maki-salmon', 'maki-roe', 'maki-vegetable']];
     const i = Math.min(6, c), bonus = 20 * c * (S.frenzy > 0 ? 2 : 1);
     g.score.add(bonus);
-    addBanner(g, `${names[i]}  x${c}`, `Combo bonus +${bonus}`, icons[i], { life: 1.5 });
+    addBanner(g, `${names[i]}  x${c}`, `コンボボーナス +${bonus}`, icons[i], { life: 1.5 });
     WN.snd('chime', { vol: 0.45, step: Math.min(9, c - 2), delay: 0.08, jitter: 0 });
     if (c >= 3 && c % 2 === 1 && !REDUCE()) { S.freeze = 0.08; S.slow = 0.55; g.fx.doFlash('#FFFFFF', 0.25); g.fx.shake(14, 0.2); }
     if (c >= 4) for (let k = 0; k < 8; k++) S.parts.push({ type: 'star', x: f.x + U.rand(-80, 80), y: f.y + U.rand(-80, 80), vx: U.rand(-300, 300), vy: U.rand(-500, -100), g: 800, rot: 0, vr: 4, life: 0.8, t: 0, size: U.rand(30, 60), color: '#FFE27A' });
@@ -299,14 +300,14 @@
   function startFrenzy(g, f) {
     S.frenzy = 8; S.stormT = 0.4;
     g.fx.doFlash('#FFE9A8', 0.7); g.fx.shake(14, 0.3);
-    addBanner(g, 'FRUIT FRENZY!', 'Short words  -  2x points  -  no hearts lost!', ['banana'], { big: true, y: 400, life: 2.2, color: '#FFD23F' });
+    addBanner(g, 'フルーツ フィーバー！', 'みじかい ことば・とくてん 2ばい・ハートは へらない！', ['banana'], { big: true, y: 400, life: 2.2, color: '#FFD23F' });
     WN.snd('frenzy', { vol: 0.8 }); WN.snd('golden', { vol: 0.6, delay: 0.1 }); setMusic('frenzy');
     for (let i = 0; i < 26; i++) S.parts.push({ type: 'star', x: f.x, y: f.y, vx: U.rand(-700, 700), vy: U.rand(-800, 100), g: 600, rot: 0, vr: 3, life: 1.1, t: 0, size: U.rand(30, 70), color: '#FFD23F' });
   }
   function startIce(g, f) {
     S.ice = 6.5;
     g.fx.doFlash('#BFE8FF', 0.6);
-    addBanner(g, 'FREEZE!', 'Time slows down...', ['ice'], { big: true, y: 400, life: 2.0, color: '#9BDCFF' });
+    addBanner(g, 'こおりの じかん！', 'ゆっくり なるよ', ['ice'], { big: true, y: 400, life: 2.0, color: '#9BDCFF' });
     WN.snd('freeze', { vol: 0.8 });
     for (let i = 0; i < 22; i++) S.parts.push({ type: 'shard', x: f.x, y: f.y, vx: U.rand(-600, 600), vy: U.rand(-700, 200), g: 1300, rot: U.rand(0, 6), vr: U.rand(-8, 8), life: 1.0, t: 0, size: U.rand(14, 30), color: i % 2 ? '#E6F7FF' : '#7CCBFF' });
   }
@@ -331,8 +332,8 @@
     WN.snd('poof', { vol: 0.8 }); g.fx.doFlash('#C8E65A', 0.5); g.fx.shake(18, 0.3);
     if (g.demo) return;
     g.score.breakCombo(); S.chain = 0;
-    g.fx.pop(f.x, f.y - 80, 'Stinky! Oh no!', { color: '#B7D945', size: 70, life: 1.3 });
-    loseHeart(g, f.x, 'The stinky durian got you!');
+    g.fx.pop(f.x, f.y - 80, 'くさーい！', { color: '#B7D945', size: 70, life: 1.3 });
+    loseHeart(g, f.x, 'くさい ドリアン！');
   }
   function smokePuff(x, y, n, color, big = 1) {
     for (let i = 0; i < n; i++) S.parts.push({ type: 'smoke', x: x + U.rand(-50, 50), y: y + U.rand(-40, 40), vx: U.rand(-90, 90), vy: U.rand(-140, -20), g: -20, rot: U.rand(0, 6), vr: U.rand(-1, 1), life: U.rand(0.9, 1.6), t: 0, size: U.rand(110, 210) * big, color });
@@ -343,7 +344,7 @@
     TM.sfx.hurt(); g.fx.doFlash('#FF5A5F', 0.28); g.fx.shake(14, 0.2);
     if (S.lives <= 0) {
       S.lives = 0;
-      g.end({ win: false, title: 'Out of hearts!', sub: `You reached level ${S.level} and sliced ${S.sliced} fruit.`, targetMet: false, stats: [['Fruit sliced', S.sliced], ['Level', S.level]] });
+      g.end({ win: false, title: 'ゲームオーバー', sub: `ステージ${S.level}まで いって、フルーツを ${S.sliced}こ きったよ`, targetMet: false, stats: [['きったフルーツ', S.sliced], ['ステージ', S.level]] });
     }
   }
 
@@ -425,7 +426,7 @@
     const K = WN.kinds[f.kind];
     if (f.type === 'bomb') {
       smokePuff(f.x, FLOOR_HIT - 30, 9, '#9CC043', 1.0); WN.snd('poof', { vol: 0.45, rate: 1.1 });
-      if (!g.demo && g.state === 'play') { g.score.add(20); g.fx.pop(f.x, FLOOR_HIT - 190, 'Phew! Good ninja +20', { color: '#B7F26A', size: 44, life: 1.3 }); }
+      if (!g.demo && g.state === 'play') { g.score.add(20); g.fx.pop(f.x, FLOOR_HIT - 190, 'セーフ！ +20', { color: '#B7F26A', size: 44, life: 1.3 }); }
       return;
     }
     // squashed on the floor
@@ -433,12 +434,12 @@
     for (let i = 0; i < 8; i++) S.parts.push({ type: 'drop', x: f.x, y: FLOOR_HIT, vx: U.rand(-300, 300), vy: U.rand(-450, -120), g: 1500, rot: 0, vr: 0, life: U.rand(0.4, 0.8), t: 0, size: U.rand(5, 12), color: K.juice });
     WN.snd('slice', { vol: 0.25, rate: 0.7 });
     if (g.demo || g.state !== 'play') return;
-    if (f.type === 'golden' || f.type === 'ice') { g.fx.pop(f.x, FLOOR_HIT - 200, 'It got away!', { color: '#fff', size: 44, life: 1.1 }); S.resolved++; return; }
+    if (f.type === 'golden' || f.type === 'ice') { g.fx.pop(f.x, FLOOR_HIT - 200, 'にげられた！', { color: '#fff', size: 44, life: 1.1 }); S.resolved++; return; }
     S.resolved++;
     if (window.__wndbg) console.log('MISS', f.item.t, f.item.len, 'T', f.T && f.T.toFixed(1), 'life', (S.t - f.born).toFixed(1), 'prog', f.typer.progress.toFixed(2), 'alive', S.fruits.length);
     g.missWord(f.item);
-    if (f.free || S.frenzy > 0) { g.fx.pop(f.x, FLOOR_HIT - 190, 'Splat!', { color: '#fff', size: 44, life: 0.9 }); return; }
-    g.fx.pop(f.x, FLOOR_HIT - 190, 'Splat!  -1 heart', { color: C.miss, size: 50, life: 1.2 });
+    if (f.free || S.frenzy > 0) { g.fx.pop(f.x, FLOOR_HIT - 190, 'ベチャッ！', { color: '#fff', size: 44, life: 0.9 }); return; }
+    g.fx.pop(f.x, FLOOR_HIT - 190, 'ベチャッ！ ハート -1', { color: C.miss, size: 50, life: 1.2 });
     loseHeart(g, f.x);
   }
   function moveBoss(g, f, wdt, dt) {
@@ -465,7 +466,7 @@
         f.alive = false; S.boss = null; floorSplat(f.x, '#FF4D6A', 560); floorSplat(f.x - 160, '#8DBE3A', 300); g.fx.shake(24, 0.4); WN.snd('thud', { vol: 0.9, rate: 0.7 });
         smokePuff(f.x, FLOOR_HIT, 8, '#F7E9C6', 1.4);
         S.resolved++; g.missWord(f.item);
-        g.fx.pop(f.x, FLOOR_HIT - 260, 'The melon got away!', { color: C.miss, size: 56, life: 1.6 });
+        g.fx.pop(f.x, FLOOR_HIT - 260, 'スイカが にげた！', { color: C.miss, size: 56, life: 1.6 });
         loseHeart(g, f.x); setMusic('main');
       }
     }
@@ -489,7 +490,7 @@
     if (S.needBanner) {
       S.needBanner = false;
       const tier = g.ladder(stage()).tier;
-      addBanner(g, `LEVEL ${S.level}`, tier === 1 ? 'Warm-up words' : tier === 2 ? 'Longer words and phrases' : 'Phrases and sentences', null, { big: true, y: 420, life: 2.3, color: '#FFD23F' });
+      addBanner(g, `ステージ ${S.level}`, tier === 1 ? 'ウォーミングアップ' : tier === 2 ? 'ながい ことばも でるよ' : 'ぶんも でるよ', null, { big: true, y: 420, life: 2.3, color: '#FFD23F' });
       WN.snd('swish', { vol: 0.3 });
     }
     S.phaseT += dt;
@@ -520,7 +521,7 @@
             S.waveWait = gap;
           }
         } else if (S.queue.length === 0 && alive === 0 && !S.fruits.some((f) => f.alive && f.type !== 'bomb')) {
-          if (S.bosses.includes(S.level)) { S.phase = 'bossIntro'; S.phaseT = 0; addBanner(g, 'WATCH OUT!', 'A giant watermelon is coming!', ['watermelon'], { big: true, y: 420, life: 2.4, color: '#FF6B7A' }); WN.snd('thud', { vol: 0.6, rate: 0.6 }); setMusic('boss'); }
+          if (S.bosses.includes(S.level)) { S.phase = 'bossIntro'; S.phaseT = 0; addBanner(g, 'ちゅうい！', 'おおきな スイカが くるよ！', ['watermelon'], { big: true, y: 420, life: 2.4, color: '#FF6B7A' }); WN.snd('thud', { vol: 0.6, rate: 0.6 }); setMusic('boss'); }
           else { S.phase = 'clear'; S.phaseT = 0; levelClear(g); }
         }
         break;
@@ -536,7 +537,7 @@
           if (S.level >= S.maxLevel) {
             S.phase = 'won';
             g.fx.confetti(W / 2, 400, 90);
-            g.end({ win: true, title: 'Word Ninja Master!', sub: `You cleared all ${S.maxLevel} levels and sliced ${S.sliced} fruit!`, targetMet: true, stats: [['Fruit sliced', S.sliced], ['Melons split', S.bossesDown]], delay: 1800 });
+            g.end({ win: true, title: 'ことばニンジャ めいじん！', sub: `${S.maxLevel}ステージ ぜんぶ クリア！ フルーツ ${S.sliced}こ きったよ`, targetMet: true, stats: [['きったフルーツ', S.sliced], ['わったスイカ', S.bossesDown]], delay: 1800 });
           } else startLevel(g, S.level + 1);
         }
         break;
@@ -680,7 +681,7 @@
       const k = U.clamp(B.left / B.hover, 0, 1), bw = 560, bx = B.x - bw / 2, by = B.y - B.r - 60;
       D.pill(ctx, bx - 6, by - 6, bw + 12, 34, C.ink);
       D.pill(ctx, bx, by, Math.max(26, bw * k), 22, k > 0.3 ? '#7CE38B' : C.miss);
-      D.text(ctx, 'Split the melon before time runs out!', B.x, by - 34, { size: 30, color: '#fff', outline: 8 });
+      D.text(ctx, 'じかんぎれ まえに スイカを わろう！', B.x, by - 34, { size: 30, color: '#fff', outline: 8 });
     }
     for (const bn of S.banners) drawBanner(g, ctx, bn, v);
     // chips (most urgent on top; locked on very top; others dim while locked)
@@ -699,11 +700,11 @@
       if (danger) { const pulse = 0.5 + 0.5 * Math.sin(t * 14); ctx.save(); ctx.globalAlpha = 0.35 + 0.4 * pulse; ctx.strokeStyle = C.miss; ctx.lineWidth = 12; ctx.stroke(P.rr(c.cx - c.w / 2 - 8, c.cy - c.h / 2 - 8, c.w + 16, c.h + 16, c.h / 2 + 8)); ctx.restore(); }
       D.chip(ctx, c.cx, c.cy, f.typer, { size: c.size, accent: bomb ? BOMB_ACCENT : f.type === 'golden' ? '#D98A00' : ACCENT, locked: f.locked, hint: g.hint, dim: !!lockedF && lockedF !== f });
       if (bomb) {
-        const lbl = f.locked ? 'STOP! Backspace!' : "Don't type!";
-        ctx.save(); const wd = lbl.length * 14 + 40; D.pill(ctx, c.cx - wd / 2, c.cy - c.h / 2 - 40, wd, 34, f.locked ? C.miss : BOMB_ACCENT, { stroke: C.ink, lw: 4 }); ctx.restore();
+        const lbl = f.locked ? 'やめて！ BackSpace！' : 'タイプしない！';
+        ctx.save(); const wd = lbl.length * 24 + 40; D.pill(ctx, c.cx - wd / 2, c.cy - c.h / 2 - 40, wd, 34, f.locked ? C.miss : BOMB_ACCENT, { stroke: C.ink, lw: 4 }); ctx.restore();
         D.text(ctx, lbl, c.cx, c.cy - c.h / 2 - 23, { size: 24, color: '#fff' });
       } else if (f.type === 'golden' || f.type === 'ice') {
-        const lbl = f.type === 'golden' ? 'FRENZY!' : 'FREEZE!', wd = lbl.length * 15 + 36;
+        const lbl = f.type === 'golden' ? 'フィーバー！' : 'こおり！', wd = lbl.length * 23 + 36;
         D.pill(ctx, c.cx - wd / 2, c.cy - c.h / 2 - 38, wd, 32, f.type === 'golden' ? '#E39A00' : '#2C8AD8', { stroke: C.ink, lw: 4 });
         D.text(ctx, lbl, c.cx, c.cy - c.h / 2 - 22, { size: 22, color: '#fff' });
       }
@@ -761,8 +762,8 @@
   }
   function drawMeters(g, ctx, v) {
     let y = hudBottom(g) + 6; const cx = W / 2;
-    if (S.frenzy > 0) { meter(ctx, cx, y, 520, S.frenzy / 8, 'FRENZY  x2 points', '#E39A00'); y += 52; }
-    if (S.ice > 0) { meter(ctx, cx, y, 520, S.ice / 6.5, 'FREEZE', '#2C8AD8'); y += 52; }
+    if (S.frenzy > 0) { meter(ctx, cx, y, 520, S.frenzy / 8, 'フィーバー  とくてん 2ばい', '#E39A00'); y += 52; }
+    if (S.ice > 0) { meter(ctx, cx, y, 520, S.ice / 6.5, 'こおりの じかん', '#2C8AD8'); y += 52; }
   }
   function drawBanner(g, ctx, bn, v) {
     // compact strip in the top safe zone, under the HUD and meters; drawn BEHIND fruit and word chips
@@ -772,7 +773,7 @@
     ctx.save(); ctx.font = D.FONT_DISPLAY(size); const tw = ctx.measureText(bn.text).width; ctx.restore();
     const icons = bn.icons.map((n) => WN.kinds[n] ? WN.kinds[n].img : WN.img(n)).filter(Boolean);
     const iconSlot = icons.length ? isz + 18 : 0;
-    const sw = bn.sub ? Math.min(900, bn.sub.length * size * 0.2) : 0;
+    const sw = bn.sub ? Math.min(1100, (() => { ctx.save(); ctx.font = D.FONT_DISPLAY(size * 0.46); const m = ctx.measureText(bn.sub).width; ctx.restore(); return m; })()) : 0;
     const w = Math.max(tw, sw, 220) + 70 + iconSlot * 2, h = size * 1.15 + (bn.sub ? size * 0.62 : 12) + 14;
     let rows = 0; if (S.frenzy > 0) rows++; if (S.ice > 0) rows++;
     const cy = hudBottom(g) + 12 + rows * 52 + h / 2;
@@ -796,20 +797,20 @@
   /* ---------- game ---------- */
   TM.game({
     id: 'word-ninja', name: 'Word Ninja', accent: ACCENT, bg: '#2A170B',
-    logoHTML: 'Word<br>Ninja', tagline: 'Type the words to slice the fruit!',
+    logoHTML: 'Word<br>Ninja', tagline: 'ことばを タイプして フルーツを きろう！',
     lifeIcon: TM.ui.heartSVG('#FF5A6E'),
     howto: [
-      'Fruit flies through the dojo. Each fruit carries a <b>word</b>. Type it to <b>slice</b> the fruit!',
-      'The first letter you type <b>locks on</b> to a fruit. Backspace lets go.',
-      'Slice quickly one after another for a sushi <b>combo</b>: Nigiri, Maki, Sushi Platter!',
-      'Fruit that hits the floor costs a <b>heart</b>. A purple <b>stinky durian</b> says "Don\'t type!" - just leave it alone.',
-      'The <b>golden banana</b> starts a Fruit Frenzy (2x points). The <b>frost pear</b> slows time.',
-      'At the end of some levels a <b>giant watermelon</b> carries a whole sentence. Type it to split it open!',
+      'どうじょうに フルーツが とびだすよ。フルーツには <b>ことば</b>が かいてあるよ。タイプして <b>スパッと</b> きろう！',
+      '1ぽんめの もじを うつと、そのフルーツに <b>ロックオン</b>。BackSpaceで はなせるよ。',
+      'つづけて きると <b>コンボ</b>！ たまごにぎり、まきずし、おすしセットが でるよ。',
+      'ゆかに おちたフルーツは <b>ハート</b>が 1つ へるよ。むらさきの <b>くさい ドリアン</b>は タイプしないで そのままに しよう。',
+      '<b>きんいろバナナ</b>で フィーバー（とくてん 2ばい）。<b>こおりのなし</b>で じかんが ゆっくりに。',
+      'ステージの さいごに <b>おおきな スイカ</b>が でるよ。ぶんを タイプして わろう！',
     ],
     music: mMain,
     init(g) { WN.backdrop.init(); WN.load(); },
     reset, update, draw, onKey, onBack,
     nextKey: () => { const t = S.lock.locked || S.fruits.filter((f) => f.alive && f.type !== 'bomb').sort((a, b) => b.danger - a.danger)[0]; return t ? t.typer.nextReq() : null; },
-    hud: (g) => ({ lives: S.lives, maxLives: S.maxLives, right: `Level ${S.level}/${S.maxLevel}`, progress: S.total ? S.resolved / S.total : 0 }),
+    hud: (g) => ({ lives: S.lives, maxLives: S.maxLives, right: `ステージ ${S.level}/${S.maxLevel}`, progress: S.total ? S.resolved / S.total : 0 }),
   });
 })();

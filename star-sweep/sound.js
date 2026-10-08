@@ -81,6 +81,36 @@
     if (flag && ctx.state === 'running') ctx.suspend(); else if (!flag && ctx.state === 'suspended') ctx.resume();
   };
 
+  /* ---- synthesised weapon sounds (no files needed): rattle = minigun burst, whoosh = missile, beam = laser sweep, fanfare = upgrade ---- */
+  function sfxNoise(t, dur, vol, type, freq, q) {
+    const s = ctx.createBufferSource(); s.buffer = noiseBuf; const f = ctx.createBiquadFilter(); f.type = type; f.frequency.value = freq; f.Q.value = q || 1;
+    const g = ctx.createGain(); g.gain.setValueAtTime(vol, t); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    s.connect(f); f.connect(g); g.connect(sfxBus); s.start(t, Math.random() * 0.5); s.stop(t + dur + 0.02);
+  }
+  function sfxOsc(type, f, t, dur, vol, slide, lp) {
+    const g = ctx.createGain(); const os = ctx.createOscillator(); os.type = type; os.frequency.setValueAtTime(f, t);
+    if (slide) os.frequency.exponentialRampToValueAtTime(Math.max(20, slide), t + dur);
+    g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(vol, t + 0.01); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    let n = os; if (lp) { const f2 = ctx.createBiquadFilter(); f2.type = 'lowpass'; f2.frequency.value = lp; os.connect(f2); n = f2; }
+    n.connect(g); g.connect(sfxBus); os.start(t); os.stop(t + dur + 0.05);
+  }
+  snd.synth = function (kind, o) {
+    if (!ctx || TM.settings.sfx <= 0 || ctx.state !== 'running' || !noiseBuf) return;
+    o = o || {}; const t = ctx.currentTime + (o.delay || 0), v = o.vol ?? 0.5;
+    if (kind === 'rattle') { // a burst of 6 quick pops + a low thump
+      for (let i = 0; i < 6; i++) { sfxNoise(t + i * 0.014, 0.05, v * 0.5, 'bandpass', 1900 + Math.random() * 900, 0.9); sfxOsc('square', 210 + Math.random() * 30, t + i * 0.014, 0.04, v * 0.16, 90, 900); }
+      sfxOsc('sine', 120, t, 0.12, v * 0.5, 50);
+    } else if (kind === 'whoosh') { sfxNoise(t, 0.5, v * 0.5, 'bandpass', 700, 0.7); sfxOsc('sawtooth', 300, t, 0.4, v * 0.12, 900, 1500); }
+    else if (kind === 'beam') { sfxOsc('sawtooth', 520, t, 0.32, v * 0.22, 140, 2400); sfxOsc('square', 260, t, 0.32, v * 0.12, 70, 1400); sfxNoise(t, 0.3, v * 0.28, 'highpass', 3000, 0.8); }
+    else if (kind === 'fanfare') {
+      const tier = o.tier || 1; const base = 60 + tier * 2; const N = (m) => 440 * Math.pow(2, (m - 69) / 12);
+      const seq = [0, 4, 7, 12, 16, 19, 24].slice(0, 4 + Math.min(3, tier));
+      seq.forEach((n, i) => { sfxOsc('square', N(base + n), t + i * 0.07, 0.22, v * 0.2, 0, 3000); sfxOsc('triangle', N(base + n + 12), t + i * 0.07, 0.3, v * 0.22); });
+      sfxNoise(t, 0.35, v * 0.3, 'highpass', 5000, 0.7); sfxOsc('sine', 140, t, 0.3, v * 0.7, 40);
+    } else if (kind === 'down') { sfxOsc('sawtooth', 400, t, 0.35, v * 0.2, 90, 1200); }
+    else if (kind === 'chain') { const N = (m) => 440 * Math.pow(2, (m - 69) / 12); sfxOsc('square', N(72 + (o.n || 0)), t, 0.1, v * 0.15, 0, 3200); }
+  };
+
   /* ---------------- music ---------------- */
   const N = (m) => 440 * Math.pow(2, (m - 69) / 12);
   const triad = (r, minor) => [r, r + (minor ? 3 : 4), r + 7];

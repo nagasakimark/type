@@ -87,35 +87,35 @@
   /* ---------- biomes ---------- */
   WJ.BIOMES = [
     {
-      id: 'meadow', name: 'Sunny Meadow', ground: 't/grass', plat: 't/grassHalf', liquid: 'water',
+      id: 'meadow', name: 'ひなたの草原', ground: 't/grass', plat: 't/grassHalf', liquid: 'water',
       sky: ['#63C3FF', '#CFF1FF'], far: '#A6E2A0', mid: '#83D274', near: '#5FBF57', fog: '#CFF1FF', clouds: true, tint: 0.28,
       decor: ['i/bush', 'i/plant', 't/fence', 't/sign', 'i/rock', 'i/mushroomRed', 'i/mushroomBrown', 'i/plant'],
       ground2: 'i/plant', enemies: ['slimeGreen', 'snail', 'ladyBug', 'mouse', 'worm', 'grassBlock'], fliers: ['fly', 'bee'],
       boss: 'slimeBlock', coin: 'i/coinGold', music: 0, ambient: 'pollen', accent: '#6CCB3C',
     },
     {
-      id: 'mushroom', name: 'Mushroom Woods', ground: 't/grass', plat: 'm/shroomRed', platAlt: 'm/shroomTan', platStem: true, liquid: 'lava',
+      id: 'mushroom', name: 'キノコの森', ground: 't/grass', plat: 'm/shroomRed', platAlt: 'm/shroomTan', platStem: true, liquid: 'lava',
       sky: ['#79B91F', '#A6D94E'], far: '#6FA81B', mid: '#5E9A17', near: '#4C8A12', fog: '#8CC832', clouds: false, bg: 'bg_shroom', tint: 0.18,
       decor: ['m/tinyShroom_red', 'm/tinyShroom_tan', 'm/tinyShroom_brown', 'm/bush', 'i/plant', 'i/mushroomRed', 'i/mushroomBrown', 'm/tallShroom_tan'],
       enemies: ['ladyBug', 'frog', 'spider', 'worm', 'snake', 'snail'], fliers: ['bee', 'fly', 'ladyBugFly'],
       boss: 'frog', coin: 'i/coinGold', music: 1, ambient: 'fireflies', accent: '#FF8A1F',
     },
     {
-      id: 'town', name: 'Cozy Town', ground: 't/sand', plat: 't/sandHalf', liquid: 'water',
+      id: 'town', name: 'のんびり町', ground: 't/sand', plat: 't/sandHalf', liquid: 'water',
       sky: ['#79CBFF', '#E6F8FF'], far: '#BFE0E8', mid: '#9FB9C4', near: '#7FA0A8', fog: '#E6F8FF', clouds: true, bg: 'bg_town', tint: 0.3,
       decor: ['t/sign', 'b/fenceLow', 'i/bush', 'i/rock', 't/signRight', 'i/plant', 'i/cactus'],
       enemies: ['mouse', 'slime', 'snail', 'spider', 'worm', 'grassBlock'], fliers: ['bat', 'fly', 'bee'],
       boss: 'ghost', coin: 'i/coinGold', music: 2, ambient: 'none', accent: '#E8A33D',
     },
     {
-      id: 'candy', name: 'Candy Land', ground: 'c/cake', plat: 'c/chocoHalf', liquid: 'lava',
+      id: 'candy', name: 'おかしの国', ground: 'c/cake', plat: 'c/chocoHalf', liquid: 'lava',
       sky: ['#FFA9DB', '#FFF0F8'], far: '#F7B7DA', mid: '#E9A0D4', near: '#D88AD0', fog: '#FFE3F4', clouds: true, tint: 0.3,
       decor: ['c/candyRed', 'c/candyBlue', 'c/candyGreen', 'c/candyYellow', 'c/cherry', 'c/cupCake', 'c/lollipopFruitRed', 'c/canePinkTop'],
       enemies: ['slime', 'worm', 'snakeSlime', 'grassBlock', 'spinnerHalf', 'frog'], fliers: ['bee', 'fly', 'ladyBugFly'],
       boss: 'snakeLava', coin: 'i/coinGold', music: 3, ambient: 'sprinkles', accent: '#FF4FA3',
     },
     {
-      id: 'ice', name: 'Frosty Peaks', ground: 'ice/tundra', plat: 'ice/tundraHalf', liquid: 'ice',
+      id: 'ice', name: 'こおりの山', ground: 'ice/tundra', plat: 'ice/tundraHalf', liquid: 'ice',
       sky: ['#9CCBFF', '#F2FBFF'], far: '#D6EAFB', mid: '#BBD9F3', near: '#A3C8EC', fog: '#EAF6FF', clouds: true, tint: 0.3,
       decor: ['ice/pineSapling', 'ice/pineSaplingAlt', 'ice/rock', 'ice/plant', 'ice/plantAlt', 'ice/snowBallBigGround', 'ice/caneRedTop', 'ice/caneGreenTop', 'ice/deadTree'],
       enemies: ['slimeBlue', 'spinnerHalf', 'snail', 'mouse', 'frog', 'worm'], fliers: ['bat', 'spinner', 'fly'],

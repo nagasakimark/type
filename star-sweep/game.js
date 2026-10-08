@@ -5,8 +5,9 @@
   const TM = window.TM, SS = window.SS, C = TM.C, U = TM.U, D = TM.draw, P = D.P;
   const W = 1920, H = 1080, SX = W / 2;
   const rnd = U.rand, clamp = U.clamp, lerp = U.lerp;
-  const KV = (px) => `${px}px KenVector, "Baloo 2", "Arial Rounded MT Bold", sans-serif`;
-  const BD = (px, w) => `${w || 800} ${px}px "Baloo 2", "Arial Rounded MT Bold", sans-serif`;
+  const JF = '"Hiragino Maru Gothic ProN", "BIZ UDGothic", "Yu Gothic UI", "Meiryo", "Noto Sans CJK JP", sans-serif';
+  const KV = (px) => `${px}px KenVector, "Baloo 2", "Arial Rounded MT Bold", ${JF}`;
+  const BD = (px, w) => `${w || 800} ${px}px "Baloo 2", "Arial Rounded MT Bold", ${JF}`;
   const BOLTS = [['laserBlue04', '#8fdcff'], ['laserGreen04', '#a6ff9d'], ['laserRed04', '#ff9a9a'], ['laserBlue07', '#fff2a0']];
   const COLNAME = { Black: 'gray', Blue: 'blue', Green: 'green', Red: 'red' };
 
@@ -41,7 +42,7 @@
       ship: { x: SX, y: 880, rot: 0, slide: 0, recoil: 0, shieldHit: 0, hullHit: 0, hitAng: 0, gunSide: 1, flamePh: 0 },
       shield: 100, hull: 100, shieldDelay: 0, inv: 0, slow: 0, dbl: 0, timeScale: 1, slowmo: 0, pace: 1,
       pulse: 1, flash: { a: 0, c: '#fff' }, banner: null, bq: [], bGap: 0, pops: [], comboFlash: null, audit: null, warp: 0, clearT: 0, map: null, vt: 0, dying: 0, boss: null, bossFx: [],
-      puCool: 14, kills: 0, escaped: 0, hurtVig: 0, comboLostT: 0, lastCombo: 0, mapPlanets: [], victory: null, botT: 0, botRate: 5.5, nextTip: 0,
+      puCool: 14, tier: 0, sinceOrb: 0, streakIdx: 0, drones: 0, magnet: 0, timers: [], beams: [], chain: { n: 0, t: 0 }, morph: 0, spin: 0, fireGlow: 0, tierShow: 0, missRun: 0, gen: 0, keyStat: { in: 0, ok: 0, miss: 0, ignored: 0 }, lastKey: null, kills: 0, escaped: 0, hurtVig: 0, comboLostT: 0, lastCombo: 0, mapPlanets: [], victory: null, botT: 0, botRate: 5.5, nextTip: 0,
     };
     g.fx.pop = popFn;
     S.diffSpd = g.diff === 'gentle' ? 0.78 : g.diff === 'turbo' ? 1.25 : 1;
@@ -75,16 +76,25 @@
   }
 
   /* ---------- waves ---------- */
+  /* Full reset of everything that must never leak across a wave / sector boundary: lock-on, partial input, enemies, bolts, enemy shots,
+     delayed effects. (v1 bug: a power-up that was locked when the map opened stayed "locked", so the next sector's keystrokes fed a
+     ship that no longer existed - nothing seemed to work until that hidden word was finished.) */
+  function clearField(g) {
+    for (const e of S.enemies) { e.locked = false; if (e.alive && e.type === 'powerup') SS.fx.ring(e.x, e.y, 150, '#ffffff', 0.3); }
+    S.lockT = null; S.enemies.length = 0; S.bolts.length = 0; S.shots.length = 0; S.timers.length = 0; S.beams.length = 0;
+    S.lastFire = { e: null, t: -9 }; S.missRun = 0; S.gen++; S.boss = null; S.chain = { n: 0, t: 0 };
+  }
   function startWave(g) {
+    clearField(g);
     const demo = g.demo;
     S.plan = demo ? SS.planWave(0, S.wave % 2, 4, 'normal') : SS.planWave(S.sector, S.wave, S.perSector, g.diff);
     S.L = demo ? S.wave % 3 + 2 : S.plan.L;
     S.queue = S.plan.tokens.slice(); S.spawnT = 2.2; S.mode = 'fight'; S.warp = 1; S.boss = null;
     const sec = SS.SECTORS[S.sector];
     const boss = S.plan.kind === 'boss';
-    const title = boss ? 'BOSS!' : S.plan.kind === 'elite' ? `WAVE ${S.wave + 1}` : `WAVE ${S.wave + 1}`;
+    const title = `ウェーブ ${S.wave + 1}`;
     S.bq.length = 0;
-    banner({ key: 'wave', dur: boss ? 3.0 : 2.2, title: boss ? 'WARNING!' : title, top: S.wave === 0 ? `SECTOR ${S.sector + 1}` : null, sub: boss ? SS.BOSSES[S.sector].name : S.wave === 0 ? sec.name : S.plan.kind === 'elite' ? 'Mini-boss incoming!' : sec.name, boss, color: boss ? '#ff5a5f' : sec.accent });
+    banner({ key: 'wave', dur: boss ? 3.0 : 2.2, title: boss ? 'キケン！' : title, top: S.wave === 0 ? `エリア ${S.sector + 1}` : null, sub: boss ? SS.BOSSES[S.sector].name : S.wave === 0 ? sec.name : S.plan.kind === 'elite' ? 'ちゅうボスが くるぞ！' : sec.name, boss, color: boss ? '#ff5a5f' : sec.accent });
     if (!demo) { snd(boss ? 'lowThreeTone' : 'wave', { vol: 0.5 }); snd('warp', { vol: 0.35, jitter: false }); }
     if (!demo && SS.snd.musicOn()) SS.snd.musicMode(boss ? 3 : S.wave === 0 ? 2 : 2, boss);
   }
@@ -107,8 +117,8 @@
         const bonus = 60 * (S.L + 1);
         g.score.add(bonus);
         const lastOfSector = S.wave + 1 >= S.perSector;
-        if (lastOfSector) { S.clearT = 1.6; g.fx.pop(SX, S.F.bottom - 330, `Sector clear! +${bonus}`, { color: SS.SECTORS[S.sector].accent, size: 56, life: 1.5 }); }
-        else { S.clearT = 2.6; banner({ key: 'clear', dur: 2.0, title: 'WAVE CLEAR!', sub: `+${bonus}`, color: '#7dff9b', clear: true }); }
+        if (lastOfSector) { S.clearT = 1.6; g.fx.pop(SX, S.F.bottom - 330, `エリアクリア！ +${bonus}`, { color: SS.SECTORS[S.sector].accent, size: 56, life: 1.5 }); }
+        else { S.clearT = 2.6; banner({ key: 'clear', dur: 2.0, title: 'ウェーブ クリア！', sub: `+${bonus}`, color: '#7dff9b', clear: true }); }
         snd('clear', { vol: 0.6 });
         S.hull = Math.min(100, S.hull + 4); S.shield = Math.min(100, S.shield + 30);
         if (S.pace < 1) S.pace = Math.min(1, S.pace + 0.1);
@@ -127,19 +137,22 @@
   }
 
   function beginMap(g) {
+    clearField(g);
     S.mode = 'map'; S.map = { t: 0, from: S.sector, to: S.sector + 1 }; S.warp = 1;
     snd('door', { vol: 0.5 }); snd('warp', { vol: 0.4, jitter: false });
     if (SS.snd.musicOn()) SS.snd.musicMode(1, false);
     S.hull = Math.min(100, S.hull + 35); S.shield = 100; S.pulse = 1; S.inv = 0;
   }
   function endMap(g) {
+    clearField(g);
     S.sector = S.map.to; S.wave = 0; S.map = null; S.perSector = perSectorFor(g);
     SS.bg.set(S.sector); SS.bg.pipGrow = S.sector === 4 ? 0.15 : 0;
     if (SS.snd.musicOn()) SS.snd.musicSector(S.sector);
     startWave(g);
   }
   function beginVictory(g) {
-    S.mode = 'victory'; S.banner = null; S.bq.length = 0; S.vt = 0; S.enemies.length = 0; S.queue.length = 0; S.shots.length = 0; S.warp = 0;
+    clearField(g);
+    S.mode = 'victory'; S.banner = null; S.bq.length = 0; S.vt = 0; S.queue.length = 0; S.warp = 0;
     S.flash = { a: 0.9, c: '#fff6c8' };
     snd('hugeBoom', { vol: 0.6 }); snd('zapThreeToneUp', { vol: 0.7, delay: 0.3 });
     if (SS.snd.musicOn()) SS.snd.musicMode(2, false);

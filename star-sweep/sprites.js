@@ -4,10 +4,12 @@
   const SS = (window.SS = window.SS || {});
   const M = window.SS_MANIFEST || { main: { rects: {} }, fx: { rects: {} }, audio: {} };
   const BASE = '../assets/kenney/star-sweep/';
-  const atlas = { main: null, fx: null };
+  const atlas = { main: null, fx: null, parts: null };
   const R = {};
   for (const k in M.main.rects) R[k] = { a: 'main', x: M.main.rects[k][0], y: M.main.rects[k][1], w: M.main.rects[k][2], h: M.main.rects[k][3] };
   for (const k in M.fx.rects) R[k] = { a: 'fx', x: M.fx.rects[k][0], y: M.fx.rects[k][1], w: M.fx.rects[k][2], h: M.fx.rects[k][3] };
+  const PR = (window.SS_PARTS && window.SS_PARTS.rects) || {};
+  for (const k in PR) R[k] = { a: 'parts', x: PR[k][0], y: PR[k][1], w: PR[k][2], h: PR[k][3] };
   SS.R = R;
   SS.ready = false; SS.progress = 0;
   SS.planets = []; SS.sky = {};
@@ -15,10 +17,11 @@
 
   function loadImg(src, cb) { const i = new Image(); i.onload = () => cb(i); i.onerror = () => cb(null); i.src = src; }
   SS.load = function (done) {
-    const total = 2 + 10 + SS.SKY_KEYS.length; let n = 0;
+    const total = 3 + 10 + SS.SKY_KEYS.length; let n = 0;
     const tick = () => { n++; SS.progress = n / total; if (n === total) { SS.ready = true; done && done(); } };
     loadImg(BASE + 'ss-main.png', (i) => { atlas.main = i; tick(); });
     loadImg(BASE + 'ss-fx.webp', (i) => { atlas.fx = i; tick(); });
+    loadImg(BASE + 'ss-parts.png', (i) => { atlas.parts = i; tick(); });
     for (let p = 0; p < 10; p++) loadImg(BASE + `planet${p}.webp`, (i) => { SS.planets[p] = i; tick(); });
     for (const k of SS.SKY_KEYS) loadImg(BASE + `sky_${k}.jpg`, (i) => { SS.sky[k] = i; tick(); });
   };
@@ -54,8 +57,8 @@
     if (a <= 0) return;
     const old = ctx.globalAlpha;
     ctx.globalAlpha = old * (a > 1 ? 1 : a);
-    if (o.rot || o.flipY) {
-      ctx.save(); ctx.translate(x, y); if (o.rot) ctx.rotate(o.rot); if (o.flipY) ctx.scale(1, -1);
+    if (o.rot || o.flipY || o.flipX) {
+      ctx.save(); ctx.translate(x, y); if (o.rot) ctx.rotate(o.rot); if (o.flipY || o.flipX) ctx.scale(o.flipX ? -1 : 1, o.flipY ? -1 : 1);
       ctx.drawImage(src, sx, sy, r.w, r.h, -w * ax, -h * ay, w, h);
       ctx.restore();
     } else ctx.drawImage(src, sx, sy, r.w, r.h, x - w * ax, y - h * ay, w, h);

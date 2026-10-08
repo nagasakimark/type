@@ -47,7 +47,8 @@
     g.fx.pop = popFn;
     S.diffSpd = g.diff === 'gentle' ? 0.78 : g.diff === 'turbo' ? 1.25 : 1;
     S.diffDmg = g.diff === 'gentle' ? 0.5 : g.diff === 'turbo' ? 1.35 : 1;
-    S.paceMax = g.diff === 'gentle' ? 1.0 : g.diff === 'turbo' ? 1.35 : 1.25;
+    S.paceMax = g.diff === 'gentle' ? 1.05 : g.diff === 'turbo' ? 1.55 : 1.3;   // top of the rubber band; the band itself is TM.Adapt (S.ad)
+    S.ad = new TM.Adapt(g.diff); g.ad = S.ad; S.lastDone = 0;
     if (SS.bg.sector !== 0 || !SS.bg.sec) SS.bg.set(0, true); SS.bg.pipGrow = 0;
     startWave(g);
   }
@@ -121,7 +122,6 @@
         else { S.clearT = 2.6; banner({ key: 'clear', dur: 2.0, title: 'ウェーブ クリア！', sub: `+${bonus}`, color: '#7dff9b', clear: true }); }
         snd('clear', { vol: 0.6 });
         S.hull = Math.min(100, S.hull + 4); S.shield = Math.min(100, S.shield + 30);
-        if (S.pace < 1) S.pace = Math.min(1, S.pace + 0.1);
       } else if (waveDone() && g.demo) { S.wave++; startWave(g); }
     } else if (S.mode === 'clear') {
       S.clearT -= dt;
@@ -369,6 +369,7 @@
     else {
       tgt = pickFresh(k, null) || pickResume(k);
       if (!tgt) { g.keyResult('miss'); missFire(); return; }
+      if (tgt.k0 == null) tgt.k0 = S.t;
       res = tgt.typer.feed(k);
       S.lockT = tgt; tgt.locked = true; S.lockMiss = 0;
       snd('computer', { vol: 0.12, rate: 1.6 + rnd(0, 0.3) });
@@ -450,7 +451,10 @@
       if (o.bomb) { g.score.add(e.item.len * 8 * (S.dbl > 0 ? 2 : 1)); g.fx.pop(x, y - 30, '+' + e.item.len * 8, { color: '#ffb26b', size: 44 }); }
       else if (o.typer) {
         g.wordDone(o.typer, x, y - e.hh * 0.4, { bonus, color: S.dbl > 0 ? '#ffe03a' : '#ffe066' });
-        if (e.typer.errors === 0 || o.typer.errors === 0) S.pace = Math.min(S.paceMax, S.pace + 0.012);
+        if (e.k0 != null && !g.demo && e.type !== 'ace' && e.type !== 'boss' && e.type !== 'powerup') {
+          const F = S.F, margin = clamp((F.impactY - e.y) / Math.max(200, F.impactY - F.safeTop), 0, 1);
+          S.ad.word(o.typer.typedReq || e.item.len, S.t - e.k0, o.typer.errors, e.k0 - (e.seenAt || e.k0), S.t - Math.max(S.lastDone, e.seenAt || 0), margin); S.lastDone = S.t;
+        }
         S.kills++;
       }
     }
@@ -580,7 +584,7 @@
     if (e.type === 'meteor') SS.fx.debris(x, y, 6, 'gray', 380, 40);
     if (g.demo || g.state !== 'play') return;
     g.missWord(e.item); g.score.breakCombo(); S.escaped++;
-    S.pace = Math.max(0.74, S.pace - 0.07);
+    S.ad.fail(); S.pace = Math.max(0.7, S.pace - 0.05);
     g.fx.pop(x, y - 70, 'Ouch!', { color: '#ff8a8a', size: 46 });
     hurtPlayer(g, e.T.dmg * (e.type === 'ace' ? 1 : 1), x, F.impactY, 'ram');
   }
@@ -700,6 +704,7 @@
     S.timeScale += (tsT - S.timeScale) * (1 - Math.exp(-dt * 6));
     if (!g.demo) { S.shieldDelay -= dt; if (S.shieldDelay <= 0 && S.shield < 100) S.shield = Math.min(100, S.shield + (g.diff === 'gentle' ? 8 : 4.5) * dt); }
     if (S.bombFx) { S.bombFx.t += dt; if (S.bombFx.t > 1.1) S.bombFx = null; }
+    if (!g.demo) S.pace += (S.ad.pick(0.72, S.paceMax) - S.pace) * (1 - Math.exp(-dt * 1.2));
     updateWaves(g, dt);
     if (S.mode === 'map') { S.enemies.length = 0; shipAim(g, dt, null); return; }
     // bot (attract mode)

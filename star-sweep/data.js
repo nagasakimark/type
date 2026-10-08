@@ -39,11 +39,13 @@
   ];
 
   SS.POWER = {
-    shield: { label: 'SHIELD', base: 'pu_powerupBlue', color: '#38b6ff', info: 'Shield restored!' },
-    bomb:   { label: 'BOMB',   base: 'pu_powerupRed', color: '#ff5a5f', info: 'BOOM!' },
-    slow:   { label: 'SLOW',   base: 'pu_powerupGreen', color: '#44e08a', info: 'Slow time!' },
-    double: { label: 'x2',     base: 'pu_powerupYellow', color: '#ffd23f', info: 'Double score!' },
-    repair: { label: 'REPAIR', base: 'pu_powerupGreen', color: '#7dff9b', info: 'Hull repaired!' },
+    shield: { label: 'シールド', base: 'pu_powerupBlue', color: '#38b6ff', info: 'シールド ぜんかい！' },
+    bomb:   { label: 'ボム',   base: 'pu_powerupRed', color: '#ff5a5f', info: 'ドカーン！' },
+    slow:   { label: 'スロー',   base: 'pu_powerupGreen', color: '#44e08a', info: 'じかんが ゆっくり！' },
+    double: { label: 'x2',     base: 'pu_powerupYellow', color: '#ffd23f', info: 'とくてん 2ばい！' },
+    repair: { label: 'かいふく', base: 'pu_powerupGreen', color: '#7dff9b', info: 'ふねが なおった！' },
+    upgrade: { label: 'ぶき UP', base: 'pu_powerupRed', color: '#ff7ae8', info: 'ぶきが パワーアップ！' },
+    wing:   { label: 'ウィングマン', base: 'pu_powerupBlue', color: '#8fe9ff', info: 'ウィングマンが きた！' },
   };
 
   /* ---- wave planner ---- */

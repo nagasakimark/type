@@ -42,10 +42,11 @@
       ship: { x: SX, y: 880, rot: 0, slide: 0, recoil: 0, shieldHit: 0, hullHit: 0, hitAng: 0, gunSide: 1, flamePh: 0 },
       shield: 100, hull: 100, shieldDelay: 0, inv: 0, slow: 0, dbl: 0, timeScale: 1, slowmo: 0, pace: 1,
       pulse: 1, flash: { a: 0, c: '#fff' }, banner: null, bq: [], bGap: 0, pops: [], comboFlash: null, audit: null, warp: 0, clearT: 0, map: null, vt: 0, dying: 0, boss: null, bossFx: [],
-      puCool: 14, tier: 0, sinceOrb: 0, streakIdx: 0, drones: 0, magnet: 0, timers: [], beams: [], chain: { n: 0, t: 0 }, morph: 0, spin: 0, fireGlow: 0, tierShow: 0, missRun: 0, gen: 0, keyStat: { in: 0, ok: 0, miss: 0, ignored: 0 }, lastKey: null, kills: 0, escaped: 0, hurtVig: 0, comboLostT: 0, lastCombo: 0, mapPlanets: [], victory: null, botT: 0, botRate: 5.5, nextTip: 0,
+      energy: 0, fireIdx: 0, arcs: [], tierFlash: 0, puCool: 14, tier: 0, sinceOrb: 0, streakIdx: 0, drones: 0, magnet: 0, timers: [], beams: [], chain: { n: 0, t: 0 }, morph: 0, spin: 0, fireGlow: 0, tierShow: 0, missRun: 0, gen: 0, keyStat: { in: 0, ok: 0, miss: 0, ignored: 0 }, lastKey: null, kills: 0, escaped: 0, hurtVig: 0, comboLostT: 0, lastCombo: 0, mapPlanets: [], victory: null, botT: 0, botRate: 5.5, nextTip: 0,
     };
     g.fx.pop = popFn;
     S.diffSpd = g.diff === 'gentle' ? 0.78 : g.diff === 'turbo' ? 1.25 : 1;
+    S.diffK = g.diff === 'gentle' ? 1.3 : g.diff === 'turbo' ? 0.85 : 1;
     S.diffDmg = g.diff === 'gentle' ? 0.5 : g.diff === 'turbo' ? 1.35 : 1;
     S.paceMax = g.diff === 'gentle' ? 1.05 : g.diff === 'turbo' ? 1.55 : 1.3;   // top of the rubber band; the band itself is TM.Adapt (S.ad)
     S.ad = new TM.Adapt(g.diff); g.ad = S.ad; S.lastDone = 0;
@@ -234,6 +235,8 @@
     if (S.hull < 70) need.push('repair', 'repair');
     if (S.shield < 55) need.push('shield', 'shield');
     need.push('bomb', 'slow', 'double', 'shield');
+    if (S.tier < SS.W.MAX) need.push('upgrade', 'upgrade', 'upgrade');
+    if (S.drones < 2 && S.L >= 1) need.push('wing', 'wing');
     kind = forceKind || U.pick(need);
     const e = { id: ++S.uid, type: 'powerup', T: SS.TYPES.powerup, kind, alive: true, doomed: false, x: x ?? rnd(F.xmin + 80, F.xmax - 80), y: y ?? F.spawnY, t: 0, flash: 0, locked: false, spdMul: 1, sc: 1.9, rot: 0, targetable: true, stun: 0, ph: rnd(0, 6), hitsPending: 0, delay: 0, spr: SS.POWER[kind].base, hw: 36, hh: 36, hr: 44 };
     if (y == null) e.y = F.top - e.hh - 24;
@@ -375,12 +378,56 @@
       snd('computer', { vol: 0.12, rate: 1.6 + rnd(0, 0.3) });
     }
     g.keyResult(res);
-    if (res === 'miss') { SS.fx.emit({ spr: 'p_star8', x: tgt.chx, y: tgt.chy - 20, life: 0.25, s0: 40, s1: 70, a0: 0.8, a1: 0, add: true, tint: '#ff6a6a' }); return; }
+    if (res === 'miss') { addEnergy(g, -9 / gainK()); SS.fx.emit({ spr: 'p_star8', x: tgt.chx, y: tgt.chy - 20, life: 0.25, s0: 40, s1: 70, a0: 0.8, a1: 0, add: true, tint: '#ff6a6a' }); return; }
     onLetter(g, tgt, res === 'done', k);
   }
   function missFire() {
     const sh = S.ship; SS.fx.emit({ spr: 'p_star6', x: sh.x, y: sh.y - 70, life: 0.25, s0: 30, s1: 60, a0: 0.8, a1: 0, add: true, tint: '#ff7a7a' });
   }
+  /* ---------- weapons: a power meter climbs the tier ladder (blaster > twin > spread > minigun > homing missiles > beam) ---------- */
+  const TH = [0, 30, 80, 150, 240, 350];            // energy needed for each tier
+  const ENERGY_MAX = 380;
+  const gainK = () => S.diffK || 1;
+  function addEnergy(g, n) {
+    if (g.demo || S.mode === 'dying') return;
+    S.energy = clamp(S.energy + n, 0, ENERGY_MAX);
+    while (S.tier < SS.W.MAX && S.energy >= TH[S.tier + 1]) setTier(g, S.tier + 1);
+    while (S.tier > 0 && S.energy < TH[S.tier] - 10) setTier(g, S.tier - 1);
+  }
+  function setTier(g, t) {
+    const up = t > S.tier; S.tier = t; const T = SS.W.TIERS[t], sh = S.ship;
+    S.morph = 1; S.tierShow = 2.4; S.tierUp = up;
+    if (up) {
+      SS.fx.ring(sh.x, sh.y, 520, T.color, 0.7); SS.fx.ring(sh.x, sh.y, 340, '#ffffff', 0.5); SS.fx.confettiStars(sh.x, sh.y - 40, 10 + t * 3, [T.color, '#ffffff']);
+      g.fx.shake(10 + t * 2, 0.25); S.flash = { a: 0.22, c: T.color }; snd(t >= 4 ? 'power8' : 'power', { vol: 0.6, rate: 0.9 + t * 0.06 }); snd('phaseJump3', { vol: 0.3, rate: 0.8 + t * 0.1 });
+    } else { SS.fx.ring(sh.x, sh.y, 260, '#ff9a9a', 0.4); snd('phaserDown1', { vol: 0.3 }); }
+  }
+  /* muzzle position in the world for the current ship pose */
+  function muzzleWorld(mx, my) {
+    const sh = S.ship, u = 1.55, c = Math.cos(sh.rot), n = Math.sin(sh.rot);
+    return [sh.x + (mx * c - my * n) * u, sh.y + (mx * n + my * c) * u];
+  }
+  const dronePos = (i) => { const sh = S.ship, sd = i ? 1 : -1, b = Math.sin(S.t * 2.1 + i * 2) * 8; return [sh.x + sd * (150 + Math.sin(S.t * 1.3 + i) * 10), sh.y + 36 + b]; };
+  function splash(g, src, spec, extra) {
+    if (!spec || g.demo) return; const n = spec.n + (extra || 0); if (n <= 0) return;
+    const cand = [];
+    for (const e of S.enemies) {
+      if (e === src || !e.alive || e.doomed || !e.seen || e.delay > 0 || e.locked) continue;
+      const hp0 = SS.W.SPLASH_HP[e.type]; if (!hp0) continue;       // aces, bosses, power-ups are never mowed down
+      if (e.typer && e.typer.pos > 0) continue;                       // never steal a word the kid has started
+      if (e.phases && !e.shieldGone) continue;                        // shields protect
+      const d = Math.hypot(e.x - src.x, e.y - src.y); if (d <= spec.r) cand.push([d, e]);
+    }
+    cand.sort((a, b) => a[0] - b[0]);
+    for (let i = 0; i < Math.min(n, cand.length); i++) {
+      const e = cand[i][1]; e.sp = (e.sp ?? SS.W.SPLASH_HP[e.type]) - spec.dmg;
+      S.arcs.push({ x0: src.x, y0: src.y, x1: e.x, y1: e.y, t: -i * 0.04, life: 0.28, col: SS.W.TIERS[S.tier].color, seed: Math.random() * 9 });
+      e.flash = 1; SS.fx.hit(e.x, e.y, SS.W.TIERS[S.tier].color);
+      if (e.sp <= 0) { const pts = e.item.len * 6; kill(g, e, { splash: true, pts }); }
+    }
+  }
+  function updateArcs(dt) { for (const a of S.arcs) a.t += dt; S.arcs = S.arcs.filter((a) => a.t < a.life); }
+
   function onLetter(g, e, done, k) {
     let phaseEnd = null, finalHit = false, typerDone = e.typer;
     if (e.totalLetters != null) e.typed++;
@@ -392,31 +439,57 @@
         if (e.type === 'boss' && e.typer.chars.length && !S.lockT) { S.lockT = e; e.locked = true; }
       } else { e.doomed = true; e.killT = 0.9; finalHit = true; release(true); }
     }
+    if (!g.demo) addEnergy(g, (done ? 2.5 : 1) * gainK());
     fireBolt(g, e, { final: done, phaseEnd, finalHit, typer: typerDone, k });
   }
   function fireBolt(g, e, o) {
-    const sh = S.ship; const rot = sh.rot;
-    const side = sh.gunSide; sh.gunSide = -sh.gunSide;
-    const gx = sh.x + Math.cos(rot) * 20 * side + Math.sin(rot) * 34, gy = sh.y + Math.sin(rot) * 20 * side - Math.cos(rot) * 34;
-    const mult = Math.min(3, g.score.mult - 1 + (S.dbl > 0 ? 0 : 0)); const b = BOLTS[g.demo ? 0 : clamp(g.score.mult - 1, 0, 3)];
-    S.bolts.push({ x: gx, y: gy, vx: Math.sin(rot) * 1500, vy: -Math.cos(rot) * 1500, target: e, spr: b[0], col: b[1], final: o.final, o, t: 0, big: o.final });
-    e.hitsPending++; sh.recoil = 1; S.lastFire = { e, t: S.t };
-    SS.fx.muzzle(gx, gy, rot, b[1]);
-    const rate = 1 + Math.min(0.4, g.score.combo * 0.012);
-    if (!g.demo) snd(o.final ? 'laserFinal' : 'laser', { vol: o.final ? 0.5 : 0.38, rate });
+    const sh = S.ship; const rot = sh.rot, tier = g.demo ? 0 : S.tier;
+    sh.gunSide = -sh.gunSide;
+    const b0 = BOLTS[g.demo ? 0 : clamp(g.score.mult - 1, 0, 3)], TC = SS.W.TIERS[tier];
+    const col = tier ? TC.color : b0[1];
+    S.fireIdx++; S.fireGlow = 1; S.spin += 1.1;
+    const ms = SS.W.muzzles(tier, S.spin, S.fireIdx);
+    const dir = [Math.sin(rot), -Math.cos(rot)];
+    const mk = (m, i, extra) => {
+      const [gx, gy] = muzzleWorld(m[0], m[1]);
+      const sp = tier === 4 ? 1500 : 1500;
+      return Object.assign({ x: gx, y: gy, vx: dir[0] * sp, vy: dir[1] * sp, target: e, spr: tier === 4 ? 'missile3' : b0[0], col, final: o.final, t: 0, big: o.final, sp: tier === 4 ? 2100 : 2700 }, extra);
+    };
+    // the real shot (carries the game logic); the others are the same shot as seen from the other guns / drones
+    const main = mk(ms[0], 0, { o });
+    if (tier === 5) main.instant = true;
+    S.bolts.push(main); e.hitsPending++; sh.recoil = 1; S.lastFire = { e, t: S.t };
+    SS.fx.muzzle(main.x, main.y, rot, col);
+    for (let i = 1; i < ms.length; i++) {
+      const sp = tier === 2 ? (i === 1 ? -0.45 : i === 2 ? 0.45 : 0) : 0;
+      const c = mk(ms[i], i, { cos: true, delay: tier === 1 ? 0.04 : 0, big: false });
+      const an = rot + sp; c.vx = Math.sin(an) * 1500; c.vy = -Math.cos(an) * 1500;
+      S.bolts.push(c); SS.fx.muzzle(c.x, c.y, rot, col);
+    }
+    if (tier === 3) for (let i = 1; i <= 2; i++) { const m = SS.W.muzzles(3, S.spin + i * 0.7, S.fireIdx + i)[0], c = mk(m, 0, { cos: true, delay: i * 0.035, big: false }); S.bolts.push(c); }
+    if (tier === 4) for (const sd of [-1, 1]) { const c = mk([sd * 46, -2], 0, { cos: true, delay: 0.05 + (sd > 0 ? 0.04 : 0), big: false, spr: 'missile3', sp: 1800, wob: sd }); c.vx = Math.sin(rot + sd * 1.0) * 700; c.vy = -Math.cos(rot + sd * 1.0) * 700; S.bolts.push(c); }
+    if (tier === 5) { S.arcs.push({ beam: true, x0: main.x, y0: main.y, e, t: 0, life: o.final ? 0.34 : 0.16, col, w: o.final ? 2 : 1 }); }
+    for (let i = 0; i < S.drones; i++) { const [dx, dy] = dronePos(i); S.bolts.push({ x: dx, y: dy - 20, vx: 0, vy: -900, target: e, spr: b0[0], col: '#bff4ff', t: 0, cos: true, delay: 0.06 + i * 0.05, sp: 2300, big: false }); S.droneFire = 1; }
+    S.fireLevel = tier;
+    const rate = 1 + Math.min(0.4, g.score.combo * 0.012) + tier * 0.04;
+    if (!g.demo) snd(o.final ? 'laserFinal' : 'laser', { vol: (o.final ? 0.5 : 0.38) + tier * 0.02, rate });
   }
 
   /* ---------- bolts ---------- */
   function updateBolts(g, dt) {
     for (const b of S.bolts) {
       const e = b.target;
-      if (!e.alive) { b.dead = true; if (e.hitsPending > 0) e.hitsPending--; continue; }
+      if (b.delay > 0) { b.delay -= dt; continue; }
+      if (!e.alive) { b.dead = true; if (!b.cos && e.hitsPending > 0) e.hitsPending--; continue; }
       const dx = e.x - b.x, dy = e.y - b.y, d = Math.hypot(dx, dy) || 1;
-      const k = 1 - Math.exp(-dt * 18), sp = 2700;
+      if (b.instant) { b.dead = true; hitEnemy(g, b); continue; }
+      const k = 1 - Math.exp(-dt * (b.cos ? 11 : 18)), sp = b.sp || 2700;
+      if (b.wob) { b.vx += Math.cos(S.t * 22 + b.wob) * 900 * dt; }
       b.vx += (dx / d * sp - b.vx) * k; b.vy += (dy / d * sp - b.vy) * k;
       const step = Math.hypot(b.vx, b.vy) * dt;
-      if (d <= step + 8 || d < e.hr * 0.45) { b.dead = true; hitEnemy(g, b); continue; }
+      if (d <= step + 8 || d < e.hr * 0.45) { b.dead = true; if (b.cos) { SS.fx.hit(b.x, b.y, b.col); } else hitEnemy(g, b); continue; }
       b.x += b.vx * dt; b.y += b.vy * dt; b.t += dt;
+      if (b.spr === 'missile3' && Math.random() < 0.9) SS.fx.puff(b.x, b.y, 34, 0.5, true, rnd(-20, 20), rnd(20, 60));
       if (Math.random() < 0.5) SS.fx.emit({ spr: 'p_circle5', x: b.x, y: b.y, life: 0.16, s0: 22, s1: 6, a0: 0.55, a1: 0, add: true, tint: b.col });
     }
     S.bolts = S.bolts.filter((b) => !b.dead);
@@ -428,6 +501,11 @@
     else if (!b.o.final) snd('hit', { vol: 0.12, rate: 1.3 });
     if (b.o.phaseEnd === 'shield') shieldBreak(g, e, b);
     else if (b.o.phaseEnd === 'bossPhase') bossPhaseBreak(g, e, b);
+    if (!g.demo && S.tier > 0) {
+      const spec = b.o.final ? SS.W.TIERS[S.tier].final : SS.W.TIERS[S.tier].letter;
+      if (S.tier >= 4 && b.o.final) { SS.fx.ring(e.x, e.y, spec.r * 0.9, SS.W.TIERS[S.tier].color, 0.5); SS.fx.explode(e.x, e.y, 150, { color: 'red' }); }
+      splash(g, e, spec, b.o.final ? S.drones : 0);
+    }
     if (b.o.finalHit) kill(g, e, { typer: b.o.typer });
   }
   function shieldBreak(g, e, b) {
@@ -449,13 +527,15 @@
     if (!o.silent) {
       let bonus = (T === 'kamikaze' ? 1.4 : T === 'ace' ? 2.5 : T === 'shielded' ? 1.0 : T === 'splitter' ? 1.25 : 1) * (S.dbl > 0 ? 2 : 1);
       if (o.bomb) { g.score.add(e.item.len * 8 * (S.dbl > 0 ? 2 : 1)); g.fx.pop(x, y - 30, '+' + e.item.len * 8, { color: '#ffb26b', size: 44 }); }
+      else if (o.splash) { const pts = Math.round((o.pts || 10) * (S.dbl > 0 ? 2 : 1)); g.score.add(pts); g.fx.pop(x, y - 20, '+' + pts, { color: SS.W.TIERS[S.tier].color, size: 36, life: 0.8 }); }
       else if (o.typer) {
         g.wordDone(o.typer, x, y - e.hh * 0.4, { bonus, color: S.dbl > 0 ? '#ffe03a' : '#ffe066' });
         if (e.k0 != null && !g.demo && e.type !== 'ace' && e.type !== 'boss' && e.type !== 'powerup') {
           const F = S.F, margin = clamp((F.impactY - e.y) / Math.max(200, F.impactY - F.safeTop), 0, 1);
           S.ad.word(o.typer.typedReq || e.item.len, S.t - e.k0, o.typer.errors, e.k0 - (e.seenAt || e.k0), S.t - Math.max(S.lastDone, e.seenAt || 0), margin); S.lastDone = S.t;
         }
-        S.kills++;
+        S.kills++; S.sinceOrb++;
+        if (!g.demo && S.sinceOrb >= 11 && S.tier < SS.W.MAX && !S.enemies.some((q) => q.alive && q.type === 'powerup')) { S.sinceOrb = 0; spawnPower(g, undefined, undefined, 'upgrade'); }
       }
     }
     if (T === 'splitter' && !o.silent) {
@@ -562,7 +642,9 @@
     S.shieldDelay = 3.2; S.hurtVig = 1;
     const sd = Math.min(S.shield, dmg); S.shield -= sd; const rest = dmg - sd;
     if (sd > 0) { sh.shieldHit = 1; snd('field', { vol: 0.5 }); }
+    if (rest > 0 && S.drones > 0) { const [dx, dy] = dronePos(S.drones - 1); S.drones--; SS.fx.explode(dx, dy, 110, { color: 'blue' }); g.fx.pop(dx, dy - 70, 'ウィングマンが まもった！', { color: '#8fe9ff', size: 38, life: 1.3 }); snd('hurt', { vol: 0.35 }); g.fx.shake(9, 0.15); return; }
     if (rest > 0) {
+      addEnergy(g, -22);
       S.hull = Math.max(0, S.hull - rest * 0.9); sh.hullHit = 1; snd('hurt', { vol: 0.6 }); g.fx.shake(16, 0.25); S.flash = { a: 0.28, c: '#ff4040' };
       SS.fx.explode(sh.x + rnd(-30, 30), sh.y + rnd(-10, 20), 80, { color: 'blue' });
       if (S.hull <= 0) die(g);
@@ -604,6 +686,8 @@
       case 'slow': S.slow = 8; snd('phaserDown1', { vol: 0.6 }); break;
       case 'double': S.dbl = 12; snd('power8', { vol: 0.5 }); break;
       case 'bomb': bomb(g); break;
+      case 'upgrade': addEnergy(g, Math.max(40, (TH[Math.min(SS.W.MAX, S.tier + 1)] - S.energy) + 2)); break;
+      case 'wing': if (S.drones < 2) { S.drones++; SS.fx.ring(S.ship.x + (S.drones > 1 ? 150 : -150), S.ship.y + 30, 260, '#8fe9ff', 0.5); } else addEnergy(g, 30); break;
     }
   }
   function bomb(g) {
@@ -704,7 +788,7 @@
     S.timeScale += (tsT - S.timeScale) * (1 - Math.exp(-dt * 6));
     if (!g.demo) { S.shieldDelay -= dt; if (S.shieldDelay <= 0 && S.shield < 100) S.shield = Math.min(100, S.shield + (g.diff === 'gentle' ? 8 : 4.5) * dt); }
     if (S.bombFx) { S.bombFx.t += dt; if (S.bombFx.t > 1.1) S.bombFx = null; }
-    if (!g.demo) S.pace += (S.ad.pick(0.72, S.paceMax) - S.pace) * (1 - Math.exp(-dt * 1.2));
+    if (!g.demo) S.pace += (S.ad.pick(0.72, S.paceMax) * (1 + 0.04 * S.tier) - S.pace) * (1 - Math.exp(-dt * 1.2));
     updateWaves(g, dt);
     if (S.mode === 'map') { S.enemies.length = 0; shipAim(g, dt, null); return; }
     // bot (attract mode)
@@ -747,7 +831,8 @@
     }
     S.enemies = S.enemies.filter((e) => e.alive);
     if (S.lockT && !S.lockT.alive) { S.lockT = null; }
-    updateBolts(g, dt); updateShots(g, dt);
+    updateBolts(g, dt); updateShots(g, dt); updateArcs(dt);
+    S.fireGlow = Math.max(0, S.fireGlow - dt * 7); S.droneFire = Math.max(0, (S.droneFire || 0) - dt * 7); S.morph = Math.max(0, S.morph - dt * 1.6); S.tierShow = Math.max(0, S.tierShow - dt); S.spin += dt * (4 + S.fireGlow * 26);
     // aim
     let tg = S.lockT && S.lockT.alive ? S.lockT : (S.t - S.lastFire.t < 0.45 && S.lastFire.e && S.lastFire.e.alive ? S.lastFire.e : null);
     shipAim(g, dt, tg);
@@ -828,6 +913,8 @@
     else if (kind === 'slow') { ctx.strokeStyle = '#fff'; ctx.lineWidth = 4; ctx.beginPath(); ctx.arc(0, 1, 15, 0, 7); ctx.stroke(); ctx.beginPath(); ctx.moveTo(0, 1); ctx.lineTo(0, -9); ctx.moveTo(0, 1); ctx.lineTo(8, 5); ctx.stroke(); }
     else if (kind === 'double') { ctx.font = '800 30px "Baloo 2", sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.lineWidth = 6; ctx.strokeStyle = '#8a5a00'; ctx.strokeText('x2', 0, 3); ctx.fillStyle = '#fff'; ctx.fillText('x2', 0, 3); }
     else if (kind === 'repair') { ctx.fillStyle = '#fff'; ctx.fill(P.rr(-5, -15, 10, 30, 3)); ctx.fill(P.rr(-15, -5, 30, 10, 3)); }
+    else if (kind === 'upgrade') { ctx.fillStyle = '#fff'; ctx.strokeStyle = '#8a1f7c'; ctx.lineWidth = 4; ctx.beginPath(); ctx.moveTo(0, -17); ctx.lineTo(15, 0); ctx.lineTo(6, 0); ctx.lineTo(6, 15); ctx.lineTo(-6, 15); ctx.lineTo(-6, 0); ctx.lineTo(-15, 0); ctx.closePath(); ctx.stroke(); ctx.fill(); }
+    else if (kind === 'wing') { SS.spr(ctx, 'ship3_blue', 0, 0, { s: 0.42 }); }
     ctx.restore();
   }
 
@@ -847,12 +934,13 @@
     }
     SS.spr(ctx, 'p_muzzle1', 0, 36 * sc, { sw: 30 * sc, sh: 55 * sc * fl, ay: 0.08, rot: Math.PI, a: 0.55, tint: '#9fe0ff' });
     ctx.globalCompositeOperation = 'source-over';
-    SS.spr(ctx, 'ship1_blue', 0, 0, { s: sc });
+    SS.W.drawShip(ctx, g.demo ? 0 : S.tier, sc, { t: S.t, fire: S.fireGlow, spin: S.spin, pop: S.morph });
     const hp = S.hull;
     if (hp < 75) SS.spr(ctx, 'dmg1', 0, 0, { s: sc }); if (hp < 50) SS.spr(ctx, 'dmg2', 0, 0, { s: sc }); if (hp < 28) SS.spr(ctx, 'dmg3', 0, 0, { s: sc });
     if (sh.hullHit > 0) SS.spr(ctx, 'ship1_blue', 0, 0, { s: sc, tint: '#ff6a6a', a: sh.hullHit * 0.7 });
     if (S.dbl > 0) { ctx.globalCompositeOperation = 'lighter'; SS.spr(ctx, 'ship1_blue', 0, 0, { s: sc, tint: '#ffd23f', a: 0.25 + 0.15 * Math.sin(S.t * 8) }); ctx.globalCompositeOperation = 'source-over'; }
     ctx.restore();
+    for (let i = 0; i < S.drones; i++) { const [dx, dy] = dronePos(i); SS.W.drawDrone(ctx, dx, dy, S.t + i, S.droneFire || 0, sh.rot * 0.5); }
     // hull smoke when badly hurt
     if (hp < 40 && Math.random() < 0.3) SS.fx.puff(sh.x + rnd(-20, 20), sh.y + rnd(-5, 15), 46, 1, true, rnd(-15, 15), rnd(-70, -30));
     // shield bubble
@@ -861,11 +949,32 @@
   }
   function drawBolts(ctx) {
     for (const b of S.bolts) {
+      if (b.delay > 0 || b.instant) continue;
       const rot = Math.atan2(b.vx, -b.vy);
       ctx.globalCompositeOperation = 'lighter'; SS.spr(ctx, 'p_circle5', b.x, b.y, { max: b.big ? 90 : 62, a: 0.75, tint: b.col }); ctx.globalCompositeOperation = 'source-over';
-      SS.spr(ctx, b.spr, b.x, b.y, { s: b.big ? 2.8 : 2.1, rot });
+      SS.spr(ctx, b.spr, b.x, b.y, { s: b.spr === 'missile3' ? (b.big ? 1.35 : 1.0) : b.big ? 2.8 : 2.1, rot });
       if (b.big) { ctx.globalCompositeOperation = 'lighter'; SS.spr(ctx, 'p_star8', b.x, b.y, { max: 70, a: 0.9, rot: S.t * 10, tint: b.col }); ctx.globalCompositeOperation = 'source-over'; }
     }
+  }
+  /* splash arcs (jagged sparks from the typed ship to the ships it takes with it) and the tier-5 beam */
+  function drawArcs(ctx) {
+    if (!S.arcs.length) return;
+    ctx.save(); ctx.globalCompositeOperation = 'lighter'; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+    for (const a of S.arcs) {
+      if (a.t < 0) continue; const k = 1 - a.t / a.life;
+      if (a.beam) {
+        if (!a.e.alive && a.t > 0.05) continue; const [mx, my] = muzzleWorld(0, -66), tx = a.e.alive ? a.e.x : a.x1 ?? a.x0, ty = a.e.alive ? a.e.y : a.y1 ?? a.y0;
+        for (const [w, c, al] of [[46 * a.w, a.col, 0.28], [22 * a.w, '#ffb8f4', 0.6], [9 * a.w, '#ffffff', 0.95]]) { ctx.globalAlpha = al * k; ctx.strokeStyle = c; ctx.lineWidth = w * (0.6 + 0.4 * k); ctx.beginPath(); ctx.moveTo(mx, my); ctx.lineTo(tx, ty); ctx.stroke(); }
+        continue;
+      }
+      const n = 6, dx = a.x1 - a.x0, dy = a.y1 - a.y0, L = Math.hypot(dx, dy) || 1, nx = -dy / L, ny = dx / L;
+      for (const [w, c] of [[14, a.col], [5, '#ffffff']]) {
+        ctx.globalAlpha = 0.85 * k; ctx.strokeStyle = c; ctx.lineWidth = w * k + 1; ctx.beginPath(); ctx.moveTo(a.x0, a.y0);
+        for (let i = 1; i < n; i++) { const f = i / n, o = Math.sin(a.seed * 7 + i * 3.1 + a.t * 60) * 26 * Math.sin(f * Math.PI); ctx.lineTo(a.x0 + dx * f + nx * o, a.y0 + dy * f + ny * o); }
+        ctx.lineTo(a.x1, a.y1); ctx.stroke();
+      }
+    }
+    ctx.restore();
   }
   function drawEnemyShots(ctx) {
     for (const s of S.shots) {
@@ -977,6 +1086,21 @@
     SS.spr(ctx, 'pu_shield_silver', x0 + 20, yb + 9, { s: 1.5, tint: S.inv > 0 ? '#ffe066' : null });
     SS.spr(ctx, 'life_blue', x0 + 20, yb + 55, { s: 1.5 });
     if (low && Math.sin(S.t * 10) > 0) { ctx.save(); ctx.globalCompositeOperation = 'lighter'; SS.spr(ctx, 'p_circle5', x0 + 20, yb + 55, { max: 60, a: 0.8, tint: '#ff5050' }); ctx.restore(); }
+    // weapon panel: icon, name, power meter to the next tier, wingmen
+    if (!g.demo) {
+      const T = SS.W.TIERS[S.tier], nxt = S.tier < SS.W.MAX ? TH[S.tier + 1] : TH[S.tier], lo = TH[S.tier], k = S.tier >= SS.W.MAX ? 1 : clamp((S.energy - lo) / (nxt - lo), 0, 1);
+      const wy = yb - 92, pulse = S.tierShow > 1.8 ? 1 + 0.12 * Math.sin(S.tierShow * 20) : 1;
+      ctx.save(); ctx.fillStyle = 'rgba(8,10,34,0.35)'; ctx.fill(P.rr(x0 - 20, wy - 34, 430, 78, 26));
+      ctx.fillStyle = 'rgba(8,10,34,0.6)'; ctx.beginPath(); ctx.arc(x0 + 20, wy + 5, 31 * pulse, 0, 7); ctx.fill(); ctx.lineWidth = 5; ctx.strokeStyle = T.color; ctx.stroke(); ctx.restore();
+      SS.W.drawIcon(ctx, T.id, x0 + 20, wy + 5, 0.62, S.t);
+      D.text(ctx, T.ja, x0 + 66, wy - 14, { font: KV(19), size: 19, color: T.color, align: 'left', outline: 6 });
+      const bx = x0 + 66, bw = 250, byy = wy + 6;
+      ctx.save(); ctx.fillStyle = 'rgba(8,10,34,0.72)'; ctx.fill(P.rr(bx - 4, byy - 4, bw + 8, 24, 12)); ctx.fillStyle = 'rgba(255,255,255,0.12)'; ctx.fill(P.rr(bx, byy, bw, 16, 8));
+      if (k > 0.01) { ctx.fillStyle = T.color; ctx.fill(P.rr(bx, byy, Math.max(16, bw * k), 16, 8)); ctx.fillStyle = 'rgba(255,255,255,0.4)'; ctx.fill(P.rr(bx + 6, byy + 2, Math.max(8, bw * k - 12), 4, 2)); }
+      ctx.restore();
+      if (S.tier >= SS.W.MAX) D.text(ctx, 'MAX！', bx + bw - 8, byy + 8, { font: BD(15, 800), size: 15, color: '#fff', align: 'right', outline: 5 });
+      for (let i = 0; i < 2; i++) { ctx.save(); ctx.globalAlpha = i < S.drones ? 1 : 0.22; SS.spr(ctx, 'ship3_blue', bx + bw - 54 + i * 34, wy - 16, { s: 0.3 }); ctx.restore(); }
+    }
     // combo meter (bottom right)
     const cx = W - 140, cy = F.bottom - 92;
     const combo = g.score.combo, mult = g.score.mult;
@@ -1056,6 +1180,15 @@
       const gr = ctx.createRadialGradient(cx, cy, r * 0.55, cx, cy, r); gr.addColorStop(0, 'rgba(255,40,40,0)'); gr.addColorStop(1, `rgba(255,40,40,${a})`);
       ctx.fillStyle = gr; ctx.fillRect(v.x - 100, v.y - 100, v.w + 200, v.h + 200);
     }
+    if (S.tierShow > 0 && !g.demo && g.state === 'play') { // big "new weapon" moment
+      const T = SS.W.TIERS[S.tier], el = 2.4 - S.tierShow, e = U.ease.outBack(clamp(el / 0.45, 0, 1)), fade = clamp(S.tierShow / 0.5, 0, 1);
+      ctx.save(); ctx.globalAlpha = fade; ctx.translate(SX, F.top + (F.bottom - F.top) * 0.30); ctx.scale(e, e);
+      ctx.globalCompositeOperation = 'lighter'; SS.spr(ctx, 'p_circle5', 0, 0, { max: 700, a: 0.35, tint: T.color }); ctx.globalCompositeOperation = 'source-over';
+      D.text(ctx, S.tierUp ? 'ぶき パワーアップ！' : 'ぶきが ダウン…', 0, -52, { size: 34, color: '#fff', outline: 10 });
+      D.text(ctx, T.ja, 0, 18, { font: KV(S.tierUp ? 78 : 56), size: S.tierUp ? 78 : 56, color: S.tierUp ? T.color : '#ff9a9a', outline: 16 });
+      SS.W.drawIcon(ctx, T.id, 0, 100, 1.1, S.t);
+      ctx.restore();
+    }
     if (S.flash.a > 0.01) { ctx.fillStyle = U.hexA(S.flash.c, clamp(S.flash.a, 0, 1)); ctx.fillRect(v.x - 100, v.y - 100, v.w + 200, v.h + 200); }
   }
 
@@ -1126,7 +1259,7 @@
     for (const e of S.enemies) if (e.type !== 'boss') drawEnemy(ctx, e);
     for (const e of S.enemies) if (e.type === 'boss') drawEnemy(ctx, e);
     drawShip(ctx, g, F);
-    SS.fx.draw(ctx, false); drawBolts(ctx); SS.fx.draw(ctx, true);
+    SS.fx.draw(ctx, false); drawBolts(ctx); drawArcs(ctx); SS.fx.draw(ctx, true);
     if (S.bombFx) { const k = S.bombFx.t / 1.1; ctx.save(); ctx.globalCompositeOperation = 'lighter'; ctx.strokeStyle = U.hexA('#ffe0a0', 1 - k); ctx.lineWidth = 60 * (1 - k) + 6; ctx.beginPath(); ctx.arc(S.bombFx.x, S.bombFx.y, k * 2300, 0, 7); ctx.stroke(); ctx.restore(); }
     drawHUD(ctx, g, F);
     S.chipRects = [];
@@ -1156,6 +1289,7 @@
       'シールドの ふねは <b>ことばが 2つ</b>。ちいさい ミサイルは みじかい ことば。スプリッターは ちいさく わかれるよ。',
       '<b>パワーアップ</b>の ことばを うつと ゲット：シールド、ボム、スロー、とくてん2ばい、かいふく。',
       'セクターの さいごは <b>ボス</b>！ ぶんしょうを うって たいりょくを けずろう。こうげきを うけるから うち つづけてね！',
+      'ミスなく うつと <b>パワーメーター</b>が たまって、ぶきが ツイン→スプレッド→ミニガン→ミサイル→ビームと パワーアップ！ ミスすると へるよ。まわりの ふねも まきこんで たおせる！ <b>ぶき UP</b>と <b>ウィングマン</b>も ゲットしよう。',
       '<b>Enter</b>で パルスが つかえるよ（セクターごとに 1かい）。てきを ぜんぶ おしもどす！',
     ],
     init: () => { SS.bg.init(); SS.load(); SS.bg.set(0, true); },
@@ -1172,6 +1306,8 @@
     goto: (sector, wave) => { clearField(G); S.sector = sector; S.wave = wave; S.perSector = perSectorFor(G); SS.bg.set(sector); startWave(G); },
     set: (o) => Object.assign(S, o),
     god: (on) => { S.god = on; },
+    tier: (t) => { addEnergy(G, TH[t] - S.energy + 1); },
+    drones: (n) => { S.drones = n; },
     auto: (cps, err, think) => { S.auto = cps ? { cps, err: err || 0, think: think ?? 0.3, acc: 0 } : null; },
     speed: (n) => { S.devSpeed = n; },
     kill: () => { for (const e of S.enemies) if (e.alive && e.type !== 'boss') { e.doomed = true; kill(G, e, { silent: true }); } },

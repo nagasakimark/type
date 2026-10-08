@@ -19,7 +19,7 @@
   /* ---------- header controls ---------- */
   const openPicker = () => TM.ui.picker('', () => { refresh(); });
   document.getElementById('controls').append(
-    el('button', { class: 'tm-btn', onclick: teacher }, 'Teacher link'),
+    el('button', { class: 'tm-btn', onclick: teacher }, 'Teacher QR'),
     el('button', { class: 'tm-btn icon', title: 'Settings', 'aria-label': 'Settings', onclick: () => TM.ui.settings() }, '\u2699'));
 
   /* ---------- the "your words" bar ---------- */
@@ -62,28 +62,39 @@
     }
   }
 
-  /* ---------- teacher link ---------- */
+  /* ---------- teacher link: pick a game + mode, get a QR code (open it big on the board / projector) ---------- */
+  function teacherUrl(gameId, diff, quiet) {
+    const base = location.href.replace(/[^/]*(\?.*)?(#.*)?$/, '');
+    return `${base}${gameId}/index.html?deck=${TM.deck.ids().join(',')}&diff=${diff}${quiet ? '&quiet=1' : ''}`;
+  }
+  function qrSvg(text) {
+    const qr = window.qrcode(0, 'M'); qr.addData(text); qr.make();
+    return qr.createSvgTag({ cellSize: 10, margin: 4, scalable: true });
+  }
   function teacher() {
     const sel = el('select', {}, GAMES.map((g) => el('option', { value: g.id }, g.name)));
-    const diff = el('select', {}, ['gentle', 'normal', 'turbo'].map((d) => el('option', { value: d, selected: d === 'normal' }, d[0].toUpperCase() + d.slice(1))));
+    const diff = el('select', {}, [['gentle', 'Gentle'], ['normal', 'Normal'], ['turbo', 'Turbo']].map(([d, l]) => el('option', { value: d, selected: d === 'normal' }, l)));
     const quiet = el('input', { type: 'checkbox' });
-    const out = el('input', { readonly: true });
-    const copy = el('button', { class: 'tm-btn small' }, 'Copy');
-    const make = () => {
-      const base = location.href.replace(/[^/]*(\?.*)?(#.*)?$/, '');
-      out.value = `${base}${sel.value}/index.html?deck=${TM.deck.ids().join(',')}${quiet.checked ? '&quiet=1' : ''}`;
-    };
-    sel.onchange = make; diff.onchange = make; quiet.onchange = make;
-    copy.onclick = () => { out.select(); try { navigator.clipboard.writeText(out.value); } catch (e) { document.execCommand('copy'); } copy.textContent = 'Copied!'; };
     const card = el('div', { class: 'tm-card tm-modal tm-small' },
-      el('header', {}, el('h2', {}, 'Teacher link'), el('button', { class: 'tm-btn icon', onclick: () => m.close() }, '✕')),
+      el('header', {}, el('h2', {}, 'QR code for class'), el('button', { class: 'tm-btn icon', 'aria-label': 'Close', onclick: () => m.close() }, '\u2715')),
       el('div', { class: 'body' },
-        el('div', { style: { font: '500 17px/1.4 var(--word)' } }, 'A link that opens a game straight on your chosen word list (', el('b', {}, TM.deck.label()), '). Put it on the board or in Google Classroom.'),
+        el('div', { style: { font: '500 17px/1.4 var(--word)' } }, 'Students scan the code with a tablet or phone and the game opens on your word list (', el('b', {}, TM.deck.label()), ').'),
         el('label', { class: 'tm-field' }, 'Game', sel),
-        el('label', { class: 'tm-field' }, 'Start with sound off', quiet),
-        el('div', { class: 'linkbox' }, out, copy)),
-      el('footer', {}, el('span'), el('button', { class: 'tm-btn', onclick: () => m.close() }, 'Done')));
-    const m = TM.ui.modal(card); make();
+        el('label', { class: 'tm-field' }, 'Mode', diff),
+        el('label', { class: 'tm-field' }, 'Start with sound off', quiet)),
+      el('footer', {}, el('button', { class: 'tm-btn', onclick: () => m.close() }, 'Cancel'), el('button', { class: 'tm-btn primary', onclick: () => { const url = teacherUrl(sel.value, diff.value, quiet.checked); const name = sel.options[sel.selectedIndex].text, mode = diff.options[diff.selectedIndex].text; m.close(); showQR(url, name, mode); } }, 'Show QR code')));
+    const m = TM.ui.modal(card);
+  }
+  function showQR(url, gameName, mode) {
+    const box = el('div', { class: 'qrbox', html: qrSvg(url), role: 'img', 'aria-label': 'QR code for ' + gameName });
+    const out = el('input', { readonly: true, value: url, 'aria-label': 'Link', onfocus: function () { this.select(); } });
+    const copy = el('button', { class: 'tm-btn small' }, 'Copy link');
+    copy.onclick = () => { out.select(); try { navigator.clipboard.writeText(url); } catch (e) { document.execCommand('copy'); } copy.textContent = 'Copied!'; };
+    const card = el('div', { class: 'tm-card tm-modal tm-qr' },
+      el('header', {}, el('h2', {}, gameName + ' \u00b7 ' + mode), el('button', { class: 'tm-btn icon', 'aria-label': 'Close', onclick: () => m.close() }, '\u2715')),
+      el('div', { class: 'body qrwrap' }, box, el('div', { class: 'qrcap' }, 'Scan to play \u2022 ', el('b', {}, TM.deck.label()))),
+      el('footer', {}, el('div', { class: 'linkbox' }, out, copy), el('button', { class: 'tm-btn primary', onclick: () => m.close() }, 'Done')));
+    const m = TM.ui.modal(card);
   }
 
   /* ---------- mascot ---------- */

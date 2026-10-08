@@ -58,6 +58,7 @@
   const DEFAULTS = { sfx: 0.8, music: 0.5, hints: 'auto', strict: false, reduceMotion: false, keyboard: false, shortOnly: false, difficulty: 'normal' };
   TM.settings = Object.assign({}, DEFAULTS, TM.store.get('settings', {}));
   if (U.qs('quiet') === '1') { TM.settings.music = 0; TM.settings.sfx = 0; }
+  if (['gentle', 'normal', 'turbo'].includes(U.qs('diff'))) TM.settings.difficulty = U.qs('diff');   // teacher links can pick the mode (not saved)
   TM.saveSettings = () => TM.store.set('settings', TM.settings);
 
   TM.records = {

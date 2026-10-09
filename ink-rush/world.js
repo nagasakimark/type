@@ -83,7 +83,7 @@
   const TPU = 48, TEXW = 14 * TPU; // paint texture: 32 px per world unit, 14 units wide
   INK.TPU = TPU;
   INK.buildStage = function (si, team) {
-    const def = INK.STAGES[si], pair = def.pairs[team] || def.pairs[0];
+    const def = INK.STAGES[si], pair = Array.isArray(team) ? team : (def.pairs[team] || def.pairs[0]);
     const rng = mulberry(1000 + si * 77);
     const R = (a, b) => a + rng() * (b - a);
     const len = def.stops[def.stops.length - 1] + 58;

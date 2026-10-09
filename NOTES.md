@@ -43,3 +43,8 @@ Done: Star Sweep targeting fix; TM.Adapt rubber-band in all 5 games (shared/adap
 Dev tools: ?speed=N, ?bot=cps,err,think; tools/sim.py <game> <diff> <cps> <err> <think> [wall] [speed]; star-sweep/_dev/regress_targeting.py.
 Also done: Ink Rush route (INK.ROUTES: bends + hills via INK.sx/gy/sy and INK.setCam; harbour quay with water slips, boats/buoys on water, arches + landmarks per stage); Star Sweep weapon tiers (power meter S.energy -> S.tier, splash via SS.W.TIERS letter/final, upgrade + wingman drops, HUD panel, tier-up banner; dev hooks __ssDev.tier(n)/drones(n)); textbook picker sizing for 800x500..3440x1440.
 Still open: Word Ninja heavy combo paths untested; real-GPU frame rate; shared g.wordDone popups; Ink Rush paint-layer slices look slightly stair-stepped on tight bends; Star Sweep weapons not yet balance-tuned beyond one sim (load pins at 1 for good typists). Rooftop Rascal stays disabled.
+
+## Latest fixes (2026-10-09)
+- Turbo Type: retry froze because setupRace reused stale state `S` (podium camera flags); now a fresh `S` per race.
+- Scaling (all games): TM.ui.fit measured modal cards mid pop-in animation (scaled) -> now uses offsetWidth/Height, and refits on load/fonts/fullscreen/visualViewport/resize + a 500ms safety interval. Title refit on every show.
+- Ink Rush: the "team" picker is replaced by a free two-colour picker (INK.PALETTE, 8 colours; stored as ink.c1/ink.c2; the two are always different). It lives inside the title column under the word-list row, so it cannot cover the play button. INK.buildStage accepts a [hex,hex] pair.

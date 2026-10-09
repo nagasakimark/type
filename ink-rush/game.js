@@ -37,7 +37,8 @@
   const parts = new INK.Parts(800);
   const drawables = [];
   const rp = (g, px) => px * g.vw().w / window.innerWidth; // real pixels -> virtual units
-  const team = () => TM.store.get('ink.team', 0);
+  INK.PALETTE = [['#FF3EA5', 'ピンク'], ['#FF8A1F', 'オレンジ'], ['#FFD21F', 'きいろ'], ['#B8F03A', 'きみどり'], ['#2FE0C8', 'みずいろ'], ['#2F9BFF', 'あお'], ['#7B5CFF', 'むらさき'], ['#FF4F5A', 'あか']];
+  const team = () => { const n = INK.PALETTE.length; let a = TM.store.get('ink.c1', 0) % n, b = TM.store.get('ink.c2', 3) % n; if (a === b) b = (a + 3) % n; return [INK.PALETTE[a][0], INK.PALETTE[b][0]]; };
   const accentOf = (col) => U.shade(col, -0.28);
 
   function newStage(g, si) {
@@ -1031,12 +1032,14 @@
   /* ---------------- team picker (title screen) ---------------- */
   function buildTeamUI(g) {
     const css = document.createElement('style');
-    css.textContent = `.ink-team{position:fixed;left:50%;bottom:26px;transform:translateX(-50%);z-index:11;display:flex;gap:14px;align-items:center;background:var(--ink);padding:10px 16px 8px;border-radius:999px;box-shadow:0 6px 0 rgba(0,0,0,.28);color:#fff;font:800 20px var(--display)}
-.ink-team button{border:5px solid var(--ink);background:#fff;border-radius:999px;padding:6px 16px 3px;cursor:pointer;display:inline-flex;gap:7px;align-items:center;font:800 20px var(--display);color:var(--ink);outline:3px solid transparent;transition:transform .08s}
-.ink-team button:hover{transform:translateY(-2px)}
-.ink-team button.on{outline:4px solid #fff;background:#FFF8EC;box-shadow:0 0 0 3px var(--ink)}
-.ink-team i{display:inline-block;width:26px;height:26px;border-radius:50%;border:3px solid var(--ink)}
-@media (max-height:560px){.ink-team{bottom:6px;transform:translateX(-50%) scale(.8)}}
+    css.textContent = `.ink-colors{display:flex;gap:12px 22px;justify-content:center;align-items:center;flex-wrap:wrap;margin:2px 0 6px;padding:8px 14px 6px;background:rgba(31,26,61,.82);border-radius:26px;color:#fff;font:800 18px var(--display)}
+.ink-colors .grp{display:flex;align-items:center;gap:6px}
+.ink-colors .sw{all:unset;cursor:pointer;width:30px;height:30px;border-radius:50%;border:3px solid var(--ink);box-sizing:border-box;box-shadow:0 0 0 2px rgba(255,255,255,.35);transition:transform .08s}
+.ink-colors .sw:hover{transform:translateY(-2px) scale(1.08)}
+.ink-colors .sw.on{box-shadow:0 0 0 4px #fff,0 0 0 7px var(--ink);transform:scale(1.12)}
+.ink-colors .sw:focus-visible{outline:4px solid #fff}
+.ink-colors .pv{display:flex;align-items:center}.ink-colors .pv i{display:block;width:34px;height:34px;border-radius:50%;border:3px solid #fff}.ink-colors .pv i+i{margin-left:-10px}
+@media (max-height:640px){.ink-colors{font-size:14px;padding:5px 10px 3px;gap:6px 14px}.ink-colors .sw{width:24px;height:24px}.ink-colors .pv i{width:26px;height:26px}}
 /* results card: never clip the buttons on short / small windows (buttons stay pinned, the middle scrolls if it must) */
 .tm-results{display:flex;flex-direction:column;overflow-y:auto;max-height:96vh}
 .tm-results>.tm-row{position:sticky;bottom:-4px;z-index:2;margin-top:auto;padding:10px 0 4px;background:linear-gradient(rgba(255,248,236,0),var(--paper,#FFF8EC) 28%)}
@@ -1054,18 +1057,32 @@
 }
 @media (max-height:560px){.tm-tricky{display:none}.tm-results .ink-map{max-height:15vh}.tm-results h2{font-size:32px}}`;
     document.head.append(css);
-    const box = document.createElement('div'); box.className = 'ink-team hidden';
-    const lbl = document.createElement('span'); lbl.textContent = 'チームの いろ'; box.append(lbl);
-    const btns = [];
-    for (let i = 0; i < 2; i++) {
-      const pr = INK.STAGES[0].pairs[i], b = document.createElement('button');
-      b.innerHTML = `<i style="background:${pr[0]}"></i><i style="background:${pr[1]}"></i>Team ${i + 1}`;
-      b.onclick = () => { TM.store.set('ink.team', i); TM.sfx.click(); upd(); reset(G); };
-      btns.push(b); box.append(b);
+    const box = document.createElement('div'); box.className = 'ink-colors';
+    const mkGroup = (label, key) => {
+      const grp = document.createElement('div'); grp.className = 'grp'; const l = document.createElement('span'); l.textContent = label; grp.append(l);
+      const sws = INK.PALETTE.map((c, i) => { const b = document.createElement('button'); b.type = 'button'; b.className = 'sw'; b.style.background = c[0]; b.setAttribute('aria-label', label + ' ' + c[1]);
+        b.onclick = () => choose(key, i); grp.append(b); return b; });
+      return { grp, sws };
+    };
+    const g1 = mkGroup('いろ 1', 'ink.c1'), g2 = mkGroup('いろ 2', 'ink.c2');
+    const pv = document.createElement('div'); pv.className = 'pv'; const p1 = document.createElement('i'), p2 = document.createElement('i'); pv.append(p1, p2);
+    box.append(g1.grp, g2.grp, pv);
+    function choose(key, i) {
+      const other = key === 'ink.c1' ? 'ink.c2' : 'ink.c1', oi = TM.store.get(other, other === 'ink.c1' ? 0 : 3);
+      TM.store.set(key, i); if (oi === i) TM.store.set(other, (i + 3) % INK.PALETTE.length);   // two different colours, always
+      TM.sfx.click(); upd(); if (G) reset(G);
     }
-    function upd() { const t = team(); btns.forEach((b, i) => b.classList.toggle('on', i === t)); }
-    upd(); document.body.append(box);
-    g.__teamBox = box;
+    function upd() {
+      const [a, b] = team(); const ia = TM.store.get('ink.c1', 0), ib = TM.store.get('ink.c2', 3);
+      g1.sws.forEach((e, i) => e.classList.toggle('on', i === ia)); g2.sws.forEach((e, i) => e.classList.toggle('on', i === ib));
+      p1.style.background = a; p2.style.background = b;
+    }
+    // lives inside the title column (right under the word-list row) so it can never sit on top of the play button
+    function place() {
+      const t = document.querySelector('.tm-title'); if (!t) return;
+      if (!box.isConnected) { const rows = t.querySelectorAll('.tm-row'); (rows[0] || t.firstChild).insertAdjacentElement('afterend', box); upd(); if (g.refitTitle) g.refitTitle(); }
+    }
+    upd(); place(); setTimeout(place, 300); g.__colorBox = box; g.__teamBox = box;
   }
 
   TM.game({
@@ -1092,6 +1109,6 @@
     },
   });
   // show the team picker only on the title screen
-  setInterval(() => { if (G && G.__teamBox) G.__teamBox.classList.toggle('hidden', G.state !== 'title' || (window.TM.ui.isModalOpen && window.TM.ui.isModalOpen())); }, 120);
+
   window.INK_DEBUG = { chips: () => (S ? S.enemies.filter((e) => e.alive && e.chipPos).map((e) => ({ id: e.typer.text, x: e.chipPos.x, y: e.chipPos.y, ex: INK.sx(e.x, e.z), ey: INK.gy(e.z), z: e.z })) : []), audit: AUDIT, finish: (w) => finish(G, w), msg: (t, o) => msg(G, t, o), nextKey: () => { if (!S) return null; const t = S.lock.locked || nearest(); return t && !t.typer.done ? t.typer.nextReq() : null; }, G: () => G, S: () => S, WS: () => WS, parts, spawn: (t, x, z) => mkEnemy(G, t, { x, z }), boss: () => startBoss(G), stage: (i) => { newStage(G, i); }, setCz: (c) => { S.cz = c; } };
 })();

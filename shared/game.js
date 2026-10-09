@@ -227,7 +227,7 @@
       }
       setDiff(g.diff); refreshDeck();
       return {
-        show(v) { box.classList.toggle('hidden', !v); corners.forEach((c) => c.classList.toggle('hidden', !v)); if (v) refreshDeck(); },
+        show(v) { box.classList.toggle('hidden', !v); corners.forEach((c) => c.classList.toggle('hidden', !v)); if (v) { refreshDeck(); if (g.refitTitle) { g.refitTitle(); requestAnimationFrame(g.refitTitle); setTimeout(g.refitTitle, 250); } } },
         refreshDeck,
       };
     })();

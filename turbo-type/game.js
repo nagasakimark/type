@@ -103,7 +103,7 @@
       track_at(c.dist, o1); c.y = tr.roadY(c.dist, c.lat); c.prevY = c.y;
       c.mesh.group.userData.isCar = true; c.mesh.shadow.userData.isCar = true;
     });
-    S = Object.assign(S || {}, {
+    S = Object.assign({}, {   // fresh state every race: stale podium/finish flags from the last race used to freeze the retry
       cars, player: p, phase: 'grid', raceT: 0, laps: ST.laps, total: ST.laps * L, finishOrder: 0, banners: [], nitro: 0, nitroT: 0, nitroFlash: 0, boostK: 0, shake: 0, camBump: 0, camBumpV: 0,
       queue: [], rate: 0, rateSm: 0, stageBase: tr.def.stage[0], stageSpan: tr.def.stage[1] - tr.def.stage[0], chunkCount: 0,
       cam: { init: false, y: 0, ly: 0, fov: 60, roll: 0, p0: new THREE.Vector3(), p1: new THREE.Vector3(), q0: new THREE.Quaternion(), q1: new THREE.Quaternion(), f0: 60, f1: 60, introT: 0, podT: 0 },

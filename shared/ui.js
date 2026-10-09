@@ -36,14 +36,28 @@
   const fits = new Set();
   function doFit(box, o) {
     if (!box.isConnected) { fits.delete(box); return; }
+    const prev = box.style.zoom;
     box.style.zoom = 1;
-    const r = box.getBoundingClientRect(); if (!r.width || !r.height) return;
+    // hidden (display:none) boxes measure 0: keep the old zoom and re-fit when shown. (Resetting to 1 here is what made the title screen
+    // come back HUGE after a round until the window was resized / fullscreened.)
+    const r = { width: box.offsetWidth, height: box.offsetHeight }; // layout size: NOT getBoundingClientRect, which includes the modal's pop-in scale animation and made cards fit too big
+    if (!r.width || !r.height) { box.style.zoom = prev; return; }
     const vw = window.innerWidth, vh = window.innerHeight, fill = o.fill || 0.94;
     let z = Math.min((vw * fill) / r.width, (vh * fill) / r.height, o.max || 1.45);
     box.style.zoom = Math.max(o.min || 0.45, z).toFixed(3);
   }
   function fit(box, o = {}) { const rec = { box, o }; fits.add(rec); doFit(box, o); requestAnimationFrame(() => doFit(box, o)); return () => doFit(box, o); }
-  window.addEventListener('resize', () => { for (const r of [...fits]) { if (!r.box.isConnected) fits.delete(r); else doFit(r.box, r.o); } });
+  const refitAll = () => { for (const r of [...fits]) { if (!r.box.isConnected) fits.delete(r); else doFit(r.box, r.o); } };
+  window.addEventListener('resize', refitAll);
+  window.addEventListener('orientationchange', () => setTimeout(refitAll, 200));
+  document.addEventListener('fullscreenchange', () => { refitAll(); setTimeout(refitAll, 300); });
+  if (window.visualViewport) window.visualViewport.addEventListener('resize', refitAll);
+  // content that arrives late (cover images, the Japanese font, a deck change) changes a box's natural size after it was fitted, and a
+  // Chromebook window that is not fullscreen never fires another resize, so the UI stayed oversized until fullscreen. Re-check regularly.
+  window.addEventListener('load', () => { refitAll(); setTimeout(refitAll, 600); }, { once: true });
+  document.addEventListener('load', refitAll, true);                       // any <img> finishing
+  if (document.fonts && document.fonts.addEventListener) document.fonts.addEventListener('loadingdone', refitAll);
+  setInterval(() => { if (!document.hidden && fits.size) refitAll(); }, 500);
 
   /* ---------- word-list picker: textbook covers first, then that book's units ---------- */
   function picker(root, onDone) {

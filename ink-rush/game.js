@@ -737,9 +737,22 @@
       .sort((a, b) => (S.lock.locked === a ? -1 : S.lock.locked === b ? 1 : a.z - b.z));
     const xL = VX - W / 2 + 24, xR = VX + W / 2 - 24, yMin = S.topY + 104, yMax = Math.max(H, v.y + v.h) - 260;
     const infos = list.map((e) => chipInfo(ctx, g, e, v));
+    const nowT = performance.now(), dtL = Math.min(0.1, Math.max(0.001, (nowT - (S.lastLayoutT || nowT)) / 1000)); S.lastLayoutT = nowT;
     for (const c of infos) {
       let bx = U.clamp(c.x0, xL + c.w / 2, xR - c.w / 2), by = Math.max(c.y0, yMin + c.h / 2), best = null, bc = 1e9;
       const step = c.w * 0.5 + 10;
+      /* STICKY SLOT: a chip keeps the slot (row + sideways offset) it had last frame while that slot is still free, so chips glide with
+         their monster instead of re-picking a position every frame (which made words hop around as monsters ran at the player). */
+      const sl = c.e.chipSlot;
+      if (sl) {
+        const y = by - sl.j * (c.h + 8), x = U.clamp(bx + sl.dx, xL + c.w / 2, xR - c.w / 2);
+        if (y - c.h / 2 >= yMin - 1 && y + c.h / 2 + c.hintH <= yMax) {
+          const r = { l: x - c.w / 2, r: x + c.w / 2, t: y - c.h / 2, b: y + c.h / 2 + c.hintH };
+          let bad = false; for (const o of out) if (hit(r, o, 6)) { bad = true; break; }
+          if (!bad) best = { x, y, r, j: sl.j, dx: sl.dx };
+        }
+      }
+      if (!best)
       for (let j = -3; j <= 6 && bc > 0; j++) {
         const y = by - j * (c.h + c.hintH * 0.0 + 8);
         if (y - c.h / 2 < yMin - 1 || y + c.h / 2 + c.hintH > yMax) continue;
@@ -751,12 +764,17 @@
             if (bad) continue;
             let cost = kx * step * 0.8 + (j < 0 ? -j * 220 : j * c.h * 0.9);
             for (const o of infos) if (o !== c && hit(r, o.eb, 0)) cost += 160;
-            if (c.e.boss) cost -= 0; if (cost < bc) { bc = cost; best = { x, y, r }; }
+            if (c.e.boss) cost -= 0; if (cost < bc) { bc = cost; best = { x, y, r, j, dx: x - bx }; }
           }
         }
       }
       if (!best) { const x = U.clamp(bx, xL + c.w / 2, xR - c.w / 2); best = { x, y: by, r: { l: x - c.w / 2, r: x + c.w / 2, t: by - c.h / 2, b: by + c.h / 2 + c.hintH } }; }
-      c.cx = best.x; c.cy = best.y; c.r = best.r;
+      c.e.chipSlot = best.j == null ? null : { j: best.j, dx: best.dx };
+      // glide to the slot (critically damped) rather than snapping, so even a forced re-slot never looks like a jump
+      const pp = c.e.chipPos;
+      if (!pp || Math.hypot(pp.x - best.x, pp.y - best.y) > 700) c.e.chipPos = { x: best.x, y: best.y };
+      else { const k = 1 - Math.exp(-dtL * 16); pp.x += (best.x - pp.x) * k; pp.y += (best.y - pp.y) * k; }
+      c.cx = c.e.chipPos.x; c.cy = c.e.chipPos.y; c.r = best.r;
       out.push(Object.assign(best.r, { info: c }));
     }
     return infos;
@@ -1075,5 +1093,5 @@
   });
   // show the team picker only on the title screen
   setInterval(() => { if (G && G.__teamBox) G.__teamBox.classList.toggle('hidden', G.state !== 'title' || (window.TM.ui.isModalOpen && window.TM.ui.isModalOpen())); }, 120);
-  window.INK_DEBUG = { audit: AUDIT, finish: (w) => finish(G, w), msg: (t, o) => msg(G, t, o), nextKey: () => { if (!S) return null; const t = S.lock.locked || nearest(); return t && !t.typer.done ? t.typer.nextReq() : null; }, G: () => G, S: () => S, WS: () => WS, parts, spawn: (t, x, z) => mkEnemy(G, t, { x, z }), boss: () => startBoss(G), stage: (i) => { newStage(G, i); }, setCz: (c) => { S.cz = c; } };
+  window.INK_DEBUG = { chips: () => (S ? S.enemies.filter((e) => e.alive && e.chipPos).map((e) => ({ id: e.typer.text, x: e.chipPos.x, y: e.chipPos.y, ex: INK.sx(e.x, e.z), ey: INK.gy(e.z), z: e.z })) : []), audit: AUDIT, finish: (w) => finish(G, w), msg: (t, o) => msg(G, t, o), nextKey: () => { if (!S) return null; const t = S.lock.locked || nearest(); return t && !t.typer.done ? t.typer.nextReq() : null; }, G: () => G, S: () => S, WS: () => WS, parts, spawn: (t, x, z) => mkEnemy(G, t, { x, z }), boss: () => startBoss(G), stage: (i) => { newStage(G, i); }, setCz: (c) => { S.cz = c; } };
 })();

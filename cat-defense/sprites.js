@@ -95,6 +95,17 @@
     const r = M.ui[name]; if (!r || !img.ui) return; s = s || 1;
     ctx.drawImage(img.ui, r[0], r[1], r[2], r[3], x - r[2] * s / 2, y - r[3] * s / 2, r[2] * s, r[3] * s);
   };
+  /* stretch an icon into a w x h box centred on x,y (buttons) */
+  CD.iconRect = function (ctx, name, x, y, w, h, a) {
+    const r = M.ui[name]; if (!r || !img.ui) return;
+    const old = ctx.globalAlpha; if (a != null) ctx.globalAlpha = old * a;
+    ctx.drawImage(img.ui, r[0], r[1], r[2], r[3], x - w / 2, y - h / 2, w, h); ctx.globalAlpha = old;
+  };
+  CD.iconSize = (name) => { const r = M.ui[name]; return r ? [r[2], r[3]] : [0, 0]; };
+  CD.iconClip = function (ctx, name, x, y, s, frac) {          // draw only the left `frac` of an icon (progress bars)
+    const r = M.ui[name]; if (!r || !img.ui || frac <= 0) return; s = s || 1;
+    ctx.drawImage(img.ui, r[0], r[1], r[2] * frac, r[3], x - r[2] * s / 2, y - r[3] * s / 2, r[2] * frac * s, r[3] * s);
+  };
   const slotCols = [];
   CD.slotColor = function (a) {
     if (slotCols[a]) return slotCols[a];

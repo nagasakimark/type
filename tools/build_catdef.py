@@ -95,12 +95,16 @@ M['fx'] = {'bullets': [[i * 100, 0, b.width, b.height] for i, b in enumerate(bul
            'boom': [[(i % 5) * Wf, 230 + (i // 5) * 330, Wf, 330] for i in range(len(ex))]}
 
 # ---- ui icons ---------------------------------------------------------------------------------------
-icons = ['CoinIcon', 'WallIcon', 'Icon_Cat', 'AddonIcon4', 'AddonIcon2', 'AddonIcon1']
+icons = ['CoinIcon', 'WallIcon', 'Icon_Cat', 'AddonIcon1', 'AddonIcon2', 'AddonIcon3', 'AddonIcon4', 'AddonIcon5', 'AddonIcon6', 'AddonIcon7', 'AddonIcon8',
+         'Up0', 'Up1', 'Up2', 'Up3', 'WaveBar', 'BtnGreen', 'BtnOrange', 'AddonBoxNumber', 'GreenLevel', 'OrangeLvl', 'LockedCatBox']
 ims = [load(P('Ui', n + '.png'), 1) for n in icons]
-ui = Image.new('RGBA', (sum(i.width for i in ims) + 10 * len(ims), max(i.height for i in ims)), (0, 0, 0, 0))
-x = 0; M['ui'] = {}
+ui = Image.new('RGBA', (1700, 760), (0, 0, 0, 0))
+x = y = rh = 0; M['ui'] = {}
 for n, im in zip(icons, ims):
-    ui.paste(im, (x, 0), im); M['ui'][n] = [x, 0, im.width, im.height]; x += im.width + 10
+    if x + im.width > 1700:
+        x = 0; y += rh + 6; rh = 0
+    ui.paste(im, (x, y), im); M['ui'][n] = [x, y, im.width, im.height]; x += im.width + 6; rh = max(rh, im.height)
+ui = ui.crop((0, 0, 1700, y + rh))
 ui.save(os.path.join(OUT, 'ui.webp'), 'WEBP', quality=90, method=6)
 
 # ---- backgrounds -------------------------------------------------------------------------------------

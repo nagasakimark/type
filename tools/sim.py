@@ -10,14 +10,14 @@ speed = sys.argv[7] if len(sys.argv) > 7 else '6'
 port = 8800 + (abs(hash((game, diff, cps))) % 150)
 srv = subprocess.Popen(['python3', '-m', 'http.server', str(port)], cwd=ROOT, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 time.sleep(0.8)
-extra = {'star-sweep': "(()=>{const d=window.__SS_STATE();return d?{mode:d.mode,sec:d.sector+1,wave:d.wave+1,hull:Math.round(d.hull),sh:Math.round(d.shield),pace:+d.pace.toFixed(2),n:d.enemies.length}:null})()", 'word-ninja': "(()=>{const S=WN.dbg();return {alive:S.fruits.filter(f=>f.alive&&f.type==='fruit').length,lvl:S.level,lives:S.lives,q:S.queue.length,phase:S.phase,work:S.fruits.filter(f=>f.alive&&f.type==='fruit').reduce((a,f)=>a+f.item.len*(1-f.typer.progress),0)}})()"}.get(game, 'null')
+extra = {'star-sweep': "(()=>{const d=window.__SS_STATE();return d?{mode:d.mode,sec:d.sector+1,wave:d.wave+1,hull:Math.round(d.hull),sh:Math.round(d.shield),pace:+d.pace.toFixed(2),n:d.enemies.length}:null})()", 'word-ninja': "(()=>{const S=WN.dbg();return {alive:S.fruits.filter(f=>f.alive&&f.type==='fruit').length,lvl:S.level,lives:S.lives,q:S.queue.length,phase:S.phase,work:S.fruits.filter(f=>f.alive&&f.type==='fruit').reduce((a,f)=>a+f.item.len*(1-f.typer.progress),0)}})()", 'cat-defense': "(()=>{const d=CDDev.state();return {ph:d.phase,w:d.wave+1,coins:d.coins,wall:d.wall,kills:d.kills,en:d.en.length,typ:d.typedPct,cats:d.slots.filter(x=>x).join(','),up:Object.values(d.up).join(''),st:Object.values(d.stock).join('')}})()"}.get(game, 'null')
 with sync_playwright() as p:
     b = p.chromium.launch(args=['--use-gl=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist'])
     pg = b.new_page(viewport={'width': 1600, 'height': 900})
     errs = []
     pg.on('pageerror', lambda x: errs.append(str(x)))
     pg.add_init_script(f"localStorage.setItem('tm.settings', JSON.stringify({{difficulty:'{diff}'}}));")
-    pg.goto(f'http://localhost:{port}/{game}/index.html?deck=nh5-u1&quiet=1&speed={speed}&bot={cps},{err},{think}')
+    pg.goto(f'http://localhost:{port}/{game}/index.html?deck=nh5-u1&quiet=1&dev=1&speed={speed}&bot={cps},{err},{think}')
     pg.wait_for_timeout(2500); pg.keyboard.press('Enter')
     t0 = time.time(); last = ''
     rows = []

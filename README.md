@@ -12,7 +12,7 @@ Open `index.html` (the Arcade) and pick a game. Every page also works when opene
 | Turbo Type | `turbo-type/` | Nitro Type |
 | Rooftop Rascal | `rooftop-rascal/` | Rebellious Robot |
 | Ink Rush | `ink-rush/` | The Typing of the Dead, Splatoon style (no killing) |
-| Cat Defenders | `cat-defense/` | Merge Cats lane defence: type to shoot, coins buy cats, merge cats to level up |
+| Cat Defenders | `cat-defense/` | Lane defence with real bullets: typing makes the cats fire, coins buy/merge cats, upgrades and add-ons (spikes, boxing cat, TNT, guardian) |
 
 ## Direct links
 

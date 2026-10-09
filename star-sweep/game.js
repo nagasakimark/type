@@ -253,6 +253,10 @@
     const mw = def.maxWords - (g.diff === 'gentle' ? 2 : 0) + (g.diff === 'turbo' ? 1 : 0);
     const phases = []; for (let i = 0; i < nPh; i++) phases.push(mkPhrase(g, Math.max(3, mw - (i === 0 && nPh > 1 ? 1 : 0))));
     const e = mkBigShip(g, 'boss', def.spr, def.scale, def.rot, phases, def);
+    /* a boss taller than the playfield (Megacross on short windows) used to hover with its top edge above the safe zone, so it never counted as
+       'seen' and the kid got no prompt at all. Shrink it to fit the field, and below also force 'seen' once its entry fly-in has finished. */
+    const room = F.impactY - 150 - (F.safeTop + 20), fit = room / (e.hh * 2);
+    if (fit < 1) { e.sc *= fit; const sz = sprSize(e); e.hw = sz[0] / 2; e.hh = sz[1] / 2; e.hr = Math.max(e.hw, e.hh) * 0.8; }
     e.def = def; e.name = def.name; e.x = SX; e.y = F.top - e.hh - 40; e.y0 = e.y; e.hoverY = Math.min(F.safeTop + 20 + e.hh, F.impactY - 150 - e.hh); e.entry = 0; e.targetable = false; e.atkT = 5; e.minT = 8; e.charge = 0;
     e.glow = def.glow; e.hr = def.hr; e.totalLetters = phases.reduce((a, p) => a + p.len, 0); e.typed = 0; e.hpShown = 1; e.grace = 0; e.beam = null; e.queueAtk = [];
     S.boss = e; return e;
@@ -725,7 +729,7 @@
     e.t += dt * ts;
     if (e.entry < 1) {
       e.entry = Math.min(1, e.entry + dt / 3.4); const k = U.ease.outCubic(e.entry);
-      e.y = lerp(e.y0, e.hoverY, k); e.x = SX; if (!e.seen && e.y - e.hh >= F.safeTop) { markSeen(e); e.targetable = true; }
+      e.y = lerp(e.y0, e.hoverY, k); e.x = SX; if (!e.seen && (e.y - e.hh >= F.safeTop || e.entry >= 1)) { markSeen(e); e.targetable = true; }
     } else { e.x = SX + Math.sin(e.t * 0.42) * Math.min(260, (F.xmax - SX) * 0.4); e.y = e.hoverY + Math.sin(e.t * 0.9) * 14; }
     const hp = clamp(1 - e.typed / e.totalLetters, 0, 1);
     e.hpShown += (hp - e.hpShown) * (1 - Math.exp(-dt * 3.5));

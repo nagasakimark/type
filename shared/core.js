@@ -68,10 +68,10 @@
   TM.GAMES = [
     { id: 'word-jumper', name: 'Word Jumper', short: 'ジャンプ', c: '#6CCB3C' }, { id: 'word-ninja', name: 'Word Ninja', short: 'ニンジャ', c: '#2F9BFF' },
     { id: 'star-sweep', name: 'Star Sweep', short: 'うちゅう', c: '#7B5CFF' }, { id: 'turbo-type', name: 'Turbo Type', short: 'レース', c: '#FF7A1A' },
-    { id: 'ink-rush', name: 'Ink Rush', short: 'インク', c: '#FF3EA5' },
+    { id: 'ink-rush', name: 'Ink Rush', short: 'インク', c: '#FF3EA5' }, { id: 'cat-defense', name: 'Cat Defenders', short: 'ネコ', c: '#FF9F1C' },
   ];
   TM.progress = {
-    GAMES: ['word-jumper', 'word-ninja', 'star-sweep', 'turbo-type', 'ink-rush'],
+    GAMES: ['word-jumper', 'word-ninja', 'star-sweep', 'turbo-type', 'ink-rush', 'cat-defense'],
     all() { return TM.store.get('progress', {}); },
     record(gameId, deckIds, stars) {
       const all = this.all(); let fresh = [];

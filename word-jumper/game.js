@@ -38,15 +38,15 @@
 
   /* ============================================================ state */
   function speedFor(g, li) {
-    const m = g.diff === 'gentle' ? 0.92 : g.diff === 'turbo' ? 1.08 : 1;
+    const m = g.diff === 'gentle' ? 0.8 : g.diff === 'turbo' ? 1.05 : 0.9;
     return (305 + li * 30) * m * (S ? S.speedAd : 1);
   }
   function reset(g) {
     GG = g;
     const demo = g.demo;
     S = {
-      picker: WJ.makePicker(g), li: URLQ.get('level') ? clamp(parseInt(URLQ.get('level'), 10) - 1 || 0, 0, LEVELS - 1) : demo ? Math.floor(Math.random() * LEVELS) : 0, hearts: g.diff === 'gentle' ? 5 : 3, maxHearts: g.diff === 'gentle' ? 5 : 3, hero: null, L: null,
-      heroCol: URLQ.get('hero') && ALL_COLORS.includes(URLQ.get('hero')) ? URLQ.get('hero') : savedHero(), ad: new TM.Adapt(g.diff), speedAd: 1,
+      picker: WJ.makePicker(g), li: URLQ.get('level') ? clamp(parseInt(URLQ.get('level'), 10) - 1 || 0, 0, LEVELS - 1) : demo ? Math.floor(Math.random() * LEVELS) : 0, hearts: g.diff === 'gentle' ? 6 : g.diff === 'turbo' ? 3 : 4, maxHearts: g.diff === 'gentle' ? 6 : g.diff === 'turbo' ? 3 : 4, shield: 0, hero: null, L: null,
+      heroCol: URLQ.get('hero') && ALL_COLORS.includes(URLQ.get('hero')) ? URLQ.get('hero') : savedHero(), ad: new TM.Adapt(g.diff, { game: g.def.id }), speedAd: 1,
       t: 0, parts: [], phase: 'play', phaseT: 0, banner: null, cam: { x: 0, y: 0, ty: 0 }, fade: 1, proj: { z: 1, gl: 800, vx: 0, vy: 0, sc: 1, anchor: 520 },
       coinsAll: 0, coinTotAll: 0, starsAll: 0, levelStars: [], lvl: null, bot: new TM.Bot(7.5), botJit: 0, runT: 0, shakeX: 0,
       toast: null, chipRects: [], dbgOverlap: 0,
@@ -59,7 +59,7 @@
   }
 
   function loadLevel(g, li, first) {
-    S.li = li; S.speedAd = S.ad.pick(0.9, 1.25);   // the rubber band sets this level's running speed
+    S.li = li; S.speedAd = S.ad.pick(0.78, 1.12);   // the rubber band sets this level's running speed
     S.L = WJ.buildLevel({ index: li, picker: S.picker, speed: speedFor(g, li), diff: g.diff, shift: (S.ad.load - 0.45) * 1.7, seed: Math.floor(Math.random() * 1e9) });
     const L = S.L;
     for (const o of L.obs) { if (o.item) o.typer = new TM.Typer(o.item); o.px = o.x; }
@@ -301,8 +301,9 @@
     const h = S.hero; ob.fails = (ob.fails || 0) + 1;
     g.missWord(ob.item);
     TM.sfx.hurt(); WJ.sound('lowRandom', 0.5);
-    const lose = !g.demo;
-    S.ad.fail(1.2);
+    let lose = !g.demo;
+    S.ad.fail(1.2); if (TM.coach) TM.coach.hurt(1);
+    if (lose && S.shield) { S.shield = 0; lose = false; toast('シールドが まもってくれた！', { color: '#7FE3FF', size: 50 }); }
     if (lose) { S.hearts--; S.lvl.lost++; }
     const pit = ob.type === 'gap' || ob.type === 'bossgap' || ob.type === 'mplatIn';
     if (pit) { h.st = 'fall'; h.vx = 150; h.vy = -380; h.wait = 0; }
@@ -310,11 +311,11 @@
     h.fail = ob; h.inv = 0;
     g.fx.shake(14, 0.22);
     const v = w2v(h.x, h.y - 150); g.fx.pop(v.x, v.y, pit ? 'ドボン！' : 'ゴツン！', { color: '#FF5A5F', size: 60 });
-    if (lose && S.hearts <= 0) { h.dead = true; }
+    if (lose && S.hearts <= 0) { if (g.secondWind()) { S.hearts = Math.min(S.maxHearts, 3); S.ad.relief = 1; } else h.dead = true; }
   }
   /* seconds the hero waits at a word before falling: the time THIS player needs for it (adaptive) plus a little slack; never endless */
   function graceFor(g, len) {
-    const slack = g.diff === 'gentle' ? 1.6 : g.diff === 'turbo' ? 0.8 : 1.15, f = g.diff === 'gentle' ? 1.7 : g.diff === 'turbo' ? 1.15 : 1.4;
+    const slack = g.diff === 'gentle' ? 2.3 : g.diff === 'turbo' ? 0.9 : 1.7, f = g.diff === 'gentle' ? 2.1 : g.diff === 'turbo' ? 1.2 : 1.7;
     return clamp(S.ad.time(len) * f + slack, 2.6, 7.5);
   }
   function respawn(g) {
@@ -998,6 +999,14 @@
       '5つの せかいの さいごには ボスが いるよ。1ステージで 星は 3つまで！',
     ],
     music: songs[0],
+    /* comeback gift: a missing heart comes back, otherwise a shield eats the next mistake; either way the words get easier for a while */
+    gift(g, info) {
+      if (!S || S.phase !== 'play') return null;
+      S.ad.relief = 1;
+      if (S.hearts < S.maxHearts) { S.hearts++; return 'ハート かいふく！ ゆっくり タイム'; }
+      if (!S.shield) { S.shield = 1; return 'シールド ゲット！ ミス 1かい ぶん まもるよ'; }
+      return 'ゆっくり タイム！';
+    },
     init: () => { WJ.preloadSounds(); },
     reset, update, draw, onKey,
     onEnter: (g) => { if (S && S.phase === 'rating') proceed(g); },

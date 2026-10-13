@@ -47,6 +47,7 @@
       const before = g.score.mult;
       const helped = TM.mode() === 'ja2en' && typer.assist >= 2;       // answer was (half) shown: half points, no combo, goes on the "tricky" list
       const pts = g.score.word(typer.item, typer.errors + (helped ? 1 : 0), (o.bonus || 1) * (helped ? 0.5 : 1));
+      if (TM.coach) TM.coach.done(g, typer, helped);
       if (x != null) g.fx.pop(x, y - 40, '+' + pts, { color: o.color || C.gold, size: typer.item.kind === 'sentence' ? 64 : 52 });
       (typer.item.kind === 'sentence' ? TM.sfx.big : TM.sfx.word)();
       if (g.score.mult > before) {
@@ -57,16 +58,27 @@
       hud.bump();
       return pts;
     };
-    g.missWord = (item) => { if (!g.demo) g.score.missedWord(item); };
+    g.missWord = (item) => { if (!g.demo) { g.score.missedWord(item); if (TM.coach) TM.coach.miss(item); } };
     g.end = (result = {}) => {
       if (g.state !== 'play') return;
-      g.live = false; g.state = 'over';
+      g.live = false; g.state = 'over'; g.lastResult = result;   // (also read by tools/balance.py)
       TM.audio.stopMusic();
       (result.win === false ? TM.sfx.lose : TM.sfx.win)();
       setTimeout(() => showResults(result), result.delay ?? 1300);
     };
+    /* second wind: the first time a run would end in a loss, the student gets one more chance (a games-specific refill is done by the caller).
+       Returns true when granted. Not in Turbo (that mode is for people who want the pressure). */
+    g.secondWind = () => {
+      if (g.demo || g.windUsed || g.diff === 'turbo') return false;
+      g.windUsed = true; if (TM.coach) TM.coach.struggle = 0;
+      g.fx.doFlash('#BFF5C8', 0.6); g.fx.shake(8, 0.2); TM.sfx.star(2);
+      g.fx.pop(W / 2, 330, 'あきらめないで！ もういっかい！', { color: '#FFC83D', size: 58, life: 2.2 });
+      g.fx.pop(W / 2, 410, '🍀 セカンドチャンス', { color: '#fff', size: 46, life: 2.2 });
+      g.fx.confetti(W / 2, 360, 50);
+      return true;
+    };
     g.ladder = (stage) => TM.ladder(stage, g.diff);
-    g.speedMul = () => (g.diff === 'gentle' ? 0.6 : g.diff === 'turbo' ? 1.35 : 1) * (TM.mode() === 'ja2en' ? 0.8 : 1);   // remembering takes longer than reading
+    g.speedMul = () => (g.diff === 'gentle' ? 0.5 : g.diff === 'turbo' ? 1.3 : 0.85) * (TM.mode() === 'ja2en' ? 0.8 : 1);   // remembering takes longer than reading
 
     /* ---------- loop ---------- */
     let last = performance.now(), acc = 0, countdown = 0;
@@ -266,8 +278,8 @@
       if (TM.ui.isModalOpen()) return;
       if (document.activeElement && document.activeElement.blur) document.activeElement.blur();
       TM.audio.unlock(); TM.sfx.whoosh();
-      g.demo = false; g.state = 'countdown'; g.live = false; g.playT = 0; countdown = 3;
-      g.score = new TM.Score(); g.newDealer(); g.fx = new TM.FX(); TM.hint.reset();
+      g.demo = false; g.windUsed = false; g.state = 'countdown'; g.live = false; g.playT = 0; countdown = 3;
+      g.score = new TM.Score(); g.newDealer(); g.fx = new TM.FX(); TM.hint.reset(); TM.coach && TM.coach.reset();
       def.reset && def.reset(g);
       title.show(false); results.hide(); hud.show(true);
     }
@@ -313,12 +325,17 @@
             cleared ? el('div', {}, fresh.length ? '🎉 ' : '✓ ', fresh.length ? 'はじめての クリア！ ' : 'クリア ずみ ', ids.length === 1 && d0 ? (d0.unit ? `ユニット ${d0.unit}` : d0.label) : `${ids.length}リスト`) : null,
             pr ? el('div', { class: 'pbar' }, el('i', { style: { width: pr.pct + '%' } })) : null,
             pr ? el('div', { style: { fontSize: '16px', opacity: 0.8 } }, `${bk.name}: ${pr.done}/${pr.total} クリア（${pr.pct}%）`) : null) : null;
+          const growth = TM.coach ? TM.coach.finish(g, { g: def.id, d: deckKey, m: TM.mode(), wpm, acc, words: s.wordsDone, score: s.score, secs }) : null;
+          const growBox = growth ? el('div', { class: 'tm-grow' }, el('h3', {}, '📈 きょうの せいちょう'),
+            growth.items.map((i) => el('div', { class: 'gi' + (i.star ? ' star' : '') }, el('span', {}, i.icon), el('b', {}, i.text))),
+            el('div', { class: 'gn' }, growth.next)) : null;
           const body = el('div', { class: 'rbody' },
             el('h2', {}, r.title || (r.win === false ? 'おしい！' : 'すごい！')),
             r.sub ? el('div', { class: 'sub' }, r.sub) : null,
             starBox,
             el('div', {}, el('span', { class: 'tm-score' }, s.score.toLocaleString()), rec.isNewBest && s.score > 0 ? el('span', { class: 'tm-newbest' }, 'しんきろく！') : null),
             el('div', { class: 'tm-stats' }, stats.map(([a, b]) => el('div', {}, el('b', {}, String(b)), el('span', {}, a)))),
+            growBox,
             progBox,
             tricky.length ? el('div', { class: 'tm-tricky' }, el('h3', {}, 'にがてな ことば — れんしゅうしよう！'),
               el('div', { class: 'chips' }, tricky.map((it) => el('span', { class: 'tm-wchip' }, it.t, it.hint ? el('small', {}, it.hint) : null)))) : null);

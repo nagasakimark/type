@@ -55,8 +55,10 @@
     get(k, def) { const v = rawGet('tm.' + k); if (v == null) return def; try { return JSON.parse(v); } catch (e) { return def; } },
     set(k, v) { rawSet('tm.' + k, JSON.stringify(v)); },
   };
-  const DEFAULTS = { sfx: 0.8, music: 0.5, hints: 'auto', strict: false, reduceMotion: false, keyboard: false, shortOnly: false, difficulty: 'normal', mode: 'en' };
+  const DEFAULTS = { sfx: 0.8, music: 0.5, hints: 'auto', strict: false, reduceMotion: false, keyboard: false, shortOnly: false, difficulty: 'gentle', mode: 'en' };
   TM.settings = Object.assign({}, DEFAULTS, TM.store.get('settings', {}));
+  // v2: everyone starts on the easy setting once (older saves had 'normal' as the untouched default); they can switch up again in the title screen
+  { const saved = TM.store.get('settings', {}); if (saved.dv !== 2) { TM.settings.difficulty = 'gentle'; TM.settings.dv = 2; TM.store.set('settings', TM.settings); } }
   if (U.qs('quiet') === '1') { TM.settings.music = 0; TM.settings.sfx = 0; }
   if (['gentle', 'normal', 'turbo'].includes(U.qs('diff'))) TM.settings.difficulty = U.qs('diff');   // teacher links can pick the mode (not saved)
   if (['en', 'ja2en'].includes(U.qs('mode'))) TM.settings.mode = U.qs('mode');           // teacher links can pick the play mode (not saved)
@@ -251,7 +253,8 @@
         const c = src.filter(tries[i]);
         if (c.length) {
           if (i === 1) for (const it of src) this.used.delete(it.t); // pool exhausted: start a new round
-          const it = U.pick(c);
+          const hard = TM.stats && !this.noHard && !o.noHard ? c.filter((x) => TM.stats.isHard(x)) : [];
+          const it = hard.length && Math.random() < 0.3 ? U.pick(hard) : U.pick(c);   // words the student is shaky on come back more often
           this.used.add(it.t);
           this.recent.push(it.t); if (this.recent.length > 6) this.recent.shift();
           return Object.assign({}, it);

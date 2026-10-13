@@ -60,6 +60,9 @@ Hints grow when a student is stuck (`TM.hint` in `shared/core.js`): level 1 afte
 
 Source: Tokyo Shoseki's 単語・連語データベース, kept in `data/jhs-source/nh-tango-database.xlsx`. `tools/build_jhs.py` (also called at the end of `build_words.py`) turns it into the `nh1`–`nh3` books: one deck per unit (sheet ① by 単元/パート; each word appears in the grade where it first occurs), one per non-unit section, and a "Plus" deck from sheet ③. Placeholders such as `...`, `～`, `(…ing)` and `[are]` are removed from what students type; full-sentence phrases become key sentences. Run `python tools/build_jhs.py` to re-merge into the existing `data/words.js` without the elementary vocab source (needs `pip install openpyxl`). The Japanese font subset (`assets/fonts/subset-chars.txt`) also covers the JHS meanings.
 
+### Difficulty, comebacks and progress
+Games start on **Gentle** (the old default was Normal) and can be switched on each title screen. Gentle/Normal use a stronger rubber band (the game slows when a student struggles), give **one Second Chance per run** instead of an instant game over, and hand out **comeback gifts** (heart, shield, ice, nitro...) when a student finally gets a word they were struggling with. The results screen shows how the student improved (speed, accuracy, words learned) and the Arcade has a **📈 きろく** page (streak, mastered words, tricky words). Everything is stored in the student's own browser.
+
 ## Putting it on GitHub Pages
 
 1. Create a repository (e.g. `typingmaster`) and push this folder to it. `data/vocab-source/` can be left out with a `.gitignore` if you prefer; the games only need `data/words.js`.

@@ -47,9 +47,9 @@
     g.fx.pop = popFn;
     S.diffSpd = g.diff === 'gentle' ? 0.78 : g.diff === 'turbo' ? 1.25 : 1;
     S.diffK = g.diff === 'gentle' ? 1.3 : g.diff === 'turbo' ? 0.85 : 1;
-    S.diffDmg = g.diff === 'gentle' ? 0.5 : g.diff === 'turbo' ? 1.35 : 1;
+    S.diffDmg = g.diff === 'gentle' ? 0.35 : g.diff === 'turbo' ? 1.3 : 0.7;
     S.paceMax = g.diff === 'gentle' ? 1.05 : g.diff === 'turbo' ? 1.55 : 1.3;   // top of the rubber band; the band itself is TM.Adapt (S.ad)
-    S.ad = new TM.Adapt(g.diff); g.ad = S.ad; S.lastDone = 0;
+    S.ad = new TM.Adapt(g.diff, { game: g.def.id }); g.ad = S.ad; S.lastDone = 0;
     if (SS.bg.sector !== 0 || !SS.bg.sec) SS.bg.set(0, true); SS.bg.pipGrow = 0;
     startWave(g);
   }
@@ -605,7 +605,7 @@
     e.atkT -= dt * ts;
     if (e.atkT <= 0) {
       const hp = 1 - e.typed / e.totalLetters;
-      const base = (3.6 - S.sector * 0.28) * (g.diff === 'gentle' ? 1.45 : g.diff === 'turbo' ? 0.8 : 1) * (hp < 0.5 ? 0.8 : 1);
+      const base = (3.6 - S.sector * 0.28) * (g.diff === 'gentle' ? 1.9 : g.diff === 'turbo' ? 0.85 : 1.3) * (hp < 0.5 ? 0.8 : 1) * (1 + 0.5 * Math.min(1, (TM.coach ? TM.coach.struggle : 0) / 4));   // the more a student struggles, the slower the enemies shoot
       e.atkT = base * rnd(0.85, 1.15);
       const kind = U.pick(e.def.atk.filter((a) => a !== 'beam' || hp < 0.85));
       e.pending = { kind, n: kind === 'bolts' ? (S.sector > 1 ? 4 : 3) : 2, t: 0.8 };
@@ -651,7 +651,8 @@
       addEnergy(g, -22);
       S.hull = Math.max(0, S.hull - rest * 0.9); sh.hullHit = 1; snd('hurt', { vol: 0.6 }); g.fx.shake(16, 0.25); S.flash = { a: 0.28, c: '#ff4040' };
       SS.fx.explode(sh.x + rnd(-30, 30), sh.y + rnd(-10, 20), 80, { color: 'blue' });
-      if (S.hull <= 0) die(g);
+      if (TM.coach) TM.coach.hurt(1);
+      if (S.hull <= 0) { if (g.secondWind()) { S.hull = 60; S.shield = 100; S.inv = 6; S.slow = 8; } else die(g); }
     } else g.fx.shake(7, 0.15);
   }
   function die(g) {
@@ -1286,6 +1287,14 @@
     id: 'star-sweep', name: 'Star Sweep', accent: C.sweep, bg: '#05061a', dark: true,
     logoHTML: 'Star<br>Sweep', tagline: 'ことばを タイプして うちゅうを きれいに しよう！',
     lifeIcon: TM.ui.heartSVG('#7B5CFF'),
+    /* comeback gift: shield + a little repair, and time slows for a moment */
+    gift(g, info) {
+      if (!S || S.mode !== 'fight') return null;
+      S.shield = 100; S.inv = Math.max(S.inv, 5); S.slow = Math.max(S.slow || 0, 6);
+      if (S.hull < 100) S.hull = Math.min(100, S.hull + (info.kind === 'redeem' ? 25 : 15));
+      snd('shieldUp', { vol: 0.5 });
+      return 'シールド ＋ しゅうり ＋ スロー！';
+    },
     howto: [
       'ロボドローンが <b>ピップわくせい</b>を こまらせてる！ 5つの セクターを とんで たすけよう。',
       'ふねの ことばの <b>さいしょの もじ</b>を うつと <b>ロックオン</b>。ただしい もじごとに レーザーが でるよ。さいごまで うって ばくはつ！',

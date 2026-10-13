@@ -30,8 +30,29 @@
   syncMode();
   document.getElementById('controls').append(
     modeSeg,
+    el('button', { class: 'tm-btn', onclick: progress }, '📈 きろく'),
     el('button', { class: 'tm-btn', onclick: teacher }, '先生用 QR'),
     el('button', { class: 'tm-btn icon', title: 'せってい', 'aria-label': 'せってい', onclick: () => TM.ui.settings() }, '\u2699'));
+
+  /* ---------- my progress: streak, mastered words, tricky words, the last 7 days ---------- */
+  function progress() {
+    const S = TM.stats, st = S.summary(), D = S.load(), W = D.words;
+    const keys = Object.keys(W), tricky = keys.filter((k) => W[k].hard).sort((a, b) => W[b].lost + W[b].e - W[a].lost - W[a].e).slice(0, 14);
+    const mastered = keys.filter((k) => W[k].cl >= 3).length, fixed = keys.reduce((a, k) => a + (W[k].fix || 0), 0);
+    const days = []; for (let i = 6; i >= 0; i--) { const d = new Date(Date.now() - i * 864e5), k = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); days.push({ n: ['にち', 'げつ', 'か', 'すい', 'もく', 'きん', 'ど'][d.getDay()], w: (D.days[k] || {}).words || 0 }); }
+    const mx = Math.max(10, ...days.map((d) => d.w));
+    const big = (b, a) => el('div', {}, el('b', {}, String(b)), el('span', {}, a));
+    const empty = !keys.length;
+    const card = el('div', { class: 'tm-card tm-me' }, el('h2', {}, '📈 わたしの きろく'),
+      empty ? el('p', { style: { font: '700 24px var(--word)' } }, 'ゲームを あそぶと ここに せいちょうが のこるよ！') : [
+        el('div', { class: 'tm-stats' }, big(st.streak, '🔥 れんぞく (にち)'), big(mastered, '⭐ マスター'), big(fixed, '🌱 にがて クリア'), big(keys.length, 'あそんだ ことば')),
+        el('div', { class: 'tm-bars' }, days.map((d) => el('div', {}, el('i', { style: { height: Math.max(4, Math.round(110 * d.w / mx)) + 'px' } }), el('small', {}, d.n)))),
+        el('div', { style: { font: '700 16px var(--word)', opacity: 0.7 } }, 'この 7にちかんの タイプした ことば'),
+        tricky.length ? el('div', { class: 'tm-tricky' }, el('h3', {}, 'まだ にがてな ことば — あと すこし！'), el('div', { class: 'chips' }, tricky.map((k) => el('span', { class: 'tm-wchip' }, (TM.data.words[k] || { t: k }).t)))) : el('div', { style: { font: '800 24px var(--display)' } }, '🎉 にがてな ことばは いまのところ なし！')],
+      el('div', { class: 'tm-row' }, el('button', { class: 'tm-btn primary', onclick: () => m.close() }, 'とじる')));
+    const m = TM.ui.modal(card, {});
+    TM.ui.fit && TM.ui.fit(card, { max: 1.3, fill: 0.92, min: 0.4 });
+  }
 
   /* ---------- the "your words" bar ---------- */
   const wordsBtn = document.getElementById('words');

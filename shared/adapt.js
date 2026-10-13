@@ -15,9 +15,9 @@
 
   const MODES = {
     //          target success, demand factor at load 0 .. 1, step up, start load, cps before we know the player, reaction before we know
-    gentle: { target: 0.88, lo: 0.40, hi: 0.85, up: 0.030, load0: 0.30, cps0: 1.5, react0: 1.6 },
-    normal: { target: 0.78, lo: 0.55, hi: 1.10, up: 0.040, load0: 0.40, cps0: 2.1, react0: 1.2 },
-    turbo: { target: 0.62, lo: 0.75, hi: 1.45, up: 0.055, load0: 0.50, cps0: 2.8, react0: 0.9 },
+    gentle: { target: 0.92, lo: 0.28, hi: 0.66, up: 0.030, load0: 0.15, cps0: 1.0, react0: 2.0 },
+    normal: { target: 0.84, lo: 0.42, hi: 0.90, up: 0.035, load0: 0.30, cps0: 1.4, react0: 1.5 },
+    turbo: { target: 0.68, lo: 0.65, hi: 1.30, up: 0.050, load0: 0.45, cps0: 2.2, react0: 1.0 },
   };
 
   class Adapt {
@@ -27,7 +27,10 @@
       this.down = m.up * m.target / (1 - m.target);          // equilibrium success rate == target
       this.load = m.load0; this.cps = m.cps0; this.react = m.react0;
       this.words = 0; this.ok = 0; this.bad = 0; this.streak = 0; this.slump = 0; this.succ = m.target; this.keys = 0; this.miskeys = 0;
-      this.minCps = 0.7; this.maxCps = 9;
+      this.minCps = 0.5; this.maxCps = 9;
+      /* a student who has played before starts near their own speed, not at the guess (their median run, a little under) */
+      try { const h = TM.stats && TM.stats.cps(opts && opts.game); if (h) this.cps = U.clamp(h * 0.9, 0.6, Math.max(m.cps0, 3)); } catch (e) { /* no history */ }
+      this.relief = 0;   // 0..1 extra mercy a game (or the coach) can grant for a while: slows demand
       Object.assign(this, opts || {});
     }
     /* a word was typed to the end.
@@ -39,7 +42,7 @@
        margin = fraction (0..1) of the word's time budget still left when it was finished (optional). Finishing with a thin margin
                counts as a near miss, so the band eases off BEFORE the player actually fails. */
     word(len, dur, errors, react, cycle, margin) {
-      this.words++;
+      this.words++; if (this.relief > 0) this.relief = Math.max(0, this.relief - 0.1);   // a gift's relief fades over ~10 words
       const span = cycle != null && cycle > 0.15 ? Math.max(cycle, dur) : dur;
       if (len >= 2 && span > 0.15) {
         let r = len / span; if (errors) r *= 1 / (1 + 0.15 * errors);     // slips cost speed
@@ -66,7 +69,7 @@
       this.load = U.clamp(this.load - this.down * w * (1 + Math.min(1.5, this.slump * 0.35)), 0, 1);
     }
     /* how many typed characters per second the game may ask for right now */
-    get factor() { return U.lerp(this.mode.lo, this.mode.hi, this.load); }
+    get factor() { return U.lerp(this.mode.lo, this.mode.hi, this.load) * (1 - 0.14 * Math.min(3, this.slump) / 3) * (1 - 0.35 * (this.relief || 0)); }   // a slump (recent fails) and relief both slow the game
     get demand() { return this.cps * this.factor; }
     /* seconds a player needs for `chars` characters at the current demand (reaction included) */
     time(chars) { return 0.4 + chars / Math.max(0.5, this.demand); }

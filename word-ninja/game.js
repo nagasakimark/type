@@ -32,7 +32,7 @@
   let S;
   function maxLevelFor(g) { return g.diff === 'gentle' ? 4 : g.diff === 'turbo' ? 8 : 6; }
   function bossLevels(g) { return g.diff === 'gentle' ? [2, 4] : g.diff === 'turbo' ? [3, 6, 8] : [3, 6]; }
-  function livesFor(g) { return g.diff === 'gentle' ? 5 : 3; }
+  function livesFor(g) { return g.diff === 'gentle' ? 6 : g.diff === 'turbo' ? 3 : 4; }
 
   function reset(g) {
     if (!g.fx._ja) { const op = g.fx.pop.bind(g.fx); g.fx.pop = (x, y, str, o) => op(x, y, String(str).replace(/^COMBO x(\d+)!/, 'コンボ x$1！'), o); g.fx._ja = 1; }
@@ -43,7 +43,7 @@
       level: 1, maxLevel: ml, bosses: bossLevels(g), phase: 'intro', phaseT: 0, waves: [], waveIdx: 0, waveWait: 0, resolved: 0, total: 1,
       lives: lv, maxLives: lv, chain: 0, lastSlice: -9, frenzy: 0, ice: 0, ts: 1, freeze: 0, slow: 0,
       sliced: 0, bossesDown: 0, mercy: 0, lastKind: '', demoT: 1.2, px: 0, focus: W / 2, boss: null, bossT: 0, music: 'main', lvlMisses: 0, perfect: true,
-      lockWarn: 0, lastDone: 0, ad: new TM.Adapt(g.diff), lastKeyT: -9,
+      lockWarn: 0, lastDone: 0, ad: new TM.Adapt(g.diff, { game: g.def.id }), lastKeyT: -9,
     };
     g.ad = S.ad; WN.dbg = () => S;
     if (!g.demo) startLevel(g, Math.max(1, Math.min(ml, +U.qs('wnlevel') || 1)));
@@ -52,7 +52,7 @@
   const stage = () => U.clamp((S.maxLevel > 1 ? (S.level - 1) / (S.maxLevel - 1) : 0) + (S.ad ? (S.ad.load - 0.4) * 0.4 : 0), 0, 1);
   /* seconds per character the player is asked for right now (adaptive: the rubber band owns this) */
   const pcNow = () => U.clamp(1 / S.ad.demand, 0.12, 1.1);
-  const perWord = (g) => (g.diff === 'gentle' ? 0.8 : g.diff === 'turbo' ? 0.42 : 0.56);
+  const perWord = (g) => (g.diff === 'gentle' ? 0.95 : g.diff === 'turbo' ? 0.45 : 0.68);
   const hudBottom = (g) => { const v = g.vw(); return v.y + 118 * (v.w / window.innerWidth); };
   const aliveFruits = () => S.fruits.filter((f) => f.alive);
   const realAlive = () => S.fruits.filter((f) => f.alive && (f.type === 'fruit' || f.type === 'boss')).length;
@@ -285,7 +285,7 @@
     g.wordDone(f.typer, f.x, f.y - f.r - 30, { bonus: (frenzy ? 2 : 1) * (boss ? 3 : 1), color: frenzy ? C.gold : '#fff' });
     S.sliced++; S.resolved++;
     if (!boss && f.type === 'fruit' && f.k0 != null) { S.ad.word(f.typer.typedReq || f.item.len, S.t - f.k0, f.typer.errors, f.k0 - f.born - 0.8, S.t - Math.max(S.lastDone, f.born + 0.9), (f.born + f.T - S.t) / f.T); S.lastDone = S.t; }
-    S.mercy = Math.max(0, S.mercy - 0.03);
+    S.mercy = Math.max(0, S.mercy - 0.015);
     if (S.chain >= 2) chainReward(g, f);
 
     if (f.type === 'golden') startFrenzy(g, f);
@@ -345,8 +345,9 @@
   }
   function loseHeart(g, x, why) {
     if (g.demo || g.state !== 'play') return;
-    S.lives--; S.lvlMisses++; S.perfect = false; S.mercy = Math.min(0.4, S.mercy + 0.08);
+    S.lives--; S.lvlMisses++; S.perfect = false; S.mercy = Math.min(0.8, S.mercy + 0.12); if (TM.coach) TM.coach.hurt(1);
     TM.sfx.hurt(); g.fx.doFlash('#FF5A5F', 0.28); g.fx.shake(14, 0.2);
+    if (S.lives <= 0 && g.secondWind()) { S.lives = Math.min(S.maxLives, 3); S.mercy = 0.8; S.ice = 9; return; }
     if (S.lives <= 0) {
       S.lives = 0;
       g.end({ win: false, title: 'ゲームオーバー', sub: `ステージ${S.level}まで いって、フルーツを ${S.sliced}こ きったよ`, targetMet: false, stats: [['きったフルーツ', S.sliced], ['ステージ', S.level]] });
@@ -826,6 +827,14 @@
       'ステージの さいごに <b>おおきな スイカ</b>が でるよ。ぶんを タイプして わろう！',
     ],
     music: mMain,
+    /* comeback gift: a student who struggled and then got one right gets slow-motion ice, plus a heart back if they lost one */
+    gift(g, info) {
+      if (!S || S.frenzy > 0) return null;
+      const hp = S.lives < S.maxLives;
+      if (hp && (info.kind === 'redeem' || S.lives <= 2)) S.lives++;
+      S.ice = Math.max(S.ice, 7); g.fx.doFlash('#BFE8FF', 0.4);
+      return hp ? 'ハート かいふく ＋ こおりの じかん！' : 'こおりの じかん！ ゆっくり～';
+    },
     init(g) { WN.backdrop.init(); WN.load(); },
     reset, update, draw, onKey, onBack,
     nextKey: () => { const t = S.lock.locked || S.fruits.filter((f) => f.alive && f.type !== 'bomb').sort((a, b) => b.danger - a.danger)[0]; return t ? t.typer.nextReq() : null; },

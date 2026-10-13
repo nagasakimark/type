@@ -71,12 +71,12 @@
     G = g;
     S = {
       t: 0, phase: 'build', buildT: 0, wave: 0, coins: g.demo ? 0 : 90, coinsShown: g.demo ? 0 : 90, bought: 0, wall: { hp: 0, max: 100 }, slots: [], sel: -1, hover: null, ui: null, F: null, drag: null,
-      enemies: [], corpses: [], bullets: [], boomFx: [], boxers: [], spikes: [], queue: [], spawnT: 1, uid: 0, lock: new TM.LockOn(), ad: new TM.Adapt(g.diff), banner: null,
+      enemies: [], corpses: [], bullets: [], boomFx: [], boxers: [], spikes: [], queue: [], spawnT: 1, uid: 0, lock: new TM.LockOn(), ad: new TM.Adapt(g.diff, { game: g.def.id }), banner: null,
       kills: 0, maxLv: 1, lastDone: 0, clearT: 0, shake: 0, wallFlash: 0, merges: 0, auto: null, tipT: 0, stats: { tnt: 0, spikes: 0, boxer: 0, guard: 0, gifts: 0, dmg: 0 },
       area: 0, music: -1, aliveCap: 3, plan: null, bossAlive: 0, streak: 0, up: { fire: 0, dmg: 0, coin: 0, wall: 0 }, stock: { spikes: 1, boxer: 1, tnt: 1, guard: 1 }, botT: 0, giftFx: null,
     };
     g.ad = S.ad;
-    S.baseWall = g.diff === 'gentle' ? 140 : g.diff === 'turbo' ? 90 : 110; S.wall.max = S.baseWall; S.wall.hp = S.wall.max;
+    S.baseWall = g.diff === 'gentle' ? 210 : g.diff === 'turbo' ? 90 : 150; S.wall.max = S.baseWall; S.wall.hp = S.wall.max;
     for (let i = 0; i < NSLOT; i++) S.slots.push({ lvl: 0, fire: 0, autoT: rnd(0.4, 1.6), pop: 0, val: 0 });
     putCat(g, 5, 1, 0, true);                                // one starter cat, middle lane, front
     if (g.demo) { for (const [i, l] of [[1, 2], [3, 1], [5, 3], [7, 2], [9, 4]]) { S.slots[i].lvl = l; } S.wall.hp = S.wall.max = 9999; S.auto = { cps: 2.6, acc: 0, think: 0.5, err: 0.02, wait: 0 }; S.wave = 3; S.stock = { spikes: 9, boxer: 9, tnt: 9, guard: 0 }; beginWave(g); }
@@ -547,7 +547,7 @@
       const front = S.enemies.filter((q) => q !== e && q.lane === e.lane && q.x < e.x).sort((a, b) => b.x - a.x)[0];
       const base = STOP + (e.boss ? 40 : 0), minX = Math.max(base, front ? front.x + (front.boss || e.boss ? 300 : 205) : 0);
       const was = e.state;
-      const sp = e.speed * (e.slow > 0 ? 0.5 : 1);
+      const sp = e.speed * (e.slow > 0 ? 0.5 : 1) * (g.diff === 'gentle' ? 0.8 : g.diff === 'turbo' ? 1 : 0.9) * (1 - 0.3 * Math.min(1, (TM.coach ? TM.coach.struggle : 0) / 4));   // zombies shuffle slower for a student who is struggling
       if (e.x > minX + 1) { e.x = Math.max(minX, e.x - sp * dt); e.state = 'walk'; }
       else e.state = e.x <= base + 2 ? 'attack' : 'walk';
       if (e.state === 'attack') {
@@ -587,15 +587,19 @@
     // wave end
     if (!S.queue.length && !S.enemies.length && S.phase === 'fight' && !S.plan.endHandled) { S.plan.endHandled = true; endWave(g); }
     // wall destroyed
+    if (!g.demo && S.wall.hp <= 0 && S.phase === 'fight' && g.secondWind()) {
+      S.wall.hp = Math.ceil(S.wall.max * 0.6); S.coins += 60; S.wallFlash = 1; S.shake = 14; S.stock.tnt = Math.max(S.stock.tnt, 1);
+      for (const q of S.enemies) { q.push = Math.max(q.push, q.boss ? 200 : 520); q.stun = Math.max(q.stun, 2); q.slow = 8; }
+    }
     if (!g.demo && S.wall.hp <= 0 && S.phase === 'fight') {
       S.phase = 'over'; banner('かべが やられた！', { life: 3, color: '#FF5A5F' });
       g.end({ win: false, title: 'かべが こわれちゃった！', sub: `ウェーブ ${S.wave + 1} まで がんばった！`, stats: [['ウェーブ', S.wave + 1], ['ゾンビ', S.kills], ['ネコの つよさ', 'Lv ' + S.maxLv]], delay: 1600 });
     }
   }
   function hitWall(g, e) {
-    const dmg = e.boss ? 3 + S.wave * 0.7 : (2 + S.wave * 0.38) * (e.wd || 1);
+    const dmg = (e.boss ? 3 + S.wave * 0.7 : (2 + S.wave * 0.38) * (e.wd || 1)) * (g.diff === 'gentle' ? 0.6 : g.diff === 'turbo' ? 1 : 0.8);
     if (g.demo) { S.wallFlash = 0.5; return; }
-    S.wall.hp = Math.max(0, S.wall.hp - dmg); S.wallFlash = 1; S.shake = Math.max(S.shake, 5); TM.sfx.hurt(); S.ad.fail(e.boss ? 0.2 : 0.35);
+    S.wall.hp = Math.max(0, S.wall.hp - dmg); S.wallFlash = 1; S.shake = Math.max(S.shake, 5); TM.sfx.hurt(); S.ad.fail(e.boss ? 0.2 : 0.35); if (TM.coach) TM.coach.hurt(e.boss ? 0.5 : 0.7);
     if (S.wall.hp > 0 && S.wall.hp < S.wall.max * 0.25 && S.stock.guard > 0 && !S.boxers.some((b) => b.guard)) { S.stock.guard--; S.stats.guard++; guardian(g); }
   }
   function endWave(g) {
@@ -880,6 +884,14 @@
       'たたかいの あいだも コインで ネコを かえるよ（<b>1〜5</b>の キー）。<b>Backspace</b>で ガッチャンコ、<b>0</b>で かべを なおす。',
       '3・5・7・9・10ばんめの ウェーブは <b>ボス</b>！ ボスは ネコ ぜんいんで うつ。ながい ぶんしょうを うって こうげき！',
     ],
+    /* comeback gift: the wall heals, zombies slow down, and a random add-on (TNT, spikes, boxing cat, guardian) drops in */
+    gift(g, info) {
+      if (!S || S.phase !== 'fight') return null;
+      S.wall.hp = Math.min(S.wall.max, S.wall.hp + Math.ceil(S.wall.max * 0.2)); S.wallFlash = 1; S.coins += 30;
+      for (const q of S.enemies) q.slow = Math.max(q.slow, 6);
+      gift(g);
+      return 'かべ かいふく ＋ ゾンビ スロー ＋ ' + (S.giftFx ? S.giftFx.name : 'コイン') + '！';
+    },
     music: SONGS[0], reset, update, draw, onKey, onEnter, onBack(g) { onBack(g); },
     init(g) { G = g; CD.load(); },
     nextKey: () => { if (!S || S.phase !== 'fight') return null; const t = S.lock.locked || S.enemies.filter(targetable).sort((a, b) => (laneCats(a.lane).length ? 0 : 1) - (laneCats(b.lane).length ? 0 : 1) || a.x - b.x)[0]; return t ? t.typer.nextReq() : null; },

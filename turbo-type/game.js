@@ -68,10 +68,10 @@
   /* ====================================================================== setup */
   function baseWpm() {
     const recent = TM.store.get('turbo.wpm', 0);
-    const d = g.diff === 'gentle' ? 11 : g.diff === 'turbo' ? 30 : 19;
+    const d = g.diff === 'gentle' ? 5 : g.diff === 'turbo' ? 20 : 8;   // starting guess (WPM); rivals then follow the student's own pace
     return Math.max(d, Math.min(recent || d, d * 1.7));
   }
-  const rateToSpeed = (cps) => 7 + 55 * (1 - Math.exp(-cps / 3.0));
+  const rateToSpeed = (cps) => 10 + 54 * (1 - Math.exp(-cps / 2.4));   // slow typists still feel speed
 
   function makeCar(spec, idx, isPlayer) {
     const mesh = world.addCar(spec.model, spec.tint, isPlayer && ST.track.def.theme.id === 'night');
@@ -180,7 +180,7 @@
     const v = g.vw();
     g.wordDone(t, W / 2 + U.rand(-120, 120), v.y + v.h - 330, { bonus: S.nitroT > 0 ? 1.5 : 1 });
     P.kick = Math.min(9, P.kick + 3.5); P.sqV += 3;
-    S.nitro = Math.min(1.2, S.nitro + (sentence ? (clean ? 0.8 : 0.45) : (clean ? 0.34 : 0.14)));
+    S.nitro = Math.min(1.2, S.nitro + (sentence ? (clean ? 0.8 : 0.45) : (clean ? 0.34 : 0.14)) * (g.diff === 'gentle' ? 1.5 : g.diff === 'normal' ? 1.25 : 1));
     if (S.nitro >= 1 && S.nitroT <= 0) fireNitro(P);
     else if (clean && sentence) { banner('パーフェクト！', '#FFC83D', 1.0); }
     for (let i = 0; i < 10; i++) emitFlame(P, 0.6);
@@ -249,10 +249,10 @@
          close race; rubber-banding keeps the pack within sight: far behind the player -> push, far ahead -> ease off. */
       /* mode = how the rubber band behaves: Gentle rivals run a little slower than you and haul themselves back to you quickly when they
          fall behind but ease right off when ahead; Turbo rivals run a little faster than you and pull away harder when ahead. */
-      const MK = g.diff === 'gentle' ? { ref: 0.9, behind: 0.40, ahead: 0.30 } : g.diff === 'turbo' ? { ref: 1.1, behind: 0.30, ahead: 0.16 } : { ref: 1.0, behind: 0.32, ahead: 0.22 };
-      const ref = (S.demo ? c.baseWpm / c.mult / 12 : Math.max(c.baseWpm / c.mult / 12 * 0.85, S.avgRate * 1.0)) * (S.demo ? 1 : MK.ref);
+      const MK = g.diff === 'gentle' ? { ref: 0.78, behind: 0.40, ahead: 0.95 } : g.diff === 'turbo' ? { ref: 1.05, behind: 0.30, ahead: 0.30 } : { ref: 0.88, behind: 0.34, ahead: 0.7 };
+      const ref = (S.demo ? c.baseWpm / c.mult / 12 : Math.max(c.baseWpm / c.mult / 12 * 0.6, S.avgRate * 1.0)) * (S.demo ? 1 : MK.ref);
       const gap = P.dist - c.dist;                       // + = rival is behind
-      const rubber = S.demo ? 0 : clamp(gap / 140, -1, 1) * (gap > 0 ? MK.behind : MK.ahead);
+      const rubber = S.demo ? 0 : clamp(gap / (gap > 0 ? 140 : 100), -1, 1) * (gap > 0 ? MK.behind : MK.ahead);   // rival far AHEAD of the student eases off hard, so nobody gets left behind
       const wob = 1 + Math.sin(T * 0.5 + c.wob) * 0.07 + Math.sin(T * 1.3 + c.wob * 2) * 0.04;
       c.rubber = rubber * 0.55;
       cps = ref * m * wob * (1 + rubber * 0.45) * (S.demo ? 1.5 : 1);
@@ -266,9 +266,9 @@
     const nitroOn = c.nitroT > 0;
     if (nitroOn) vT *= 1.3; else if (c.padT > 0) vT *= 1.2;
     if (c.stumble > 0) vT *= 0.65;
-    if (!c.isPlayer && !S.demo && !c.finished) vT *= 1 + (c.rubber || 0);   // rubber-band on final speed (nitro/pads included)
+    if (!c.isPlayer && !S.demo && !c.finished) vT *= Math.max(0.45, 1 + (c.rubber || 0));   // rubber-band on final speed (nitro/pads included)
     vT += c.kick * (c.isPlayer ? 1 : 0);
-    if (c.isPlayer && !S.demo && !c.finished) vT *= 1 + clamp((S.leaderDist - c.dist) / 400, 0, 1) * 0.07; // small catch-up help
+    if (c.isPlayer && !S.demo && !c.finished) vT *= 1 + clamp((S.leaderDist - c.dist) / 300, 0, 1) * (g.diff === 'gentle' ? 0.22 : g.diff === 'turbo' ? 0.07 : 0.15); // catch-up help: the further behind, the more
     if (!racing || (S.phase === 'grid' && !S.demo)) vT = 0;
     const acc = c.v < vT ? (nitroOn ? 34 : 19) : 13;
     c.v += clamp(vT - c.v, -acc * dt, acc * dt);
@@ -417,7 +417,7 @@
     const rows = S.cars.slice().sort((a, b) => a.finalPlace - b.finalPlace);
     S.results = rows;
     g.end({
-      win: place <= 3, title: place === 1 ? 'ゆうしょう！' : names + 'だったよ！', sub: place === 1 ? 'タイピング ナンバーワン！' : place <= 3 ? 'ひょうしょうだい！ もういちどで 金メダル' : 'おしい！ レースごとに はやくなるよ',
+      win: place <= 3 || g.diff !== 'turbo', title: place === 1 ? 'ゆうしょう！' : names + 'だったよ！', sub: place === 1 ? 'タイピング ナンバーワン！' : place <= 3 ? 'ひょうしょうだい！ もういちどで 金メダル' : 'さいごまで ゴール！ レースごとに はやくなるよ',
       targetMet: place <= 2, stats: [['じゅんい', names], ['タイム', fmt(S.raceT)], ['ベストラップ', c.bestLap < 1e8 ? fmt(c.bestLap) : '-'], ['ビッグジャンプ', S.bigAir]], delay: 7600,
     });
   }
@@ -971,6 +971,12 @@
       'ライバルは モチ・タロ・ソラ。コースを えらんで レースしよう！',
     ],
     music, init, reset, update, draw, onKey,
+    /* comeback gift: a free nitro burst (longer and stronger than the normal one) for a student who is trailing */
+    gift(g2, info) {
+      if (!S || S.phase !== 'race' || S.nitroT > 0) return null;
+      const P = S.player; fireNitro(P); S.nitroT = 5; P.nitroT = 5; P.v += 4;
+      return 'ニトロ ブースト！';
+    },
     nextKey: () => (S && S.queue && S.queue[0] ? S.queue[0].nextReq() : null),
     hud: () => {
       if (!S) return {};

@@ -56,7 +56,7 @@
     G = g;
     S = {
       team: team(), stage: 0, stopI: 0, cz: 0, phase: 'move', t: 0, enemies: [], shots: [], critters: [], splats: [], goo: [], msg: null, chipRects: [], msgRect: null, queue: [], qt: 0,
-      ad: new TM.Adapt(g.diff), lastDone: 0, tank: 100, ultra: 0, ultraFx: null, lock: new TM.LockOn(), bot: { acc: 0 }, recoil: 0, aim: 0, pair: ['#FF3EA5', '#B8F03A'], shotI: 0, hitFlash: 0, wipe: null, amt: 0, cov: 0, stageCov: [],
+      ad: new TM.Adapt(g.diff, { game: g.def.id }), lastDone: 0, tank: 100, ultra: 0, ultraFx: null, lock: new TM.LockOn(), bot: { acc: 0 }, recoil: 0, aim: 0, pair: ['#FF3EA5', '#B8F03A'], shotI: 0, hitFlash: 0, wipe: null, amt: 0, cov: 0, stageCov: [],
       splatted: 0, ultras: 0, bossesDown: 0, thumbs: [], turf: [], lowT: 0, comboShown: 0, lastDmgT: -9, topY: 110, muzzle: { x: VX + 430, y: H - 200 }, ending: false, stats: { glob: 0 },
     };
     g.ad = S.ad;
@@ -201,7 +201,7 @@
   function onEnter(g) { if (!g.demo) tryUltra(g); }
   function missCost(g, k) {
     if (g.demo) return;
-    S.tank = Math.max(g.diff === 'gentle' ? 10 : 0, S.tank - [0, 1.6, 2.4][diffK()]);
+    S.tank = Math.max(g.diff === 'gentle' ? 10 : 0, S.tank - [0, 1.0, 2.4][diffK()]);
     S.lastDmgT = S.t;
     parts.sprite('star_09', S.muzzle.x, S.muzzle.y, 70, { color: '#FF5A5F', life: 0.2, add: false });
     if (S.tank <= 0 && g.state === 'play') outOfInk(g);
@@ -366,12 +366,18 @@
     msg(g, 'ブシュッ！', { life: 0.8, col: '#9B86E8', pri: 2 });
     if (g.demo || g.state !== 'play') return;
     g.missWord(e.typer.item);
-    const dmg = e.dmg * [0.35, 1, 1.35][diffK()];
+    const dmg = e.dmg * [0.25, 0.7, 1.2][diffK()]; if (TM.coach) TM.coach.hurt(0.8);
     S.tank = Math.max(g.diff === 'gentle' ? 12 : 0, S.tank - dmg); S.lastDmgT = S.t;
     if (S.tank <= 0) outOfInk(g);
   }
   function outOfInk(g) {
-    if (S.ending) return; S.ending = true;
+    if (S.ending) return;
+    if (!g.demo && g.secondWind()) {   // second wind: the tank refills, the ultra is ready and the screen is cleared of goo
+      S.tank = 65; S.ultra = 100; S.lastDmgT = S.t;
+      for (const q of S.enemies) { if (q.alive) { const p = eScreen(q); parts.burst(p.x, p.y, GOO2, { count: 10, speed: [150, 500], up: 100 }); q.alive = false; } }
+      S.enemies = []; S.lock.release(); return;
+    }
+    S.ending = true;
     S.lock.release(); S.queue.length = 0;
     for (const q of S.enemies) { if (q.alive) { const p = eScreen(q); parts.burst(p.x, p.y, GOO2, { count: 10, speed: [150, 500], up: 100 }); q.alive = false; } }
     S.enemies = []; S.msg = null;
@@ -1097,6 +1103,12 @@
       'ミスなしで つなげて <b>ウルトラ</b>の ほしを ためよう。いっぱいに なったら <b>Enter</b>で ペンキの なみ！',
       'ステージごとに いちばん ぬろう。ステージの さいごは ボス！ 4ステージで まちを とりもどそう！',
     ],
+    /* comeback gift: ink back in the tank and the ultra ready to go */
+    gift(g, info) {
+      if (!S || g.state !== 'play' || S.ending || S.phase === 'wipe') return null;
+      S.tank = Math.min(100, S.tank + (info.kind === 'redeem' ? 40 : 30)); S.ultra = 100; INK.snd('up', 0.8, 1);
+      return 'インク かいふく ＋ ウルトラ OK！';
+    },
     music: SONGS[0], reset, update, draw, onKey, onBack, onEnter,
     init(g) { G = g; INK.loadImages(); INK.preloadSfx(); buildTeamUI(g); },
     nextKey: () => { if (!S) return null; const t = S.lock.locked || nearest(); return t && !t.typer.done ? t.typer.nextReq() : null; },

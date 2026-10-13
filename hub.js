@@ -47,14 +47,14 @@
     const first = TM.data.decks[ids[0]];
     const book = first && TM.data.books.find((b) => b.id === first.book);
     wordsBtn.innerHTML = '';
-    wordsBtn.append(
+    wordsBtn.append(...[
       book ? el('span', { class: 'cover' }, el('img', { src: book.cover, alt: '' })) : null,
       first && first.image ? el('span', { class: 'thumb' }, el('img', { src: first.image, alt: '' })) : null,
       el('span', { class: 'txt' },
         el('span', { class: 'k' }, 'いまの たんご'),
         el('span', { class: 'v' }, TM.deck.label(ids)),
-        el('span', { class: 'm' }, (book ? book.name : '') + (TM.progress && ids.length === 1 ? '  ・  クリア ' + TM.progress.games(ids[0]).length + '/' + TM.progress.GAMES.length : '') + (ids.length > 1 ? ` ほか ${ids.length - 1}こ` : ''))),
-      el('span', { class: 'chg' }, 'かえる \u25B8'));
+        el('span', { class: 'm' }, (book ? TM.level(book).text + '  ・  ' + book.name : '') + (TM.progress && ids.length === 1 ? '  ・  クリア ' + TM.progress.games(ids[0]).length + '/' + TM.progress.GAMES.length : '') + (ids.length > 1 ? ` ほか ${ids.length - 1}こ` : ''))),
+      el('span', { class: 'chg' }, 'かえる \u25B8')].filter(Boolean));
     const q = '?deck=' + encodeURIComponent(ids.join(','));
     const key = TM.deck.key(ids);
     for (const c of cabs) {

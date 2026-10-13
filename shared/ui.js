@@ -7,7 +7,7 @@
     const e = document.createElement(tag);
     for (const [k, v] of Object.entries(attrs || {})) {
       if (k === 'class') e.className = v;
-      else if (k === 'style' && typeof v === 'object') Object.assign(e.style, v);
+      else if (k === 'style' && typeof v === 'object') { for (const [sk, sv] of Object.entries(v)) { if (sk.startsWith('--')) e.style.setProperty(sk, sv); else e.style[sk] = sv; } }   // custom properties need setProperty
       else if (k.startsWith('on')) e.addEventListener(k.slice(2), v);
       else if (k === 'html') e.innerHTML = v;
       else if (v !== false && v != null) e.setAttribute(k, v === true ? '' : v);
@@ -79,17 +79,27 @@
       return el('div', { class: 'gd', 'aria-label': 'クリアした ゲーム' }, TM.GAMES.map((g) => el('i', { class: have.has(g.id) ? 'on' : '', style: { '--c': g.c }, title: g.short }, have.has(g.id) ? '✓' : '')));
     };
 
+    // Books are shelved by school level: 小学校 (Let's Try 1,2 = 3,4年; New Horizon 5,6 + Picture Dictionary = 5,6年) then 中学校 (New Horizon 1,2,3 = 1,2,3年).
+    const pill = (b, cls) => { const lv = TM.level(b); return el('span', { class: 'lvl ' + lv.key + (cls ? ' ' + cls : '') }, lv.text); };
     function renderBooks() {
-      const grid = el('div', { class: 'tm-books', role: 'list' });
-      for (const b of data.books) {
-        const n = selIn(b), pr = TM.progress.book(b);
-        const card = el('button', { class: 'tm-book' + (b.id === book ? ' cur' : ''), role: 'listitem', 'aria-label': b.name, onclick: () => { book = b.id; view = 'decks'; TM.sfx && TM.sfx.click(); render(); } },
-          el('div', { class: 'cover' }, el('img', { src: img(b.cover), alt: b.name, draggable: 'false' }), n ? el('span', { class: 'badge' }, `えらんだ ${n}`) : null),
-          el('div', { class: 'bn' }, b.name),
-          el('div', { class: 'bp' }, el('div', { class: 'pbar' }, el('i', { style: { width: pr.pct + '%' } })), el('span', {}, `${pr.done}/${pr.total} クリア ${pr.pct}%`)));
-        grid.append(card);
+      const wrap = el('div', { class: 'tm-books', role: 'list' });
+      for (const lv of ['es', 'jhs']) {
+        const list = data.books.filter((b) => TM.level(b).key === lv);
+        if (!list.length) continue;
+        const shelf = el('section', { class: 'tm-shelf ' + lv, style: { '--n': list.length }, 'aria-label': TM.level(list[0]).school },
+          el('h3', {}, el('span', { class: 'lvl ' + lv }, TM.level(list[0]).school)));
+        const grid = el('div', { class: 'tm-shelfgrid' });
+        for (const b of list) {
+          const n = selIn(b), pr = TM.progress.book(b), L = TM.level(b);
+          const card = el('button', { class: 'tm-book' + (b.id === book ? ' cur' : ''), role: 'listitem', 'aria-label': `${L.text} ${b.name}`, onclick: () => { book = b.id; view = 'decks'; TM.sfx && TM.sfx.click(); render(); } },
+            el('div', { class: 'cover' }, el('img', { src: img(b.cover), alt: b.name, draggable: 'false' }), pill(b, 'corner'), n ? el('span', { class: 'badge' }, `えらんだ ${n}`) : null),
+            el('div', { class: 'bn' }, b.name),
+            el('div', { class: 'bp' }, el('div', { class: 'pbar' }, el('i', { style: { width: pr.pct + '%' } })), el('span', {}, `${pr.done}/${pr.total} クリア ${pr.pct}%`)));
+          grid.append(card);
+        }
+        shelf.append(grid); wrap.append(shelf);
       }
-      stage.append(grid);
+      stage.append(wrap);
     }
     function renderDecks() {
       const b = bookOf(book);
@@ -99,14 +109,18 @@
       for (const id of b.decks) {
         const d = data.decks[id];
         const pic = el('div', { class: 'img' });
-        const fallback = () => { pic.textContent = d.unit ? d.unit : '★'; };
+        const fallback = () => {
+          const m = /^Unit (\d+)$/.exec(d.label);
+          pic.textContent = d.unit ? d.unit : m ? m[1] : d.label === 'Plus' ? '＋' : /^[A-Za-z]+$/.test(d.label) && d.label.length <= 4 ? d.label : (d.label.match(/[A-Z]/g) || ['★']).join('').slice(0, 3);
+          if (b.tint) pic.style.background = b.tint;
+        };
         if (d.image) pic.append(el('img', { src: img(d.image), alt: '', draggable: 'false', onerror: function () { this.remove(); fallback(); } })); else fallback();
         const nS = d.sentences ? d.sentences.length : 0, isDone = TM.progress.done(id);
         const tile = el('button', { class: 'tm-tile' + (sel.has(id) ? ' on' : '') + (isDone ? ' done' : ''), 'aria-pressed': sel.has(id) ? 'true' : 'false' },
           pic,
           el('div', { class: 't' },
-            el('div', { class: 'u' }, d.unit ? `ユニット ${d.unit}` : d.label),
-            el('div', { class: 'n' }, d.unit || d.label !== d.title ? d.title : ' '),
+            el('div', { class: 'u' }, d.unit ? `ユニット ${d.unit}` : /^Unit \d+$/.test(d.label) ? d.label.replace('Unit', 'ユニット') : d.label),
+            el('div', { class: 'n' }, d.title && (d.unit || d.label !== d.title) ? d.title : ' '),
             el('div', { class: 'c' }, `${d.words.length} ことば`, nS ? ` ・ ぶん ${nS}` : ''),
             gameDots(id)),
           el('div', { class: 'tick' }, '✓'),
@@ -121,7 +135,7 @@
         grid.append(tile);
       }
       stage.append(el('div', { class: 'tm-bookbar' }, el('img', { src: img(b.cover), alt: '' }),
-        el('div', { class: 'bt' }, el('b', {}, b.name), el('span', {}, 'ユニットを タップしてね')),
+        el('div', { class: 'bt' }, el('b', {}, b.name, ' ', pill(b)), el('span', {}, 'ユニットを タップしてね')),
         el('div', { class: 'bp wide' }, el('div', { class: 'pbar' }, el('i', { style: { width: pr.pct + '%' } })), el('span', {}, `${pr.done}/${pr.total} クリア ${pr.pct}%`))), grid);
     }
     function render() {

@@ -134,6 +134,15 @@
   };
   TM.typedLen = (text) => TM.typedChars(text).filter((c) => !c.opt).length;
 
+  /* School level of a textbook: book.level is 'es' (elementary) or 'jhs' (junior high), book.years the school years it is for.
+     TM.level(book) -> { school: '小学校', short: '小学', text: '小学5・6年', color } */
+  TM.level = function (b) {
+    const jhs = b && b.level === 'jhs';
+    const yrs = (b && b.years && b.years.length) ? b.years.join('・') : '';
+    return jhs ? { key: 'jhs', school: '中学校', short: '中学', text: `中学${yrs}年`, color: '#7B5CFF' }
+      : { key: 'es', school: '小学校', short: '小学', text: yrs ? `小学${yrs}年` : '小学校', color: '#FF8A1F' };
+  };
+
   TM.deck = {
     all: DATA.decks,
     books: DATA.books,
@@ -160,7 +169,7 @@
       if (!ids.length) return 'No words';
       const d = DATA.decks[ids[0]];
       const book = DATA.books.find((b) => b.id === d.book);
-      const one = `${book ? book.short : ''} ${d.label}${d.unit ? ' · ' + d.title : d.label === d.title ? '' : ' · ' + d.title}`.trim();
+      const one = `${book ? book.short : ''} ${d.label}${d.title && d.label !== d.title ? ' · ' + d.title : ''}`.trim();
       return ids.length === 1 ? one : `${one} + ${ids.length - 1} more`;
     },
     showHints(ids) {
@@ -203,7 +212,11 @@
     next(o = {}) {
       const kind = o.kind || 'word';
       let src = kind === 'sentence' ? this.pool.sentences : kind === 'any' ? this.pool.words.concat(this.pool.sentences) : this.pool.words;
-      if (kind === 'sentence' && !src.length) src = this.pool.words.slice().sort((a, b) => b.len - a.len).slice(0, 12);
+      if (kind === 'sentence' && !src.length) {   // no key sentences (e.g. junior-high lists): use multi-word phrases, else the longest words
+        const byLen = this.pool.words.slice().sort((a, b) => b.len - a.len);
+        const phrases = byLen.filter((w) => w.words >= 2).slice(0, 24);
+        src = phrases.length >= 6 ? phrases : byLen.slice(0, 12);
+      }
       if (!src.length) return makeItem('type', '', '', 'word');
       const ok = (it, strictLen) => {
         if (o.avoidFirst && o.avoidFirst.has(it.first)) return false;

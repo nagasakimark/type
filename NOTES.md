@@ -61,3 +61,10 @@ Still open: Word Ninja heavy combo paths untested; real-GPU frame rate; shared g
   Geometry: everything is in "image space" 2143x1062 (the area art); frame(g) maps it to the 1920x1080 stage, cropping up to 150px from the left only. Wall HP bar baked into the art is overpainted by drawWallBar.
   Dev: ?dev=1 -> window.CDDev (state, goto(wave), coins, god, start, buy, merge, tnt, use(id), buyUp(id), buyAdd(id), stock({}), auto(cps,err,think), slot(i,lvl), S()); ?bot=cps,err,think and tools/sim.py cat-defense normal 3 0.05 0.6 300 5 work (the bot buys/merges/upgrades/uses add-ons itself).
   Not done / ideas: level-select map / daily bonus / gems shop screens from the kit are deliberately not used; per-area enemy variety; balance pass with real kids; sound effects are shared synth sfx only.
+
+## Junior high + school levels (2026-10-13)
+- NEW BOOKS New Horizon 1/2/3 (`nh1`-`nh3`, `assets/books/nh*.jpg`, `tint` colours for picture-less tiles), built by `tools/build_jhs.py` from `data/jhs-source/nh-tango-database.xlsx`. Every book now has `level` ('es'|'jhs') and `years`; `TM.level(book)` (core.js) gives the Japanese labels (小学3年, 小学5・6年, 中学1年 ...). Mapping: Let's Try 1/2 = 小3/小4, NH5/NH6 = 小5/小6, Picture Dictionary = 小5・6, NH1/2/3 = 中1/2/3.
+- Picker (shared/ui.js `renderBooks`, tm.css `.tm-shelf`): two shelves 小学校 | 中学校 (side by side, stacked on narrow screens), year pill on each cover and in the deck header; hub bar shows e.g. 中学2年 ・ New Horizon 2.
+- JHS unit decks have no title (unit titles are not in the spreadsheet); Unit 0 uses `unit: null` because `unit === 0` means "All" for elementary decks. Section names RLE/GfC are shown as in the database (meaning not in the data); rename in `EXTRAS` if wanted. JHS decks have almost no key sentences, so the hardest tier uses multi-word phrases (Dealer fallback in core.js).
+- `TM.ui.el` now sets CSS custom properties with setProperty (the per-game clear dots in the picker used `--c` and were not coloured before).
+- Font subset rebuilt with ~680 more kanji (+110 KB per weight).

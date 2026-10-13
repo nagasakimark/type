@@ -1,6 +1,16 @@
 # Typing Master
 
-Six typing games for elementary students, using the **New Horizon 5 & 6**, **Let's Try 1 & 2** and **My Picture Dictionary** word lists.
+Typing games for elementary and junior-high students, using the **New Horizon 1–6**, **Let's Try 1 & 2** and **My Picture Dictionary** word lists.
+
+The word-list picker shelves the books by school level:
+
+| Level | Book | Year |
+| --- | --- | --- |
+| 小学校 | Let's Try 1 / Let's Try 2 | 小学3年 / 小学4年 |
+| 小学校 | New Horizon 5 / New Horizon 6 | 小学5年 / 小学6年 |
+| 小学校 | My Picture Dictionary | 小学5・6年 |
+| 中学校 | New Horizon 1 / 2 / 3 | 中学1年 / 2年 / 3年 |
+(levels live in `tools/build_jhs.py` `LEVELS`)
 
 Open `index.html` (the Arcade) and pick a game. Every page also works when opened straight from disk.
 
@@ -24,7 +34,7 @@ turbo-type/index.html?deck=nh6-u3,nh6-u7
 star-sweep/index.html?deck=nh5-u5&quiet=1
 ```
 
-Deck ids: `nh5-u1` … `nh5-u8`, `nh6-u1` … `nh6-u8`, `lt1-u1` …, `lt2-u1` …, `lt2-colors`, `lt2-directions`, `lt1-all`, `lt2-all`, and `pd-<topic>` for Picture Dictionary topics (e.g. `pd-animals`). `quiet=1` starts with sound off. The Arcade's **Teacher link** button builds these for you.
+Deck ids: `nh5-u1` … `nh5-u8`, `nh6-u1` … `nh6-u8`, junior high `nh1-u0` … `nh1-u10`, `nh2-u0` … `nh2-u7`, `nh3-u0` … `nh3-u6` plus `nh<N>-sal|gfc|sa|lr|rle|wr|plus` (Sounds & Letters, GfC, Stage Activity, Let's Read, RLE, Word Room, extra words not in the Word List), `lt1-u1` …, `lt2-u1` …, `lt2-colors`, `lt2-directions`, `lt1-all`, `lt2-all`, and `pd-<topic>` for Picture Dictionary topics (e.g. `pd-animals`). `quiet=1` starts with sound off. The Arcade's **Teacher link** button builds these for you.
 
 ## Updating the words
 
@@ -39,6 +49,10 @@ python tools/build_words.py --images "D:/Programming/skribbl/assets/images"
 ```
 
 This writes `data/words.js` (what the games load) and `data/words.json`, and copies one category picture per deck into `assets/decks/` plus the textbook covers into `assets/books/` (needs `pip install pillow`). Leave out `--images` to rebuild only the words.
+
+### Junior high (New Horizon 1–3)
+
+Source: Tokyo Shoseki's 単語・連語データベース, kept in `data/jhs-source/nh-tango-database.xlsx`. `tools/build_jhs.py` (also called at the end of `build_words.py`) turns it into the `nh1`–`nh3` books: one deck per unit (sheet ① by 単元/パート; each word appears in the grade where it first occurs), one per non-unit section, and a "Plus" deck from sheet ③. Placeholders such as `...`, `～`, `(…ing)` and `[are]` are removed from what students type; full-sentence phrases become key sentences. Run `python tools/build_jhs.py` to re-merge into the existing `data/words.js` without the elementary vocab source (needs `pip install openpyxl`). The Japanese font subset (`assets/fonts/subset-chars.txt`) also covers the JHS meanings.
 
 ## Putting it on GitHub Pages
 

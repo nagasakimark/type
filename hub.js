@@ -20,7 +20,16 @@
 
   /* ---------- header controls ---------- */
   const openPicker = () => TM.ui.picker('', () => { refresh(); });
+  const modeBtns = {};
+  const modeSeg = el('div', { class: 'tm-seg tm-modeseg', title: 'あそびかた', role: 'group', 'aria-label': 'モード' });
+  for (const [v, label] of [['en', 'えいごを タイプ'], ['ja2en', 'にほんご → えいご']]) {
+    const b = el('button', { 'aria-pressed': 'false', onclick: () => { TM.settings.mode = v; TM.saveSettings(); TM.sfx && TM.sfx.click(); syncMode(); refresh(); } }, label);
+    modeBtns[v] = b; modeSeg.append(b);
+  }
+  function syncMode() { for (const k in modeBtns) { modeBtns[k].classList.toggle('on', k === TM.mode()); modeBtns[k].setAttribute('aria-pressed', k === TM.mode() ? 'true' : 'false'); } }
+  syncMode();
   document.getElementById('controls').append(
+    modeSeg,
     el('button', { class: 'tm-btn', onclick: teacher }, '先生用 QR'),
     el('button', { class: 'tm-btn icon', title: 'せってい', 'aria-label': 'せってい', onclick: () => TM.ui.settings() }, '\u2699'));
 
@@ -65,9 +74,9 @@
   }
 
   /* ---------- teacher link: pick a game + mode, get a QR code (open it big on the board / projector) ---------- */
-  function teacherUrl(gameId, diff, quiet) {
+  function teacherUrl(gameId, diff, quiet, mode) {
     const base = location.href.replace(/[^/]*(\?.*)?(#.*)?$/, '');
-    return `${base}${gameId}/index.html?deck=${TM.deck.ids().join(',')}&diff=${diff}${quiet ? '&quiet=1' : ''}`;
+    return `${base}${gameId}/index.html?deck=${TM.deck.ids().join(',')}&diff=${diff}${mode === 'ja2en' ? '&mode=ja2en' : ''}${quiet ? '&quiet=1' : ''}`;
   }
   function qrSvg(text) {
     const qr = window.qrcode(0, 'M'); qr.addData(text); qr.make();
@@ -77,14 +86,16 @@
     const sel = el('select', {}, GAMES.map((g) => el('option', { value: g.id }, g.name)));
     const diff = el('select', {}, [['gentle', 'ゆっくり'], ['normal', 'ふつう'], ['turbo', 'ターボ']].map(([d, l]) => el('option', { value: d, selected: d === 'normal' }, l)));
     const quiet = el('input', { type: 'checkbox' });
+    const mode = el('select', {}, [['en', 'えいごを タイプ'], ['ja2en', 'にほんご → えいご']].map(([d, l]) => el('option', { value: d, selected: d === TM.mode() }, l)));
     const card = el('div', { class: 'tm-card tm-modal tm-small' },
       el('header', {}, el('h2', {}, 'クラス用 QRコード'), el('button', { class: 'tm-btn icon', 'aria-label': 'とじる', onclick: () => m.close() }, '\u2715')),
       el('div', { class: 'body' },
         el('div', { style: { font: '500 17px/1.4 var(--word)' } }, 'タブレットや スマホで よみとると、このたんご（', el('b', {}, TM.deck.label()), ') で ゲームが ひらきます。'),
         el('label', { class: 'tm-field' }, 'ゲーム', sel),
         el('label', { class: 'tm-field' }, 'モード', diff),
+        el('label', { class: 'tm-field' }, 'あそびかた', mode),
         el('label', { class: 'tm-field' }, 'おとを けして はじめる', quiet)),
-      el('footer', {}, el('button', { class: 'tm-btn', onclick: () => m.close() }, 'キャンセル'), el('button', { class: 'tm-btn primary', onclick: () => { const url = teacherUrl(sel.value, diff.value, quiet.checked); const name = sel.options[sel.selectedIndex].text, mode = diff.options[diff.selectedIndex].text; m.close(); showQR(url, name, mode); } }, 'Show QR code')));
+      el('footer', {}, el('button', { class: 'tm-btn', onclick: () => m.close() }, 'キャンセル'), el('button', { class: 'tm-btn primary', onclick: () => { const url = teacherUrl(sel.value, diff.value, quiet.checked, mode.value); const name = sel.options[sel.selectedIndex].text, md = diff.options[diff.selectedIndex].text + (mode.value === 'ja2en' ? ' ・ にほんご→えいご' : ''); m.close(); showQR(url, name, md); } }, 'Show QR code')));
     const m = TM.ui.modal(card);
   }
   function showQR(url, gameName, mode) {

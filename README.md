@@ -50,6 +50,12 @@ python tools/build_words.py --images "D:/Programming/skribbl/assets/images"
 
 This writes `data/words.js` (what the games load) and `data/words.json`, and copies one category picture per deck into `assets/decks/` plus the textbook covers into `assets/books/` (needs `pip install pillow`). Leave out `--images` to rebuild only the words.
 
+### にほんご → えいご mode
+
+A second way to play every game: the chip shows the **Japanese** meaning and one blank per English letter; the student types the English from memory. Switch it on the Arcade (top right), on each game's title screen, or with `?mode=ja2en` in a link (the Teacher QR dialog has a menu for it). Records are kept separately per mode.
+
+Hints grow when a student is stuck (`TM.hint` in `shared/core.js`): level 1 after 5 s without a correct key (or 2 wrong keys on the word) shows the next letter and each word's first letter; level 2 (9 s / 4 wrong keys) about every other letter; level 3 (14 s / 6 wrong keys) the whole answer, faded. **Tab** or the 💡 button raises the level by one (from level 2 it also reads the word aloud with the browser's speech). A word typed while level 2+ was showing is "helped": half points, no combo, and it goes on the 'tricky words' list. Each Japanese meaning appears only once per list, so the answer is unambiguous.
+
 ### Junior high (New Horizon 1–3)
 
 Source: Tokyo Shoseki's 単語・連語データベース, kept in `data/jhs-source/nh-tango-database.xlsx`. `tools/build_jhs.py` (also called at the end of `build_words.py`) turns it into the `nh1`–`nh3` books: one deck per unit (sheet ① by 単元/パート; each word appears in the grade where it first occurs), one per non-unit section, and a "Plus" deck from sheet ③. Placeholders such as `...`, `～`, `(…ing)` and `[are]` are removed from what students type; full-sentence phrases become key sentences. Run `python tools/build_jhs.py` to re-merge into the existing `data/words.js` without the elementary vocab source (needs `pip install openpyxl`). The Japanese font subset (`assets/fonts/subset-chars.txt`) also covers the JHS meanings.

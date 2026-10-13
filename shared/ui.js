@@ -111,7 +111,7 @@
         const pic = el('div', { class: 'img' });
         const fallback = () => {
           const m = /^Unit (\d+)$/.exec(d.label);
-          pic.textContent = d.unit ? d.unit : m ? m[1] : d.label === 'Plus' ? '＋' : /^[A-Za-z]+$/.test(d.label) && d.label.length <= 4 ? d.label : (d.label.match(/[A-Z]/g) || ['★']).join('').slice(0, 3);
+          pic.textContent = d.unit ? d.unit : m ? m[1] : d.abbr ? d.abbr : d.label === 'Plus' ? '＋' : /^[A-Za-z]+$/.test(d.label) && d.label.length <= 4 ? d.label : (d.label.match(/[A-Z]/g) || ['★']).join('').slice(0, 3);
           if (b.tint) pic.style.background = b.tint;
         };
         if (d.image) pic.append(el('img', { src: img(d.image), alt: '', draggable: 'false', onerror: function () { this.remove(); fallback(); } })); else fallback();

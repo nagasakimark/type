@@ -68,3 +68,12 @@ Still open: Word Ninja heavy combo paths untested; real-GPU frame rate; shared g
 - JHS unit decks have no title (unit titles are not in the spreadsheet); Unit 0 uses `unit: null` because `unit === 0` means "All" for elementary decks. Section names RLE/GfC are shown as in the database (meaning not in the data); rename in `EXTRAS` if wanted. JHS decks have almost no key sentences, so the hardest tier uses multi-word phrases (Dealer fallback in core.js).
 - `TM.ui.el` now sets CSS custom properties with setProperty (the per-game clear dots in the picker used `--c` and were not coloured before).
 - Font subset rebuilt with ~680 more kanji (+110 KB per weight).
+
+## Japanese -> English mode + 2025 unit titles (2026-10-13)
+- `TM.mode()` ('en' | 'ja2en'; setting `mode`, link `?mode=ja2en`). Toggle on hub, on every title screen (shared/game.js `modeSeg`), in the teacher QR dialog. `TM.deck.key()` gets a `~jp` suffix so records/stars are per mode; progress (cleared decks) is shared.
+- Rendering: `D.chip` / `D.chipSize` (shared/draw.js) switch to a two-line chip (Japanese `item.q`, blanks below) when the mode is on; turbo-type draws its own panel (Japanese pill above, blanks in the panel). `g.hint` (the old Japanese pill) is forced off in this mode.
+- Hints: `TM.hint` (core.js): level 0..3 = max(idle time since the last correct key, restarted per word when first drawn; wrong keys on that word; Tab/💡 presses). Time = game clock (`TM.hint.tick` in the framework loop). `Typer.assist` records the highest level showing when a correct key was typed; `g.wordDone` halves points / no combo / tricky list when assist >= 2. Title-screen demos show level 3.
+- `item.q` (makeItem): kana, plus the kanji in brackets when the kana is 1-2 chars (ひ（火）). `TM.pool` in this mode drops items without Japanese and keeps one English word per question text.
+- Game pace is x0.8 in this mode (`g.speedMul`); TM.Adapt still rubber-bands on top.
+- NH1-3 unit titles are the 2025 (R7) editions (`UNIT_TITLES` in tools/build_jhs.py, with sources in the comment); RLE = "Real-life English" (per the owner). `deck.abbr` is the short tag on picture-less tiles.
+- Not done / ideas: per-mode 'cleared' ticks; speech uses the browser voice (quality varies on Chromebooks); synonyms are not accepted (one English word per Japanese question).

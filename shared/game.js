@@ -36,7 +36,7 @@
     TM.current = g;
 
     /* ---------- helpers games use ---------- */
-    g.newDealer = () => { g.dealer = new TM.Dealer(TM.pool()); g.hint = TM.deck.showHints(); return g.dealer; };
+    g.newDealer = () => { g.dealer = new TM.Dealer(TM.pool()); g.hint = TM.mode() === 'ja2en' ? false : TM.deck.showHints(); return g.dealer; };   // ja2en draws the Japanese inside the chip
     g.keyResult = (r) => {
       if (g.demo) return;
       if (r === 'miss') { g.score.key(false); TM.sfx.miss(); hud.comboBreak(); }
@@ -45,7 +45,8 @@
     g.wordDone = (typer, x, y, o = {}) => {
       if (g.demo) { if (x != null) g.fx.stars(x, y, 5); return 0; }
       const before = g.score.mult;
-      const pts = g.score.word(typer.item, typer.errors, o.bonus || 1);
+      const helped = TM.mode() === 'ja2en' && typer.assist >= 2;       // answer was (half) shown: half points, no combo, goes on the "tricky" list
+      const pts = g.score.word(typer.item, typer.errors + (helped ? 1 : 0), (o.bonus || 1) * (helped ? 0.5 : 1));
       if (x != null) g.fx.pop(x, y - 40, '+' + pts, { color: o.color || C.gold, size: typer.item.kind === 'sentence' ? 64 : 52 });
       (typer.item.kind === 'sentence' ? TM.sfx.big : TM.sfx.word)();
       if (g.score.mult > before) {
@@ -65,7 +66,7 @@
       setTimeout(() => showResults(result), result.delay ?? 1300);
     };
     g.ladder = (stage) => TM.ladder(stage, g.diff);
-    g.speedMul = () => (g.diff === 'gentle' ? 0.6 : g.diff === 'turbo' ? 1.35 : 1);
+    g.speedMul = () => (g.diff === 'gentle' ? 0.6 : g.diff === 'turbo' ? 1.35 : 1) * (TM.mode() === 'ja2en' ? 0.8 : 1);   // remembering takes longer than reading
 
     /* ---------- loop ---------- */
     let last = performance.now(), acc = 0, countdown = 0;
@@ -107,7 +108,7 @@
         if (Math.ceil(countdown) !== before && countdown > 0) TM.sfx.beep(false);
         if (countdown <= 0) { g.state = 'play'; g.live = true; TM.sfx.beep(true); if (def.music) TM.audio.startMusic(def.music); }
       }
-      if (g.state === 'play') g.playT += dt;
+      if (g.state === 'play') { g.playT += dt; TM.hint.tick(dt); }
       def.update(g, dt);
       runBot(dt);
       g.fx.update(dt);
@@ -201,11 +202,21 @@
       for (const [v, label] of [['gentle', 'ゆっくり'], ['normal', 'ふつう'], ['turbo', 'ターボ']]) {
         const b = el('button', { onclick: () => setDiff(v) }, label); segBtns[v] = b; seg.append(b);
       }
+      const modeBtns = {}, modeSeg = el('div', { class: 'tm-seg tm-modeseg' });
+      for (const [v, label] of [['en', 'えいごを タイプ'], ['ja2en', 'にほんご → えいご']]) {
+        const b = el('button', { onclick: () => setMode(v) }, label); modeBtns[v] = b; modeSeg.append(b);
+      }
+      function setMode(v) {
+        TM.settings.mode = v; TM.saveSettings(); for (const k in modeBtns) modeBtns[k].classList.toggle('on', k === v);
+        g.newDealer(); def.reset && def.reset(g); refreshDeck(); TM.sfx.click();
+        if (g.refitTitle) { g.refitTitle(); setTimeout(g.refitTitle, 120); }
+      }
       function setDiff(v) { g.diff = v; TM.settings.difficulty = v; TM.saveSettings(); for (const k in segBtns) segBtns[k].classList.toggle('on', k === v); TM.sfx.click(); }
       const inner = el('div', { class: 'tm-tin' },
         el('h1', { class: 'tm-logo', html: def.logoHTML || def.name }),
         def.tagline ? el('div', { class: 'tm-tagline' }, def.tagline) : null,
         el('div', { class: 'tm-row' }, el('button', { class: 'tm-btn tm-deckbtn', onclick: () => openPicker() }, deckImg, deckLabel, el('span', { style: { opacity: 0.6 } }, '▾')), seg),
+        el('div', { class: 'tm-row' }, modeSeg),
         el('div', { class: 'tm-row' },
           el('button', { class: 'tm-btn primary', onclick: () => start() }, 'あそぶ', el('kbd', {}, 'Enter')),
           el('button', { class: 'tm-btn', onclick: () => howto() }, 'あそびかた')),
@@ -225,7 +236,7 @@
         const d = TM.data.decks[ids[0]];
         if (d && d.image) { deckImg.style.display = ''; deckImg.src = root + d.image; } else deckImg.style.display = 'none';
       }
-      setDiff(g.diff); refreshDeck();
+      setDiff(g.diff); refreshDeck(); for (const k in modeBtns) modeBtns[k].classList.toggle('on', k === TM.mode());
       return {
         show(v) { box.classList.toggle('hidden', !v); corners.forEach((c) => c.classList.toggle('hidden', !v)); if (v) { refreshDeck(); if (g.refitTitle) { g.refitTitle(); requestAnimationFrame(g.refitTitle); setTimeout(g.refitTitle, 250); } } },
         refreshDeck,
@@ -236,7 +247,7 @@
     function howto() {
       const card = el('div', { class: 'tm-card tm-modal tm-fixed' },
         el('header', {}, el('h2', {}, 'あそびかた'), el('button', { class: 'tm-btn icon', 'aria-label': 'とじる', onclick: () => m.close() }, '✕')),
-        el('ol', { class: 'tm-howto' }, (def.howto || []).map((s) => el('li', { html: s }))),
+        el('ol', { class: 'tm-howto' }, (TM.mode() === 'ja2en' ? ['<b>にほんご → えいご モード！</b> にほんごの いみを みて、<b>えいごを おもいだして</b> タイプしよう。ぶんぼうの したの せんが もじの かずだよ。'] : []).concat(def.howto || []).map((s) => el('li', { html: s }))),
         el('footer', {}, el('span'), el('button', { class: 'tm-btn primary', style: { fontSize: '28px', padding: '12px 30px 8px' }, onclick: () => { m.close(); start(); } }, 'あそぶ！')));
       const m = TM.ui.modal(card);
       TM.ui.fit(card, { max: 1.35, fill: 0.92 });
@@ -246,7 +257,7 @@
     function toTitle() {
       TM.audio.stopMusic();
       g.state = 'title'; g.live = false; g.demo = true;
-      g.newDealer(); g.score = new TM.Score();
+      g.newDealer(); g.score = new TM.Score(); TM.hint.reset();
       def.reset && def.reset(g);
       hud.show(false); title.show(true); results.hide();
     }
@@ -256,7 +267,7 @@
       if (document.activeElement && document.activeElement.blur) document.activeElement.blur();
       TM.audio.unlock(); TM.sfx.whoosh();
       g.demo = false; g.state = 'countdown'; g.live = false; g.playT = 0; countdown = 3;
-      g.score = new TM.Score(); g.newDealer(); g.fx = new TM.FX();
+      g.score = new TM.Score(); g.newDealer(); g.fx = new TM.FX(); TM.hint.reset();
       def.reset && def.reset(g);
       title.show(false); results.hide(); hud.show(true);
     }
@@ -342,15 +353,21 @@
       if (k === 'Escape') { pause(); return; }
       if (g.state !== 'play') return;
       ime.classList.add('hidden');
+      if (k === 'Tab') { TM.hint.boost(); return; }
       if (k === 'Backspace') { def.onBack && def.onBack(g); return; }
       if (k === 'Enter') { def.onEnter && def.onEnter(g); return; }
       if (k.length !== 1) return;
       def.onKey(g, k.toLowerCase());
     });
 
+    /* ---------- hint button (Japanese -> English mode only; Tab does the same) ---------- */
+    const hintBtn = el('button', { class: 'tm-btn tm-hintbtn hidden', title: 'ヒント (Tab)', onclick: (e) => { e.currentTarget.blur(); TM.hint.boost(); } }, '💡 ヒント', el('kbd', {}, 'Tab'));
+    document.body.append(hintBtn);
+    setInterval(() => hintBtn.classList.toggle('hidden', !(TM.mode() === 'ja2en' && g.state === 'play')), 200);
+
     /* ---------- boot ---------- */
     const fontsReady = document.fonts ? Promise.race([Promise.all([
-      document.fonts.load(D.FONT_WORD(46)), document.fonts.load(D.FONT_WORD(46, 700)), document.fonts.load(D.FONT_DISPLAY(60)), document.fonts.load(D.FONT_DISPLAY(60, 700)),
+      document.fonts.load(D.FONT_WORD(46)), document.fonts.load(D.FONT_WORD(46, 700)), document.fonts.load(D.FONT_DISPLAY(60)), document.fonts.load(D.FONT_DISPLAY(60, 700)), document.fonts.load('700 40px "TM JP"', 'あ日'),
     ]), new Promise((r) => setTimeout(r, 1500))]) : Promise.resolve();
     fontsReady.then(() => {
       def.init && def.init(g);

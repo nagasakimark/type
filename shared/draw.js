@@ -6,7 +6,7 @@
 
   const FONT_WORD = (px, w = 500) => `${w} ${px}px Lexend, "Segoe UI", Arial, sans-serif`;
   const FONT_DISPLAY = (px, w = 800) => `${w} ${px}px "Baloo 2", "Arial Rounded MT Bold", "Segoe UI", sans-serif`;
-  const FONT_JA = (px, w = 700) => `${w} ${px}px "Hiragino Maru Gothic ProN", "BIZ UDGothic", "Yu Gothic UI", "Meiryo", sans-serif`;
+  const FONT_JA = (px, w = 700) => `${w} ${px}px "TM JP", "Hiragino Maru Gothic ProN", "BIZ UDGothic", "Yu Gothic UI", "Meiryo", sans-serif`;
 
   const P = {
     rr(x, y, w, h, r) { const p = new Path2D(); r = Math.min(r, w / 2, h / 2); p.roundRect ? p.roundRect(x, y, w, h, r) : rrManual(p, x, y, w, h, r); return p; },
@@ -119,7 +119,19 @@
     if (w == null) { ctx.font = font; w = ctx.measureText(ch).width; widthCache.set(k, w); }
     return w;
   }
+  /* Japanese -> English mode: the chip shows the Japanese on top and one blank per English letter below (see TM.hint) */
+  const jaMode = (typer) => !!(window.TM && TM.mode && TM.mode() === 'ja2en' && typer.item && typer.item.hint);
+  function jaLayout(ctx, typer, size) {
+    const cell = size * 0.6, sp = size * 0.46, op = size * 0.3;
+    let sw = 0; for (const c of typer.chars) sw += c.k === ' ' ? sp : c.opt ? op : cell;
+    const text = typer.item.q || typer.item.hint, limit = Math.max(sw, size * 8);
+    let hs = size * 0.86; ctx.font = FONT_JA(hs);
+    let jw = charW(ctx, ctx.font, text);
+    if (jw > limit) { hs = Math.max(size * 0.42, hs * limit / jw); ctx.font = FONT_JA(hs); jw = charW(ctx, ctx.font, text); }
+    return { cell, sp, op, sw, text, hs, jw, w: Math.max(sw, jw) + size * 1.2, h: size * 2.3 };
+  }
   function chipSize(ctx, typer, size = 46) {
+    if (jaMode(typer)) { const L = jaLayout(ctx, typer, size); return { w: L.w, h: L.h }; }
     const font = FONT_WORD(size);
     let w = 0; for (const c of typer.chars) w += charW(ctx, font, c.c);
     return { w: w + size * 1.1, h: size * 1.55 };
@@ -129,6 +141,7 @@
     const size = o.size || 46, accent = o.accent || C.ink2;
     const font = FONT_WORD(size), fontB = FONT_WORD(size, 700);
     const { w, h } = chipSize(ctx, typer, size);
+    const JA = jaMode(typer) ? jaLayout(ctx, typer, size) : null;
     const sh = typer.shake > 0 ? Math.sin(typer.shake * 40) * 10 * typer.shake : 0;
     ctx.save();
     ctx.globalAlpha = o.alpha ?? 1;
@@ -139,6 +152,27 @@
     ctx.fillStyle = 'rgba(31,26,61,0.22)'; ctx.save(); ctx.translate(0, 6); ctx.fill(path); ctx.restore();
     ctx.fillStyle = o.dim ? '#F2EFF8' : '#fff'; ctx.fill(path);
     ctx.lineWidth = o.locked ? 7 : LW; ctx.strokeStyle = o.locked ? accent : C.ink; ctx.stroke(path);
+    if (JA) {
+      // Japanese meaning on top, blanks (+ hinted letters) underneath
+      const lv = TM.hint.level(typer), rev = TM.hint.revealed(typer, lv);
+      ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.font = FONT_JA(JA.hs); ctx.fillStyle = o.dim ? '#8C86A6' : C.ink; ctx.fillText(JA.text, 0, -h * 0.2);
+      let nxt = -1; for (let i = typer.pos; i < typer.chars.length; i++) if (!typer.chars[i].opt) { nxt = i; break; }
+      let x = -JA.sw / 2; const yb = h * 0.22, lf = FONT_WORD(size * 0.92, 700), lfl = FONT_WORD(size * 0.92, 500);
+      for (let i = 0; i < typer.chars.length; i++) {
+        const c = typer.chars[i];
+        if (c.k === ' ') { x += JA.sp; continue; }
+        if (c.opt) { ctx.font = lfl; ctx.fillStyle = 'rgba(31,26,61,0.4)'; ctx.fillText(c.c, x + JA.op / 2, yb - size * 0.02); x += JA.op; continue; }
+        const cxm = x + JA.cell / 2;
+        if (i < typer.pos) { ctx.font = lf; ctx.fillStyle = accent; ctx.fillText(c.c, cxm, yb - size * 0.08); }
+        else if (rev.has(i)) { ctx.font = lfl; ctx.fillStyle = i === nxt ? 'rgba(31,26,61,0.7)' : 'rgba(31,26,61,0.42)'; ctx.fillText(c.c, cxm, yb - size * 0.08); }
+        ctx.fillStyle = i === nxt ? accent : (i < typer.pos ? accent : 'rgba(31,26,61,0.5)');
+        ctx.fillRect(x + JA.cell * 0.1, yb + size * 0.34, JA.cell * 0.8, i === nxt ? size * 0.12 : size * 0.07);
+        x += JA.cell;
+      }
+      ctx.restore();
+      return { w: w * (o.scale || 1), h: h * (o.scale || 1) };
+    }
     // letters
     let cx = -w / 2 + size * 0.55;
     const base = size * 0.06;

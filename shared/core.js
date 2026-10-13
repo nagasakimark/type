@@ -55,10 +55,14 @@
     get(k, def) { const v = rawGet('tm.' + k); if (v == null) return def; try { return JSON.parse(v); } catch (e) { return def; } },
     set(k, v) { rawSet('tm.' + k, JSON.stringify(v)); },
   };
-  const DEFAULTS = { sfx: 0.8, music: 0.5, hints: 'auto', strict: false, reduceMotion: false, keyboard: false, shortOnly: false, difficulty: 'normal' };
+  const DEFAULTS = { sfx: 0.8, music: 0.5, hints: 'auto', strict: false, reduceMotion: false, keyboard: false, shortOnly: false, difficulty: 'normal', mode: 'en' };
   TM.settings = Object.assign({}, DEFAULTS, TM.store.get('settings', {}));
   if (U.qs('quiet') === '1') { TM.settings.music = 0; TM.settings.sfx = 0; }
   if (['gentle', 'normal', 'turbo'].includes(U.qs('diff'))) TM.settings.difficulty = U.qs('diff');   // teacher links can pick the mode (not saved)
+  if (['en', 'ja2en'].includes(U.qs('mode'))) TM.settings.mode = U.qs('mode');           // teacher links can pick the play mode (not saved)
+  /* Play mode: 'en' = type the English you see (default). 'ja2en' = you see the Japanese and type the English from memory;
+     the English shows only as blanks, with hints that grow when you are stuck (see TM.hint). */
+  TM.mode = () => (TM.settings.mode === 'ja2en' ? 'ja2en' : 'en');
   TM.saveSettings = () => TM.store.set('settings', TM.settings);
   try { if (window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches) TM.settings.reduceMotion = true; } catch (e) { /* ignore */ }
 
@@ -163,7 +167,7 @@
       u.searchParams.set('deck', ids.join(','));
       history.replaceState(null, '', u.toString());
     },
-    key(ids) { return (ids || this.ids()).slice().sort().join('+'); },
+    key(ids) { return (ids || this.ids()).slice().sort().join('+') + (TM.mode() === 'ja2en' ? '~jp' : ''); },   // records are kept per mode
     label(ids) {
       ids = ids || this.ids();
       if (!ids.length) return 'No words';
@@ -184,7 +188,9 @@
   function makeItem(t, ja, kana, kind) {
     const chars = TM.typedChars(t);
     const req = chars.filter((c) => !c.opt);
-    return { t, ja: ja || '', kana: kana || '', hint: kana || ja || '', kind, len: req.length, first: req.length ? req[0].k : '', words: t.trim().split(/\s+/).length };
+    // q = the question shown in Japanese -> English mode: the kana, plus the kanji when the kana is very short (ひ = 火? 日?)
+    const q = kana ? ((kana.length <= 2 && ja && ja !== kana) ? `${kana}（${ja}）` : kana) : (ja || '');
+    return { t, ja: ja || '', kana: kana || '', hint: kana || ja || '', q, kind, len: req.length, first: req.length ? req[0].k : '', words: t.trim().split(/\s+/).length };
   }
 
   // Build pools for the chosen decks
@@ -200,9 +206,14 @@
       }
       for (const s of d.sentences || []) if (!sset.has(s.t)) sset.set(s.t, makeItem(s.t, s.ja, '', 'sentence'));
     }
-    let words = [...wset.values()];
+    let words = [...wset.values()], sentences = [...sset.values()];
+    if (TM.mode() === 'ja2en') {     // every item needs Japanese to show; one English word per Japanese meaning, so the answer is unambiguous
+      const seen = new Set(), keep = words.filter((w) => { const q = w.q || w.hint; if (!q || seen.has(q)) return false; seen.add(q); return true; });
+      if (keep.length >= 4) words = keep;
+      const ks = sentences.filter((x) => x.hint); if (ks.length || !sentences.length) sentences = ks;
+    }
     if (TM.settings.shortOnly) { const short = words.filter((w) => w.len <= 4); if (short.length >= 4) words = short; }
-    return { words, sentences: [...sset.values()] };
+    return { words, sentences };
   };
 
   /* Dealer: hands out items without repeats until the pool runs dry.
@@ -261,6 +272,63 @@
     return { kind: 'sentence', maxLen: 99, tier: 3 };
   };
 
+  /* ---------- hints for the Japanese -> English mode ----------
+     A word's hint level (0..3) is the highest of: how long the player has gone without a correct key (all words on screen get it),
+     the Tab key / hint button (each press = one level, reset when a word is finished), and wrong keys on that very word.
+       0  blanks only (one per letter, so the length is known)      2  first letters + about every other letter
+       1  the next letter + the first letter of every word          3  the whole answer, shown faded (the word is then "helped")
+     Time is the game's own clock (TM.hint.tick), so pausing does not count. */
+  TM.hint = {
+    clock: 0, lastOk: 0, manual: 0, STEPS: [5, 9, 14], focus: null,
+    on() { const g = TM.current; return TM.mode() === 'ja2en' && !!g && !g.demo && g.state === 'play'; },
+    reset() { this.clock = 0; this.lastOk = 0; this.manual = 0; this.focus = null; },
+    tick(dt) { this.clock += dt; },
+    level(typer) {
+      const it = typer && typer.item;
+      if (TM.mode() !== 'ja2en' || !it || !it.hint) return 0;
+      const g = TM.current;
+      if (g && g.demo) return 3;                                       // the title-screen demo shows the answers
+      if (!g || g.state === 'over') return 3;
+      if (typer._seenAt == null) typer._seenAt = this.clock;           // a word's idle timer starts when it first appears
+      const idle = this.clock - Math.max(this.lastOk, typer._seenAt), S = this.STEPS;
+      const byTime = idle >= S[2] ? 3 : idle >= S[1] ? 2 : idle >= S[0] ? 1 : 0;
+      const e = typer.errors, byErr = e >= 6 ? 3 : e >= 4 ? 2 : e >= 2 ? 1 : 0;
+      return Math.max(byTime, byErr, this.manual);
+    },
+    typed(typer) { if (!this.on()) return; const lv = this.level(typer); if (lv > typer.assist) typer.assist = lv; this.lastOk = this.clock; this.focus = typer; },
+    finished() { this.manual = 0; },
+    boost() {                                                          // Tab / hint button
+      if (!this.on()) return;
+      const cur = this.level({ item: { hint: 'x' }, errors: this.focus ? this.focus.errors : 0 });
+      this.manual = Math.min(3, Math.max(this.manual, cur) + 1);
+      this.lastOk = this.clock;                                        // a press also restarts the idle timer so the next step is not instant
+      const t = this.focus; if (t && !t.done && this.manual >= 2) this.speak(t.item.t);
+      if (TM.sfx && TM.sfx.click) TM.sfx.click();
+    },
+    speak(text) {
+      try {
+        if (!window.speechSynthesis) return;
+        speechSynthesis.cancel();
+        const u = new SpeechSynthesisUtterance(text.replace(/\s*[.?!]+$/, '')); u.lang = 'en-US'; u.rate = 0.85; u.volume = Math.min(1, (TM.settings.sfx || 0.8) + 0.2);
+        speechSynthesis.speak(u);
+      } catch (e) { /* no speech available */ }
+    },
+    /* which character indices show their letter at this level (typed ones are always shown) */
+    revealed(typer, lv) {
+      const out = new Set(); if (lv <= 0) return out;
+      const ch = typer.chars; let nextIdx = -1, n = 0;
+      for (let i = typer.pos; i < ch.length; i++) if (!ch[i].opt) { nextIdx = i; break; }
+      for (let i = typer.pos; i < ch.length; i++) {
+        const c = ch[i]; if (c.opt) continue;
+        const wordStart = i === 0 || ch[i - 1].k === ' ';
+        if (lv >= 3) out.add(i);
+        else if (i === nextIdx || wordStart) out.add(i);
+        else if (lv >= 2 && (n++ % 2 === 1)) out.add(i);
+      }
+      return out;
+    },
+  };
+
   /* ---------- typing ---------- */
   class Typer {
     constructor(item) {
@@ -272,6 +340,7 @@
       this.started = 0;
       this.done = this.chars.every((c) => c.opt);
       this.shake = 0;
+      this.assist = 0;        // highest hint level showing while a correct key was typed (ja2en mode); >= 2 means the word was helped
     }
     nextReq() { for (let i = this.pos; i < this.chars.length; i++) if (!this.chars[i].opt) return this.chars[i].k; return null; }
     wouldAccept(k) {
@@ -287,9 +356,10 @@
       for (let i = this.pos; i < this.chars.length; i++) {
         if (this.chars[i].k === k) {
           this.pos = i + 1;
+          TM.hint.typed(this);
           let rest = true;
           for (let j = this.pos; j < this.chars.length; j++) if (!this.chars[j].opt) { rest = false; break; }
-          if (rest) { this.pos = this.chars.length; this.done = true; return 'done'; }
+          if (rest) { this.pos = this.chars.length; this.done = true; TM.hint.finished(); return 'done'; }
           return 'ok';
         }
         if (!this.chars[i].opt) break;

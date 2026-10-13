@@ -657,6 +657,7 @@
     if (lay.lines.length > 2) { size = 58; lay = layoutChunk(ctx, t, pw - 130, size); }
     const lh = size * 1.28, textH = lay.lines.length * lh;
     const hasHint = g.hint && t.item.hint;
+    const jp = TM.mode() === 'ja2en' && t.item.hint, hLv = jp ? TM.hint.level(t) : 0, hRev = jp ? TM.hint.revealed(t, hLv) : null;   // Japanese -> English mode: letters are blanks until hinted
     const ph = textH + 70 + (hasHint ? 0 : 0), top = bottom - ph;
     const shake = t.shake > 0 ? Math.sin(t.shake * 50) * 14 * t.shake : 0;
     ctx.save(); ctx.translate(shake, 0);
@@ -670,6 +671,12 @@
       const hs = 36; ctx.font = D.FONT_JA(hs); const hw = ctx.measureText(t.item.hint).width + 56;
       const hx = cx + pw / 2 - 36 - hw; D.pill(ctx, hx, top - 28, hw, 56, '#fff', { stroke: C.ink, lw: 5 });
       ctx.fillStyle = C.ink; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(t.item.hint, hx + hw / 2, top + 1);
+    }
+    if (jp) {   // the Japanese meaning, big, centred above the panel
+      const jq = t.item.q || t.item.hint; let hs = 50; ctx.font = D.FONT_JA(hs); const maxW = pw - 420; let hw0 = ctx.measureText(jq).width;
+      if (hw0 > maxW) { hs = Math.max(26, Math.floor(hs * maxW / hw0)); ctx.font = D.FONT_JA(hs); hw0 = ctx.measureText(jq).width; }
+      const hw = hw0 + 64, hx = cx - hw / 2; D.pill(ctx, hx, top - 84, hw, 70, '#fff', { stroke: C.ink, lw: 6 });
+      ctx.fillStyle = C.ink; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(jq, cx, top - 47);
     }
     // text lines
     let nextIdx = -1; for (let i = t.pos; i < t.chars.length; i++) if (!t.chars[i].opt) { nextIdx = i; break; }
@@ -685,13 +692,14 @@
         ctx.font = fontB; ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
         if (done) ctx.fillStyle = C.turbo; else if (cur) ctx.fillStyle = C.ink; else ctx.fillStyle = q.c.opt ? 'rgba(255,255,255,0.4)' : '#fff';
         if (q.c.k === ' ') { if (cur) { ctx.strokeStyle = C.ink; ctx.lineWidth = 6; ctx.lineCap = 'round'; ctx.beginPath(); ctx.moveTo(x + 2, y - 4); ctx.lineTo(x + 2, y + 8); ctx.lineTo(x + q.w - 4, y + 8); ctx.lineTo(x + q.w - 4, y - 4); ctx.stroke(); } else if (!done) { ctx.strokeStyle = 'rgba(255,255,255,0.35)'; ctx.lineWidth = 4; ctx.beginPath(); ctx.moveTo(x + 4, y + 8); ctx.lineTo(x + q.w - 6, y + 8); ctx.stroke(); } }
-        else ctx.fillText(q.c.c, x, y + 3);
+        else if (jp && !done && !q.c.opt && !hRev.has(q.i)) { ctx.fillStyle = cur ? C.ink : 'rgba(255,255,255,0.55)'; ctx.fillRect(x + q.w * 0.12, y + size * 0.36, q.w * 0.7, Math.max(5, size * 0.06)); }
+        else { if (jp && !done && !cur && !q.c.opt) ctx.fillStyle = 'rgba(255,255,255,0.5)'; ctx.fillText(q.c.c, x, y + 3); }
         x += q.w;
       }
     });
     // next chunk preview
     const n = S.queue[1];
-    if (n) { ctx.font = D.FONT_WORD(30, 500); ctx.fillStyle = 'rgba(255,255,255,0.55)'; ctx.textAlign = 'right'; ctx.textBaseline = 'middle'; ctx.fillText('つぎ: ' + (n.item.t.length > 38 ? n.item.t.slice(0, 36) + '...' : n.item.t), cx + pw / 2 - 40, top + ph + 22); }
+    if (n) { ctx.font = D.FONT_WORD(30, 500); ctx.fillStyle = 'rgba(255,255,255,0.55)'; ctx.textAlign = 'right'; ctx.textBaseline = 'middle'; ctx.fillText('つぎ: ' + (jp && n.item.hint ? (n.item.q || n.item.hint) : (n.item.t.length > 38 ? n.item.t.slice(0, 36) + '...' : n.item.t)), cx + pw / 2 - 40, top + ph + 22); }
     ctx.restore();
     S.panelTop = top;
   }

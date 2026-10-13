@@ -33,13 +33,31 @@ LEVELS = {
 # Tile background for decks that have no picture (matches each cover)
 TINTS = {1: "#BFE8AE", 2: "#F9C1B0", 3: "#AEDAF6"}
 
+# Unit titles of the 2025 (令和7年度) editions, as printed in the textbooks. Sources (two independent sites that cover the 2025
+# editions, cross-checked): memekeblog.com "NEW HORIZON English Course 1/2/3 2025年教科書改訂版" and eigo-duke.com (2025年度).
+# NOT the 2021-2024 editions (those have e.g. NH2 "A Trip to Singapore", NH1 Units 0-11). The unit counts match the database (NH1 0-10, NH2 0-7, NH3 0-6).
+UNIT_TITLES = {
+    1: {0: "Nice to Meet You", 1: "Hello, Everyone", 2: "Our New Teacher", 3: "Our School", 4: "Friends in New Zealand",
+        5: "My Brother in Hawaii", 6: "A Rakugo Performer from the U.K.", 7: "An Online Tour of the U.K.",
+        8: "Think Globally, Act Locally", 9: "Winter Vacation", 10: "This Year's Memories"},
+    2: {0: "My Spring Vacation", 1: "What can we experience on a trip?", 2: "What is local food?",
+        3: "What kind of job are you interested in?", 4: "What is important in a homestay?",
+        5: "What design is good for everyone?", 6: "How can we make a good presentation?",
+        7: "What are World Heritage sites and their problems?"},
+    3: {0: "Discover a New Side of Classmates", 1: "What is special about Japanese pop culture?", 2: "How do you choose your clothes?",
+        3: "How can we save animals?", 4: "How can we help each other in a disaster?", 5: "What makes a good leader?",
+        6: "What does it mean to be a global citizen?"},
+}
+# Short tag shown on picture-less tiles
+ABBR = {"sal": "SaL", "gfc": "GfC", "sa": "SA", "lr": "LR", "rle": "RLE", "wr": "WR", "plus": "＋"}
+
 # Parts of the book that are not numbered units. code prefix -> (deck suffix, label, Japanese title)
 EXTRAS = [
     ("SaL", "sal", "Sounds & Letters", "おとと もじ"),
     ("GfC", "gfc", "GfC", "ぶんぽう"),
     ("SA", "sa", "Stage Activity", "ステージ アクティビティ"),
     ("LR", "lr", "Let's Read", "よみもの"),
-    ("RLE", "rle", "RLE", "よみもの プラス"),
+    ("RLE", "rle", "Real-life English", ""),
     ("WR", "wr", "Word Room", "ワード ルーム"),
 ]
 EXTRA_PLUS = ("plus", "Plus", "プラス")   # sheet ③: words that are not in the text's Word List
@@ -73,7 +91,7 @@ def section_of(code, grade):
     m = re.match(r"U(\d+)(?:-|$)", code)
     if m:
         n = int(m.group(1))
-        return f"u{n}", f"Unit {n}", "", n
+        return f"u{n}", f"Unit {n}", UNIT_TITLES.get(grade, {}).get(n, ""), n
     for pre, suf, label, title in EXTRAS:
         if code.startswith(pre):
             return suf, label, title, None
@@ -107,7 +125,7 @@ def add_jhs(out, report, path=XLSX):
         did = f"{bid}-{suf}"
         if did not in per[grade]:
             per[grade][did] = {"id": did, "book": bid, "unit": unit, "label": label, "title": title,
-                               "image": "", "words": [], "sentences": [], "_s": set()}
+                               "image": "", "abbr": ABBR.get(suf, ""), "words": [], "sentences": [], "_s": set()}
         return per[grade][did]
 
     def put(d, text, ja, original):

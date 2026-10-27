@@ -133,7 +133,7 @@
   if (!still) {
     typed.textContent = ''; let n = 0;
     const mascot = document.getElementById('mascot');
-    const tick = () => { typed.textContent = full.slice(0, ++n); try { mascot.animate([{ transform: 'none' }, { transform: 'translateY(4px) scale(1.04,.95)' }, { transform: 'none' }], { duration: 110 }); } catch (e) { /* no web animations */ } if (n < full.length) setTimeout(tick, 55 + Math.random() * 60); };
+    const tick = () => { typed.textContent = full.slice(0, ++n); try { document.getElementById(n % 2 ? 'pawL' : 'pawR').animate([{ transform: 'none' }, { transform: 'translateY(4px) scale(1.06,.9)' }, { transform: 'none' }], { duration: 120 }); } catch (e) { /* no web animations */ } if (n < full.length) setTimeout(tick, 55 + Math.random() * 60); };
     setTimeout(tick, 350);
   } else caret.remove();
   caret.addEventListener('animationend', () => caret.remove());

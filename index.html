@@ -7,107 +7,80 @@
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect x='8' y='8' width='84' height='84' rx='22' fill='%23FFF8EC' stroke='%231F1A3D' stroke-width='8'/%3E%3Ccircle cx='38' cy='46' r='7' fill='%231F1A3D'/%3E%3Ccircle cx='62' cy='46' r='7' fill='%231F1A3D'/%3E%3Cpath d='M38 64q12 10 24 0' stroke='%231F1A3D' stroke-width='6' fill='none' stroke-linecap='round'/%3E%3C/svg%3E">
 <link rel="stylesheet" href="shared/tm.css">
 <style>
-  /* Home page. A flat, light "keyboard deck": white keys, one ink colour, and each game's own colour only on its key. */
-  :root { --deck: #E3E7ED; --key: #fff; --mute: #4A5169; --line: rgba(21,26,44,.16); --ink: #151A2C; }
+  /* Home page: a chalkboard. Deep board green, chalk-white type, and the games' own screenshots as the only colour. */
+  :root { --board: #1D2B28; --board2: #293B37; --chalk: #EEF1E8; --dust: #A5B7AE; --line: rgba(238,241,232,.18); --star: #F2C14E; }
   html, body { overflow: auto; height: auto; min-height: 100%; }
-  body { background: var(--deck); color: var(--ink); -webkit-user-select: auto; user-select: auto; }
+  body { background: var(--board); color: var(--chalk); -webkit-user-select: auto; user-select: auto; }
   button { font: inherit; color: inherit; }
-  .page { max-width: 1440px; margin: 0 auto; padding: 28px clamp(16px, 4vw, 56px) 56px; }
+  :focus-visible { outline: 3px solid var(--chalk); outline-offset: 3px; }
+  .page { max-width: 1600px; margin: 0 auto; padding: 28px clamp(16px, 4vw, 56px) 56px; }
 
-  .top { display: flex; align-items: center; justify-content: space-between; gap: 12px 24px; flex-wrap: wrap; }
-  .brand { display: flex; align-items: center; gap: 16px; }
-  .brand canvas { width: 76px; height: 76px; flex: none; }
-  h1 { margin: 0; font: 700 clamp(40px, 5vw, 66px)/1 var(--word); letter-spacing: -.035em; white-space: nowrap; }
-  .caret { display: inline-block; width: .08em; height: .82em; margin-left: .07em; vertical-align: -.06em; background: var(--ink); animation: caret 1s steps(1) 4 forwards; }
+  .top { display: flex; align-items: baseline; justify-content: space-between; gap: 8px 24px; flex-wrap: wrap; }
+  h1 { margin: 0; font: 700 clamp(40px, 5vw, 66px)/1.05 var(--word); letter-spacing: -.035em; white-space: nowrap; }
+  .caret { display: inline-block; width: .08em; height: .8em; margin-left: .07em; vertical-align: -.05em; background: var(--chalk); animation: caret 1s steps(1) 4 forwards; }
   @keyframes caret { 0%, 100% { opacity: 1; } 50% { opacity: 0; } }
   .util { display: flex; gap: 4px; flex-wrap: wrap; }
-  .util button { font: 700 18px var(--word); background: none; border: 0; border-radius: 10px; padding: 10px 14px; cursor: pointer; }
-  .util button:hover { background: rgba(21,26,44,.09); }
-  :focus-visible { outline: 3px solid var(--ink); outline-offset: 3px; }
+  .util button { font: 700 18px var(--word); background: none; border: 0; border-radius: 10px; padding: 10px 14px; cursor: pointer; color: var(--dust); }
+  .util button:hover { background: rgba(238,241,232,.1); color: var(--chalk); }
 
-  .layout { display: grid; grid-template-columns: minmax(300px, 370px) 1fr; gap: clamp(32px, 5vw, 80px); margin-top: 30px; align-items: start; }
-  .setup { position: sticky; top: 28px; display: flex; flex-direction: column; gap: 32px; }
-  h2 { margin: 0 0 12px; font: 700 22px/1.2 var(--word); }
-  .sub { margin: -6px 0 14px; font: 500 16px/1.5 var(--word); color: var(--mute); }
-
-  .words { display: flex; flex-wrap: wrap; align-items: center; gap: 14px; width: 100%; padding: 12px; text-align: left; background: var(--key); border: 0; border-radius: 16px; cursor: pointer; }
-  .words:hover { box-shadow: 0 0 0 3px var(--ink); }
-  .words .cover { flex: none; height: 84px; aspect-ratio: 341 / 480; border-radius: 6px; overflow: hidden; background: #fff; box-shadow: 0 0 0 1px var(--line); display: flex; }
-  .words .thumb { flex: none; height: 84px; aspect-ratio: 1; border-radius: 10px; overflow: hidden; background: #F1F3F7; box-shadow: 0 0 0 1px var(--line); display: flex; }
+  .setup { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 16px 40px; margin-top: 26px; padding: 14px 16px; background: var(--board2); border-radius: 16px; }
+  .words { display: flex; align-items: center; gap: 14px; min-width: 0; padding: 0; background: none; border: 0; text-align: left; cursor: pointer; border-radius: 12px; }
+  .words .cover { flex: none; height: 72px; aspect-ratio: 341 / 480; border-radius: 5px; overflow: hidden; background: #fff; display: flex; }
+  .words .thumb { flex: none; height: 72px; aspect-ratio: 1; border-radius: 9px; overflow: hidden; background: #F1F3F7; display: flex; }
   .words img { width: 100%; height: 100%; object-fit: contain; }
-  .words .txt { flex: 1 1 120px; min-width: 0; display: flex; flex-direction: column; gap: 4px; }
-  .words .v { font: 700 22px/1.2 var(--word); overflow-wrap: anywhere; }
-  .words .m { font: 500 15px/1.4 var(--word); color: var(--mute); }
-  .words .chg { flex: 1 1 100%; text-align: center; font: 700 17px var(--word); background: var(--ink); color: #fff; border-radius: 10px; padding: 10px 14px; }
+  .words .txt { min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+  .words .v { font: 700 24px/1.2 var(--word); overflow-wrap: anywhere; }
+  .words .m { font: 500 15px/1.4 var(--word); color: var(--dust); }
+  .words .chg { flex: none; font: 700 16px var(--word); color: var(--board); background: var(--chalk); border-radius: 10px; padding: 9px 16px; margin-left: 6px; }
+  .words:hover .chg { background: #fff; }
+  .mode { display: flex; gap: 6px; }
+  .mode button { display: flex; flex-direction: column; gap: 1px; text-align: left; padding: 9px 16px; background: none; border: 2px solid var(--line); border-radius: 12px; cursor: pointer; }
+  .mode button b { font: 700 18px/1.3 var(--word); }
+  .mode button span { font: 500 14px/1.4 var(--word); color: var(--dust); }
+  .mode button:hover { border-color: var(--chalk); }
+  .mode button.on { background: var(--chalk); border-color: var(--chalk); color: var(--board); }
+  .mode button.on span { color: #4B5A54; }
 
-  .mode { display: flex; flex-direction: column; gap: 8px; }
-  .mode button { display: flex; flex-direction: column; gap: 2px; text-align: left; padding: 12px 16px; background: none; border: 2px solid var(--line); border-radius: 14px; cursor: pointer; }
-  .mode button b { font: 700 19px/1.3 var(--word); }
-  .mode button span { font: 500 15px/1.4 var(--word); color: var(--mute); }
-  .mode button:hover { border-color: var(--ink); }
-  .mode button.on { background: var(--ink); border-color: var(--ink); color: #fff; }
-  .mode button.on span { color: rgba(255,255,255,.78); }
-
-  .games { display: flex; flex-direction: column; gap: 8px; }
-  .game { display: grid; grid-template-columns: 64px 176px minmax(0, 1fr) auto; align-items: center; gap: 22px; padding: 8px 22px 8px 14px; border-radius: 20px; color: inherit; text-decoration: none; transition: background .12s; }
-  .game:hover, .game:focus-visible { background: var(--key); outline-offset: 0; }
-  .game:focus-visible { outline: 3px solid var(--ink); }
-  .key { width: 64px; height: 64px; border-radius: 14px; background: var(--c); color: var(--ink); font: 700 34px/64px var(--word); text-align: center; box-shadow: 0 6px 0 rgba(21,26,44,.45); transition: transform .08s, box-shadow .08s; }
-  .game:hover .key, .game:focus-visible .key { transform: translateY(-2px); box-shadow: 0 8px 0 rgba(21,26,44,.45); }
-  .game:active .key, .game.down .key { transform: translateY(5px); box-shadow: 0 1px 0 rgba(21,26,44,.45); }
-  .shot { aspect-ratio: 16 / 9; border-radius: 8px; overflow: hidden; background: var(--c); box-shadow: 0 0 0 1px var(--line); }
-  .shot img { display: block; width: 100%; height: 100%; object-fit: cover; }
-  .game h3 { margin: 0 0 4px; font: 700 26px/1.15 var(--word); letter-spacing: -.01em; }
-  .game h3 small { margin-left: 10px; font: 500 15px var(--word); letter-spacing: 0; color: var(--mute); }
-  .game p { margin: 0; font: 500 16px/1.5 var(--word); color: var(--mute); }
-  .stars { display: flex; gap: 3px; }
-  .stars svg { width: 24px; height: 24px; }
-
-  .foot { margin-top: 44px; font: 500 14px/1.5 var(--word); color: var(--mute); }
+  .games { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 380px), 1fr)); gap: 34px clamp(16px, 2vw, 28px); margin-top: 34px; }
+  .game { display: block; color: inherit; text-decoration: none; transition: opacity .15s; }
+  .games:hover .game:not(:hover) { opacity: .5; }
+  .shot { display: block; aspect-ratio: 16 / 9; border-radius: 10px; overflow: hidden; background: var(--board2); }
+  .shot img { display: block; width: 100%; height: 100%; object-fit: cover; transition: transform .3s; }
+  .game:hover .shot img, .game:focus-visible .shot img { transform: scale(1.04); }
+  .game:focus-visible { outline-offset: 6px; border-radius: 6px; }
+  .meta { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin-top: 12px; }
+  .game h3 { margin: 0; font: 700 clamp(24px, 1.9vw, 30px)/1.15 var(--word); letter-spacing: -.01em; }
+  .stars { display: flex; gap: 2px; flex: none; align-self: center; }
+  .stars svg { width: 20px; height: 20px; }
+  .game p { margin: 5px 0 0; font: 500 16px/1.5 var(--word); color: var(--dust); max-width: 46ch; }
+  .foot { margin-top: 48px; font: 500 14px/1.5 var(--word); color: var(--dust); }
 
   .linkbox { display: flex; gap: 10px; align-items: center; }
-  .linkbox input { flex: 1; min-width: 0; font: 500 16px var(--word); padding: 12px 14px; border: 4px solid var(--ink); border-radius: 14px; }
-  .tm-small select { font: 700 18px var(--word); padding: 8px 10px; border: 4px solid var(--ink); border-radius: 12px; background: #fff; }
+  .linkbox input { flex: 1; min-width: 0; font: 500 16px var(--word); padding: 12px 14px; border: 4px solid #1F1A3D; border-radius: 14px; }
+  .tm-small select { font: 700 18px var(--word); padding: 8px 10px; border: 4px solid #1F1A3D; border-radius: 12px; background: #fff; }
 
-  @media (max-width: 1100px) {
-    .layout { grid-template-columns: 1fr; margin-top: 32px; }
-    .setup { position: static; display: grid; grid-template-columns: 1fr 1fr; gap: 28px; }
-  }
   @media (max-width: 720px) {
-    .setup { grid-template-columns: 1fr; }
-    .brand canvas { width: 56px; height: 56px; }
-    .game { grid-template-columns: 56px minmax(0, 1fr); gap: 4px 16px; padding: 10px 10px 14px; align-items: start; }
-    .key { width: 56px; height: 56px; font-size: 30px; line-height: 56px; }
-    .shot { display: none; }
-    .game .txt { grid-column: 2; }
-    .game .stars { grid-column: 2; }
-    .words { flex-wrap: nowrap; }
-    .words .chg { flex: none; padding: 8px 14px; }
-    .game h3 small { display: block; margin: 2px 0 0; }
+    .setup { gap: 16px; }
+    .words .cover, .words .thumb { height: 56px; }
     .words .m { display: none; }
-    .words .cover, .words .thumb { height: 64px; }
+    .mode { width: 100%; flex-direction: column; }
+    .games:hover .game:not(:hover) { opacity: 1; }
   }
-  @media (prefers-reduced-motion: reduce) { .caret { animation: none; } .key, .game { transition: none; } }
+  @media (prefers-reduced-motion: reduce) { .caret { animation: none; } .game, .shot img { transition: none; } .game:hover .shot img { transform: none; } }
 </style>
 </head>
 <body>
 <div class="page">
   <header class="top">
-    <div class="brand"><canvas id="kip" width="240" height="240" aria-hidden="true"></canvas><h1 id="title" aria-label="Typing Master"><span id="typed" aria-hidden="true">Typing Master</span><span class="caret" id="caret" aria-hidden="true"></span></h1></div>
+    <h1 id="title" aria-label="Typing Master"><span id="typed" aria-hidden="true">Typing Master</span><span class="caret" id="caret" aria-hidden="true"></span></h1>
     <nav class="util" id="controls" aria-label="メニュー"></nav>
   </header>
-  <div class="layout">
-    <section class="setup" aria-label="せってい">
-      <div><h2>たんご</h2><button class="words" id="words" type="button" aria-label="たんごを えらぶ"></button></div>
-      <div><h2>あそびかた</h2><div class="mode" id="mode" role="group" aria-label="あそびかた"></div></div>
-    </section>
-    <main>
-      <h2>ゲーム</h2>
-      <p class="sub">キーボードで ゲームの もじを おしても はじまるよ。</p>
-      <div class="games" id="grid"></div>
-      <div class="foot">きろくは この コンピューターに だけ ほぞんされます。</div>
-    </main>
-  </div>
+  <section class="setup" aria-label="せってい">
+    <button class="words" id="words" type="button" aria-label="たんごを えらぶ"></button>
+    <div class="mode" id="mode" role="group" aria-label="あそびかた"></div>
+  </section>
+  <main class="games" id="grid" aria-label="ゲーム"></main>
+  <div class="foot">きろくは この コンピューターに だけ ほぞんされます。</div>
 </div>
 <script src="data/words.js"></script>
 <script src="shared/core.js"></script>

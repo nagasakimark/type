@@ -61,22 +61,12 @@
   const grid = document.getElementById('grid');
   const cabs = GAMES.map((gm) => {
     const stars = el('div', { class: 'stars' });
-    const a = el('a', { class: 'game', href: gm.id + '/index.html', 'aria-keyshortcuts': gm.key },
-      el('span', { class: 'key', 'aria-hidden': 'true' }, gm.key),
+    const a = el('a', { class: 'game', href: gm.id + '/index.html' },
       el('span', { class: 'shot' }, el('img', { src: 'assets/hub/' + gm.id + '.webp', alt: '', loading: 'lazy', width: 960, height: 540 })),
-      el('span', { class: 'txt' }, el('h3', {}, gm.name, gm.first ? el('small', {}, 'はじめてなら これ') : null), el('p', {}, gm.desc)),
-      stars);
-    a.style.setProperty('--c', gm.c);
+      el('span', { class: 'meta' }, el('h3', {}, gm.name), stars),
+      el('p', {}, gm.desc));
     grid.append(a);
     return { gm, a, stars };
-  });
-  /* press a game's letter to start it (the key sinks first) */
-  document.addEventListener('keydown', (e) => {
-    if (e.ctrlKey || e.metaKey || e.altKey || e.repeat || TM.ui.isModalOpen()) return;
-    const t = e.target; if (t && /^(INPUT|SELECT|TEXTAREA)$/.test(t.tagName)) return;
-    const c = cabs.find((x) => x.gm.key.toLowerCase() === e.key.toLowerCase()); if (!c) return;
-    e.preventDefault(); c.a.classList.add('down'); try { TM.sfx.click(); } catch (err) { /* audio locked */ }
-    setTimeout(() => { location.href = c.a.href; }, 170);
   });
 
   function refresh() {
@@ -96,7 +86,7 @@
     for (const c of cabs) {
       c.a.href = c.gm.id + '/index.html' + q;
       const s = TM.records.starsFor(c.gm.id, key);
-      c.stars.innerHTML = [0, 1, 2].map((i) => TM.ui.starSVG(i < s ? '#F2A900' : 'rgba(21,26,44,0.16)')).join('');
+      c.stars.innerHTML = [0, 1, 2].map((i) => `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.8l2.8 6 6.5.8-4.8 4.5 1.3 6.5L12 17.4l-5.8 3.2 1.3-6.5-4.8-4.5 6.5-.8z" fill="${i < s ? '#F2C14E' : 'none'}" stroke="${i < s ? '#F2C14E' : 'rgba(238,241,232,.4)'}" stroke-width="1.6" stroke-linejoin="round"/></svg>`).join('');
     }
   }
 
@@ -137,16 +127,7 @@
     const m = TM.ui.modal(card);
   }
 
-  /* ---------- mascot ---------- */
-  const kipC = document.getElementById('kip').getContext('2d');
   const still = matchMedia('(prefers-reduced-motion: reduce)').matches || TM.settings.reduceMotion;
-  let t0 = performance.now();
-  function frame(now) {
-    const t = (now - t0) / 1000;
-    kipC.clearRect(0, 0, 240, 240);
-    A.kip(kipC, 120, 132, 1.6, { t, wave: true, accent: C.gold });
-    if (!still) requestAnimationFrame(frame);
-  }
   /* the title types itself once; the caret blinks a few times and goes */
   const typed = document.getElementById('typed'), caret = document.getElementById('caret'), full = typed.textContent;
   if (!still) {
@@ -156,6 +137,4 @@
   } else caret.remove();
   caret.addEventListener('animationend', () => caret.remove());
   refresh();
-  const ready = document.fonts ? Promise.race([document.fonts.load(D.FONT_WORD(30)), new Promise((r) => setTimeout(r, 1200))]) : Promise.resolve();
-  ready.then(() => requestAnimationFrame(frame));
 })();

@@ -89,9 +89,7 @@ Owner: a 3rd-year JHS student struggled on the race and wanted to give up; stude
 - Ideas not done: per-student history for Turbo's rival ghost; teacher view of class stats (stats are per browser only).
 
 ## Homepage redesign (2026-10-27)
-Owner: the arcade page "looks exactly how AI styles every website"; the title/ARCADE lockup reads badly and is convoluted.
-- index.html is now a flat light "keyboard deck" (#E3E7ED, white keys, ink #151A2C, Lexend + the bundled Japanese font). No gradients, no stroked/outlined type, no card grid, no ARCADE label, no 1./2. instruction line.
-- Left column (sticky on desktop): たんご (cover + deck + かえる) and あそびかた (two radio-like options with a plain explanation). Right: the six games as rows. Each game has a keycap in its own colour with its first letter (J N S T I C); pressing that letter on the home page starts the game (hub.js keydown handler, key sinks 170 ms first; ignored with a modal open or inside inputs).
-- きろく / 先生用 QR / せってい are plain text buttons top right. Footer lost the (outdated) book list.
-- The title types itself once on load (reduced motion: static) and the caret blinks 4 times then removes itself.
-- `GAMES[].key` in hub.js is the shortcut; the `tag`/`like` chips are gone (only Word Jumper keeps "はじめてなら これ").
+Owner: the original arcade page "looks exactly how AI styles every website" and the ARCADE title was convoluted. First attempt (light page, keycap letters, mascot) was rejected: "I liked the grid of games with larger thumbnails and the darker theme. Just less generic. The mascot sucks, so do the letter logos."
+- index.html is now a chalkboard: board green #1D2B28, chalk white type, dust #A5B7AE for secondary text, gold stars. No mascot, no letter keys, no cards, no outlines or shadows. Lexend only (Japanese from the bundled M PLUS Rounded).
+- Layout: title (types itself once, caret blinks 4x then goes; static with reduced motion) + text links きろく / 先生用 QR / せってい; one slim setup bar (current deck with かえる, two あそびかた options); then a grid of large 16:9 screenshots, name + stars + one line under each. Hovering a game dims the others (not on phones).
+- hub.js: GAMES entries no longer have tag/like; Kip mascot canvas code removed from the hub (Kip is still used inside the games).

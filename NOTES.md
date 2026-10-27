@@ -87,3 +87,11 @@ Owner: a 3rd-year JHS student struggled on the race and wanted to give up; stude
 - Results screen: "きょうの せいちょう" box (`TM.coach.finish`): faster / fewer mistakes / more words / personal best / learned a hard word / mastered (3 clean in a row) / streak / always something encouraging, plus a small next goal. Hub button "📈 きろく" shows streak, mastered words, tricky words and a 7-day bar chart.
 - Balance harness: `tools/balance.py games diffs skills [wall] [speed] [deck]` plays whole games with the dev bot (cps:err:think). Before: Ninja normal weak lost in 35 s, Jumper weak lost at stage 4. After: weak/mid/strong bots finish Ninja on both Gentle and Normal.
 - Ideas not done: per-student history for Turbo's rival ghost; teacher view of class stats (stats are per browser only).
+
+## Homepage redesign (2026-10-27)
+Owner: the arcade page "looks exactly how AI styles every website"; the title/ARCADE lockup reads badly and is convoluted.
+- index.html is now a flat light "keyboard deck" (#E3E7ED, white keys, ink #151A2C, Lexend + the bundled Japanese font). No gradients, no stroked/outlined type, no card grid, no ARCADE label, no 1./2. instruction line.
+- Left column (sticky on desktop): たんご (cover + deck + かえる) and あそびかた (two radio-like options with a plain explanation). Right: the six games as rows. Each game has a keycap in its own colour with its first letter (J N S T I C); pressing that letter on the home page starts the game (hub.js keydown handler, key sinks 170 ms first; ignored with a modal open or inside inputs).
+- きろく / 先生用 QR / せってい are plain text buttons top right. Footer lost the (outdated) book list.
+- The title types itself once on load (reduced motion: static) and the caret blinks 4 times then removes itself.
+- `GAMES[].key` in hub.js is the shortcut; the `tag`/`like` chips are gone (only Word Jumper keeps "はじめてなら これ").

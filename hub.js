@@ -4,35 +4,34 @@
   const TM = window.TM, C = TM.C, D = TM.draw, A = TM.art, el = TM.ui.el;
 
   const GAMES = [
-    { id: 'word-jumper', name: 'Word Jumper', c: C.jumper, tag: 'まずは これ！', like: 'アクションゲーム',
+    { id: 'word-jumper', key: 'J', name: 'Word Jumper', c: C.jumper, first: true,
       desc: 'カエルの ピップが ジャンプ！ ことばを うって きや すなのおしろを とびこえよう。' },
-    { id: 'word-ninja', name: 'Word Ninja', c: C.ninja, tag: 'たべもの！', like: 'フルーツ ニンジャ',
+    { id: 'word-ninja', key: 'N', name: 'Word Ninja', c: C.ninja,
       desc: 'とんでくる フルーツの ことばを うって おちるまえに スパッと きろう。' },
-    { id: 'star-sweep', name: 'Star Sweep', c: C.sweep, tag: 'うちゅう！', like: 'シューティング',
+    { id: 'star-sweep', key: 'S', name: 'Star Sweep', c: C.sweep,
       desc: 'ステーションに つくまえに うちゅうの ゴミを ビームで きれいにしよう。' },
-    { id: 'turbo-type', name: 'Turbo Type', c: C.turbo, tag: 'レース！', like: 'タイピング レース',
+    { id: 'turbo-type', key: 'T', name: 'Turbo Type', c: C.turbo,
       desc: 'タイプした ぶんだけ カートが はやく なる！ ライバル 3だいと ゴーストに かとう。' },
-    { id: 'ink-rush', name: 'Ink Rush', c: C.ink2, tag: 'ベチャッ！', like: 'インク シューティング',
+    { id: 'ink-rush', key: 'I', name: 'Ink Rush', c: C.ink2,
       desc: 'ねむそうな はいいろの グルーに インクを ぶつけて まちじゅうを ぬろう。' },
-    { id: 'cat-defense', name: 'Cat Defenders', c: '#FF9F1C', tag: 'ニャンコ！', like: 'タワー ディフェンス',
+    { id: 'cat-defense', key: 'C', name: 'Cat Defenders', c: '#FF9F1C',
       desc: 'ゾンビが かべに くるまえに ことばを うとう！ ネコが バンバン こうげき。ネコを あわせて つよくしよう。' },
   ];
 
   /* ---------- header controls ---------- */
   const openPicker = () => TM.ui.picker('', () => { refresh(); });
   const modeBtns = {};
-  const modeSeg = el('div', { class: 'tm-seg tm-modeseg', title: 'あそびかた', role: 'group', 'aria-label': 'モード' });
-  for (const [v, label] of [['en', 'えいごを タイプ'], ['ja2en', 'にほんご → えいご']]) {
-    const b = el('button', { 'aria-pressed': 'false', onclick: () => { TM.settings.mode = v; TM.saveSettings(); TM.sfx && TM.sfx.click(); syncMode(); refresh(); } }, label);
-    modeBtns[v] = b; modeSeg.append(b);
+  const modeBox = document.getElementById('mode');
+  for (const [v, label, hint] of [['en', 'えいごを タイプ', 'えいごを みて うつ'], ['ja2en', 'にほんご → えいご', 'にほんごを みて えいごを おもいだして うつ']]) {
+    const b = el('button', { type: 'button', 'aria-pressed': 'false', onclick: () => { TM.settings.mode = v; TM.saveSettings(); TM.sfx && TM.sfx.click(); syncMode(); refresh(); } }, el('b', {}, label), el('span', {}, hint));
+    modeBtns[v] = b; modeBox.append(b);
   }
   function syncMode() { for (const k in modeBtns) { modeBtns[k].classList.toggle('on', k === TM.mode()); modeBtns[k].setAttribute('aria-pressed', k === TM.mode() ? 'true' : 'false'); } }
   syncMode();
   document.getElementById('controls').append(
-    modeSeg,
-    el('button', { class: 'tm-btn', onclick: progress }, '📈 きろく'),
-    el('button', { class: 'tm-btn', onclick: teacher }, '先生用 QR'),
-    el('button', { class: 'tm-btn icon', title: 'せってい', 'aria-label': 'せってい', onclick: () => TM.ui.settings() }, '\u2699'));
+    el('button', { type: 'button', onclick: progress }, 'きろく'),
+    el('button', { type: 'button', onclick: teacher }, '先生用 QR'),
+    el('button', { type: 'button', onclick: () => TM.ui.settings() }, 'せってい'));
 
   /* ---------- my progress: streak, mastered words, tricky words, the last 7 days ---------- */
   function progress() {
@@ -43,7 +42,7 @@
     const mx = Math.max(10, ...days.map((d) => d.w));
     const big = (b, a) => el('div', {}, el('b', {}, String(b)), el('span', {}, a));
     const empty = !keys.length;
-    const card = el('div', { class: 'tm-card tm-me' }, el('h2', {}, '📈 わたしの きろく'),
+    const card = el('div', { class: 'tm-card tm-me' }, el('h2', {}, 'わたしの きろく'),
       empty ? el('p', { style: { font: '700 24px var(--word)' } }, 'ゲームを あそぶと ここに せいちょうが のこるよ！') : [
         el('div', { class: 'tm-stats' }, big(st.streak, '🔥 れんぞく (にち)'), big(mastered, '⭐ マスター'), big(fixed, '🌱 にがて クリア'), big(keys.length, 'あそんだ ことば')),
         el('div', { class: 'tm-bars' }, days.map((d) => el('div', {}, el('i', { style: { height: Math.max(4, Math.round(110 * d.w / mx)) + 'px' } }), el('small', {}, d.n)))),
@@ -62,14 +61,22 @@
   const grid = document.getElementById('grid');
   const cabs = GAMES.map((gm) => {
     const stars = el('div', { class: 'stars' });
-    const a = el('a', { class: 'cab', style: { '--c': gm.c }, href: gm.id + '/index.html' },
-      el('div', { class: 'screen' }, el('img', { src: 'assets/hub/' + gm.id + '.webp', alt: gm.name + ' の がめん', loading: 'lazy', width: 960, height: 540 }), el('span', { class: 'tag' }, gm.tag)),
-      el('div', { class: 'info' }, el('h2', {}, gm.name), el('p', {}, gm.desc), el('span', { class: 'like' }, el('b', {}, 'ジャンル：'), gm.like),
-        el('div', { class: 'row' }, stars, el('span', { class: 'go' }, 'あそぶ \u25B6'))));
+    const a = el('a', { class: 'game', href: gm.id + '/index.html', 'aria-keyshortcuts': gm.key },
+      el('span', { class: 'key', 'aria-hidden': 'true' }, gm.key),
+      el('span', { class: 'shot' }, el('img', { src: 'assets/hub/' + gm.id + '.webp', alt: '', loading: 'lazy', width: 960, height: 540 })),
+      el('span', { class: 'txt' }, el('h3', {}, gm.name, gm.first ? el('small', {}, 'はじめてなら これ') : null), el('p', {}, gm.desc)),
+      stars);
     a.style.setProperty('--c', gm.c);
-    a.addEventListener('pointerenter', () => { try { TM.sfx.click(); } catch (e) { /* audio locked */ } });
     grid.append(a);
     return { gm, a, stars };
+  });
+  /* press a game's letter to start it (the key sinks first) */
+  document.addEventListener('keydown', (e) => {
+    if (e.ctrlKey || e.metaKey || e.altKey || e.repeat || TM.ui.isModalOpen()) return;
+    const t = e.target; if (t && /^(INPUT|SELECT|TEXTAREA)$/.test(t.tagName)) return;
+    const c = cabs.find((x) => x.gm.key.toLowerCase() === e.key.toLowerCase()); if (!c) return;
+    e.preventDefault(); c.a.classList.add('down'); try { TM.sfx.click(); } catch (err) { /* audio locked */ }
+    setTimeout(() => { location.href = c.a.href; }, 170);
   });
 
   function refresh() {
@@ -81,16 +88,15 @@
       book ? el('span', { class: 'cover' }, el('img', { src: book.cover, alt: '' })) : null,
       first && first.image ? el('span', { class: 'thumb' }, el('img', { src: first.image, alt: '' })) : null,
       el('span', { class: 'txt' },
-        el('span', { class: 'k' }, 'いまの たんご'),
         el('span', { class: 'v' }, TM.deck.label(ids)),
         el('span', { class: 'm' }, (book ? TM.level(book).text + '  ・  ' + book.name : '') + (TM.progress && ids.length === 1 ? '  ・  クリア ' + TM.progress.games(ids[0]).length + '/' + TM.progress.GAMES.length : '') + (ids.length > 1 ? ` ほか ${ids.length - 1}こ` : ''))),
-      el('span', { class: 'chg' }, 'かえる \u25B8')].filter(Boolean));
+      el('span', { class: 'chg' }, 'かえる')].filter(Boolean));
     const q = '?deck=' + encodeURIComponent(ids.join(','));
     const key = TM.deck.key(ids);
     for (const c of cabs) {
       c.a.href = c.gm.id + '/index.html' + q;
       const s = TM.records.starsFor(c.gm.id, key);
-      c.stars.innerHTML = [0, 1, 2].map((i) => TM.ui.starSVG(i < s ? C.gold : 'rgba(31,26,61,0.15)')).join('');
+      c.stars.innerHTML = [0, 1, 2].map((i) => TM.ui.starSVG(i < s ? '#F2A900' : 'rgba(21,26,44,0.16)')).join('');
     }
   }
 
@@ -141,6 +147,14 @@
     A.kip(kipC, 120, 132, 1.6, { t, wave: true, accent: C.gold });
     if (!still) requestAnimationFrame(frame);
   }
+  /* the title types itself once; the caret blinks a few times and goes */
+  const typed = document.getElementById('typed'), caret = document.getElementById('caret'), full = typed.textContent;
+  if (!still) {
+    typed.textContent = ''; let n = 0;
+    const tick = () => { typed.textContent = full.slice(0, ++n); if (n < full.length) setTimeout(tick, 55 + Math.random() * 60); };
+    setTimeout(tick, 350);
+  } else caret.remove();
+  caret.addEventListener('animationend', () => caret.remove());
   refresh();
   const ready = document.fonts ? Promise.race([document.fonts.load(D.FONT_WORD(30)), new Promise((r) => setTimeout(r, 1200))]) : Promise.resolve();
   ready.then(() => requestAnimationFrame(frame));

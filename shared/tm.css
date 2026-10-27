@@ -228,7 +228,9 @@ body.dark .tm-logo { filter: drop-shadow(4px 0 0 #fff) drop-shadow(-4px 0 0 #fff
 .tm-grow .gi span { font-size: 28px; }
 .tm-grow .gi.star { background: #FFF3C4; border-radius: 12px; padding: 5px 8px; margin: 2px -8px; }
 .tm-grow .gn { margin-top: 6px; text-align: center; font: 800 20px var(--display); opacity: .75; }
-.tm-me { max-width: 900px; }
+.tm-me { max-width: 900px; padding: 26px 30px 24px; text-align: center; }
+.tm-me h2 { font: 800 34px/1.1 var(--display); margin: 0 0 16px; }
+.tm-me .tm-row { margin-top: 18px; justify-content: center; }
 .tm-bars { display: flex; gap: 14px; align-items: flex-end; justify-content: center; height: 140px; margin: 10px 0 2px; }
 .tm-bars div { display: flex; flex-direction: column; align-items: center; gap: 4px; width: 56px; }
 .tm-bars i { display: block; width: 100%; background: var(--ink); border-radius: 10px 10px 4px 4px; background: #5BC8FF; border: 3px solid var(--ink); }

@@ -7,15 +7,20 @@
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect x='8' y='8' width='84' height='84' rx='22' fill='%23FFF8EC' stroke='%231F1A3D' stroke-width='8'/%3E%3Ccircle cx='38' cy='46' r='7' fill='%231F1A3D'/%3E%3Ccircle cx='62' cy='46' r='7' fill='%231F1A3D'/%3E%3Cpath d='M38 64q12 10 24 0' stroke='%231F1A3D' stroke-width='6' fill='none' stroke-linecap='round'/%3E%3C/svg%3E">
 <link rel="stylesheet" href="shared/tm.css">
 <style>
-  /* Home page: a chalkboard. Deep board green, chalk-white type, and the games' own screenshots as the only colour. */
-  :root { --board: #1D2B28; --board2: #293B37; --chalk: #EEF1E8; --dust: #A5B7AE; --line: rgba(238,241,232,.18); --star: #F2C14E; }
+  /* Home page: deep ocean blue, white type, a yellow keycap mascot, and the games' own screenshots for colour. */
+  :root { --board: #0E2740; --board2: #17395A; --panel: #153454; --chalk: #F2F5F8; --dust: #9DB4CC; --line: rgba(242,245,248,.2); --star: #F2C14E; }
   html, body { overflow: auto; height: auto; min-height: 100%; }
   body { background: var(--board); color: var(--chalk); -webkit-user-select: auto; user-select: auto; }
   button { font: inherit; color: inherit; }
   :focus-visible { outline: 3px solid var(--chalk); outline-offset: 3px; }
   .page { max-width: 1600px; margin: 0 auto; padding: 28px clamp(16px, 4vw, 56px) 56px; }
 
-  .top { display: flex; align-items: baseline; justify-content: space-between; gap: 8px 24px; flex-wrap: wrap; }
+  .top { display: flex; align-items: center; justify-content: space-between; gap: 8px 24px; flex-wrap: wrap; }
+  .brand { display: flex; align-items: center; gap: 18px; }
+  #mascot { width: clamp(72px, 8vw, 112px); height: auto; flex: none; overflow: visible; }
+  #mascot .eyes { transform-box: fill-box; transform-origin: center; animation: blink 5s infinite; }
+  #mascot .cur { animation: caret 1s steps(1) infinite; }
+  @keyframes blink { 0%, 93%, 100% { transform: scaleY(1); } 96% { transform: scaleY(.1); } }
   h1 { margin: 0; font: 700 clamp(40px, 5vw, 66px)/1.05 var(--word); letter-spacing: -.035em; white-space: nowrap; }
   .caret { display: inline-block; width: .08em; height: .8em; margin-left: .07em; vertical-align: -.05em; background: var(--chalk); animation: caret 1s steps(1) 4 forwards; }
   @keyframes caret { 0%, 100% { opacity: 1; } 50% { opacity: 0; } }
@@ -31,28 +36,29 @@
   .words .txt { min-width: 0; display: flex; flex-direction: column; gap: 3px; }
   .words .v { font: 700 24px/1.2 var(--word); overflow-wrap: anywhere; }
   .words .m { font: 500 15px/1.4 var(--word); color: var(--dust); }
-  .words .chg { flex: none; font: 700 16px var(--word); color: var(--board); background: var(--chalk); border-radius: 10px; padding: 9px 16px; margin-left: 6px; }
-  .words:hover .chg { background: #fff; }
+  .words .chg { flex: none; font: 700 16px var(--word); color: var(--board); background: #FFD23F; border-radius: 10px; padding: 9px 16px; margin-left: 6px; }
+  .words:hover .chg { background: #FFE27A; }
   .mode { display: flex; gap: 6px; }
   .mode button { display: flex; flex-direction: column; gap: 1px; text-align: left; padding: 9px 16px; background: none; border: 2px solid var(--line); border-radius: 12px; cursor: pointer; }
   .mode button b { font: 700 18px/1.3 var(--word); }
   .mode button span { font: 500 14px/1.4 var(--word); color: var(--dust); }
   .mode button:hover { border-color: var(--chalk); }
   .mode button.on { background: var(--chalk); border-color: var(--chalk); color: var(--board); }
-  .mode button.on span { color: #4B5A54; }
+  .mode button.on span { color: #3B5068; }
 
-  .games { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 380px), 1fr)); gap: 34px clamp(16px, 2vw, 28px); margin-top: 34px; }
-  .game { display: block; color: inherit; text-decoration: none; transition: opacity .15s; }
+  .games { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 380px), 1fr)); gap: clamp(18px, 2vw, 28px); margin-top: 30px; }
+  .game { display: block; color: inherit; text-decoration: none; padding: 12px 12px 18px; background: var(--panel); border: 1px solid var(--line); border-radius: 20px; transition: opacity .15s, background .15s, border-color .15s; }
+  .game:hover, .game:focus-visible { background: var(--board2); border-color: rgba(242,245,248,.5); }
   .games:hover .game:not(:hover) { opacity: .5; }
   .shot { display: block; aspect-ratio: 16 / 9; border-radius: 10px; overflow: hidden; background: var(--board2); }
   .shot img { display: block; width: 100%; height: 100%; object-fit: cover; transition: transform .3s; }
   .game:hover .shot img, .game:focus-visible .shot img { transform: scale(1.04); }
-  .game:focus-visible { outline-offset: 6px; border-radius: 6px; }
-  .meta { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin-top: 12px; }
+  .game:focus-visible { outline-offset: 3px; }
+  .meta { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin: 14px 6px 0; }
   .game h3 { margin: 0; font: 700 clamp(24px, 1.9vw, 30px)/1.15 var(--word); letter-spacing: -.01em; }
   .stars { display: flex; gap: 2px; flex: none; align-self: center; }
   .stars svg { width: 20px; height: 20px; }
-  .game p { margin: 5px 0 0; font: 500 16px/1.5 var(--word); color: var(--dust); max-width: 46ch; }
+  .game p { margin: 5px 6px 0; font: 500 16px/1.5 var(--word); color: var(--dust); max-width: 46ch; }
   .foot { margin-top: 48px; font: 500 14px/1.5 var(--word); color: var(--dust); }
 
   .linkbox { display: flex; gap: 10px; align-items: center; }
@@ -72,7 +78,21 @@
 <body>
 <div class="page">
   <header class="top">
-    <h1 id="title" aria-label="Typing Master"><span id="typed" aria-hidden="true">Typing Master</span><span class="caret" id="caret" aria-hidden="true"></span></h1>
+    <div class="brand">
+      <svg id="mascot" viewBox="0 0 120 124" aria-hidden="true">
+        <ellipse cx="60" cy="118" rx="36" ry="5" fill="rgba(0,0,0,.28)"/>
+        <rect x="36" y="94" width="11" height="20" rx="5.5" fill="#C98F00"/><rect x="73" y="94" width="11" height="20" rx="5.5" fill="#C98F00"/>
+        <ellipse cx="40" cy="113" rx="11" ry="5" fill="#E0A100"/><ellipse cx="80" cy="113" rx="11" ry="5" fill="#E0A100"/>
+        <rect class="cur" x="57.5" y="2" width="5" height="17" rx="2.5" fill="#F2F5F8"/>
+        <rect x="8" y="30" width="104" height="70" rx="22" fill="#E0A100"/>
+        <rect x="16" y="20" width="88" height="68" rx="20" fill="#FFD23F"/>
+        <rect x="26" y="28" width="68" height="52" rx="14" fill="#FFE17A"/>
+        <g class="eyes"><ellipse cx="46" cy="50" rx="6" ry="8.5" fill="#0B1B2E"/><ellipse cx="74" cy="50" rx="6" ry="8.5" fill="#0B1B2E"/><circle cx="48" cy="46.5" r="2.2" fill="#fff"/><circle cx="76" cy="46.5" r="2.2" fill="#fff"/></g>
+        <path d="M51 63q9 9 18 0" fill="none" stroke="#0B1B2E" stroke-width="4" stroke-linecap="round"/>
+        <circle cx="36" cy="62" r="5" fill="#FF9A8A" opacity=".7"/><circle cx="84" cy="62" r="5" fill="#FF9A8A" opacity=".7"/>
+      </svg>
+      <h1 id="title" aria-label="Typing Master"><span id="typed" aria-hidden="true">Typing Master</span><span class="caret" id="caret" aria-hidden="true"></span></h1>
+    </div>
     <nav class="util" id="controls" aria-label="メニュー"></nav>
   </header>
   <section class="setup" aria-label="せってい">

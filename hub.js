@@ -132,7 +132,8 @@
   const typed = document.getElementById('typed'), caret = document.getElementById('caret'), full = typed.textContent;
   if (!still) {
     typed.textContent = ''; let n = 0;
-    const tick = () => { typed.textContent = full.slice(0, ++n); if (n < full.length) setTimeout(tick, 55 + Math.random() * 60); };
+    const mascot = document.getElementById('mascot');
+    const tick = () => { typed.textContent = full.slice(0, ++n); try { mascot.animate([{ transform: 'none' }, { transform: 'translateY(4px) scale(1.04,.95)' }, { transform: 'none' }], { duration: 110 }); } catch (e) { /* no web animations */ } if (n < full.length) setTimeout(tick, 55 + Math.random() * 60); };
     setTimeout(tick, 350);
   } else caret.remove();
   caret.addEventListener('animationend', () => caret.remove());
